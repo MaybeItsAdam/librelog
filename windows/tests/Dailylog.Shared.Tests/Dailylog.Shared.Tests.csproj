@@ -18,6 +18,13 @@
     <ProjectReference Include="..\..\src\Dailylog.Shared\Dailylog.Shared.csproj" />
   </ItemGroup>
 
+  <!-- Without the native core, the interop and sync tests fail with
+       DllNotFoundException, which hides the real cause. Say it up front. -->
+  <Target Name="RequireNativeCore" BeforeTargets="Build"
+          Condition="!Exists('$(CoreLibDir)dailylog_core.dll') And !Exists('$(CoreLibDir)libdailylog_core.dylib') And !Exists('$(CoreLibDir)libdailylog_core.so')">
+    <Error Text="No native core in $(CoreLibDir). Build it first: cargo build --release --features capi --manifest-path core/Cargo.toml" />
+  </Target>
+
   <!-- Whichever native core exists for this OS goes next to the tests. -->
   <ItemGroup>
     <None Include="$(CoreLibDir)dailylog_core.dll" Link="dailylog_core.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CoreLibDir)dailylog_core.dll')" />
