@@ -20,7 +20,7 @@ use crate::{db, search};
 
 /// The default journal has a fixed id so every device that starts fresh
 /// creates the *same* row, and they converge instead of multiplying.
-const DEFAULT_JOURNAL: &str = "00000000-0000-7000-8000-000000000001";
+pub(crate) const DEFAULT_JOURNAL: &str = "00000000-0000-7000-8000-000000000001";
 const EXCERPT_CHARS: usize = 160;
 
 struct Inner {
@@ -656,6 +656,32 @@ impl Store {
         Ok(out)
     }
 
+    // --- Import and export (SPEC.md §16) ------------------------------------
+
+    /// Writes the journal (or one journal) to `path` in `format`. Name the
+    /// file with `export_extension(format)`.
+    pub fn export(&self, format: crate::transfer::ExportFormat, path: String, journal_id: Option<String>) -> Result<crate::transfer::ExportSummary> {
+        crate::transfer::export(&self.lock().conn, format, &path, journal_id.as_deref())
+    }
+
+    /// Reads `path` (a file, folder or zip) and says what importing it would
+    /// do, without changing anything.
+    pub fn preview_import(&self, path: String) -> Result<crate::transfer::ImportPreview> {
+        crate::transfer::preview(&self.lock().conn, &path)
+    }
+
+    /// Imports `path` into `journal_id` (or each entry's own journal for a
+    /// Librelog export, else the default). Entries already imported are
+    /// skipped, so running this twice is safe. All or nothing.
+    pub fn import_file(&self, path: String, journal_id: Option<String>) -> Result<crate::transfer::ImportResult> {
+        let mut g = self.lock();
+        let Inner { conn, clock, .. } = &mut *g;
+        let tx = conn.transaction()?;
+        let result = crate::transfer::import(&tx, clock, &self.device_id, &path, journal_id.as_deref())?;
+        tx.commit()?;
+        Ok(result)
+    }
+
     /// Forgets all sync state for a fresh start with another account. The
     /// journal itself is untouched; every row is queued to push again.
     pub fn reset_sync(&self) -> Result<()> {
@@ -722,13 +748,13 @@ fn fields(v: Value) -> BTreeMap<String, Value> {
     serde_json::from_value(v).expect("callers pass a JSON object literal")
 }
 
-fn new_id() -> String {
+pub(crate) fn new_id() -> String {
     uuid::Uuid::now_v7().to_string()
 }
 
 /// A stable UUID-shaped id from a name, for rows two devices may create
 /// independently and should converge on.
-fn name_id(kind: &str, name: &str) -> String {
+pub(crate) fn name_id(kind: &str, name: &str) -> String {
     let h = blake3::hash(format!("{kind}:{}", name.to_lowercase()).as_bytes());
     let mut b: [u8; 16] = h.as_bytes()[..16].try_into().expect("16 bytes");
     b[6] = (b[6] & 0x0f) | 0x80; // version 8: custom
@@ -751,7 +777,7 @@ fn check_time(t: &str) -> Result<()> {
     time::Time::parse(t, &fmt).map(|_| ()).map_err(|_| CoreError::Invalid(format!("time {t}: want HH:MM")))
 }
 
-fn now_rfc3339() -> String {
+pub(crate) fn now_rfc3339() -> String {
     time::OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339).unwrap_or_default()
 }
 
@@ -1099,6 +1125,156 @@ mod tests {
         assert_eq!((e.body, e.rating), (para("Before the snapshot"), Some(3.0)));
         assert_eq!(e.tags[0].value.as_deref(), Some("5km"));
         assert_eq!(b.journals().unwrap().len(), 1);
+    }
+
+    fn tmp(name: &str) -> String {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join(name).to_str().unwrap().to_string();
+        std::mem::forget(dir);
+        p
+    }
+
+    fn sample(s: &Store) -> String {
+        let id = write_entry(s, "2026-10-02", "21:40", "Walked the canal & back");
+        s.set_title(id.clone(), Some("Long walk".into())).unwrap();
+        s.set_rating(id.clone(), Some(4.0)).unwrap();
+        s.set_favorite(id.clone(), true).unwrap();
+        s.tag_entry(id.clone(), s.tag_named("Walk".into()).unwrap().id, Some("5km".into())).unwrap();
+        write_entry(s, "2026-10-03", "08:15", "Slow start");
+        id
+    }
+
+    #[test]
+    fn json_export_restores_losslessly_into_a_new_install_and_reimport_adds_nothing() {
+        use crate::transfer::{ExportFormat, ImportSource};
+        let (a, b) = (store(), store());
+        let id = sample(&a);
+        let path = tmp("journal.json");
+        assert_eq!(a.export(ExportFormat::Json, path.clone(), None).unwrap().entries, 2);
+
+        let p = b.preview_import(path.clone()).unwrap();
+        assert_eq!((p.source, p.entries, p.already_imported, p.tags), (ImportSource::Librelog, 2, 0, 1));
+        assert_eq!((p.first_date.as_deref(), p.last_date.as_deref()), (Some("2026-10-02"), Some("2026-10-03")));
+
+        let r = b.import_file(path.clone(), None).unwrap();
+        assert_eq!((r.imported, r.skipped), (2, 0));
+        let (ea, eb) = (a.entry(id.clone()).unwrap(), b.entry(id.clone()).unwrap());
+        assert_eq!((eb.title, eb.rating, eb.is_favorite, eb.body), (ea.title, ea.rating, ea.is_favorite, ea.body));
+        assert_eq!(eb.tags[0].value.as_deref(), Some("5km"));
+
+        assert_eq!(b.preview_import(path.clone()).unwrap().already_imported, 2);
+        assert_eq!(b.import_file(path, None).unwrap().imported, 0);
+        assert_eq!(b.day("2026-10-02".into(), None).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn markdown_export_round_trips_through_a_zip() {
+        use crate::transfer::{ExportFormat, ImportSource};
+        let (a, b) = (store(), store());
+        let id = sample(&a);
+        let zip = tmp("journal.zip");
+        a.export(ExportFormat::Markdown, zip.clone(), None).unwrap();
+        let r = b.import_file(zip.clone(), None).unwrap();
+        assert_eq!((r.source, r.imported), (ImportSource::Markdown, 2));
+        // front matter carries the id, so the entry keeps it and re-import skips it
+        let e = b.entry(id).unwrap();
+        assert_eq!((e.title.as_deref(), e.rating, e.is_favorite, e.time.as_deref()), (Some("Long walk"), Some(4.0), true, Some("21:40")));
+        assert_eq!(e.tags[0].name, "Walk");
+        assert_eq!(b.import_file(zip, None).unwrap().imported, 0);
+    }
+
+    #[test]
+    fn html_and_text_exports_escape_and_order() {
+        use crate::transfer::ExportFormat;
+        let a = store();
+        sample(&a);
+        let html = tmp("j.html");
+        a.export(ExportFormat::Html, html.clone(), None).unwrap();
+        let h = std::fs::read_to_string(html).unwrap();
+        assert!(h.contains("canal &amp; back") && h.contains("<h2>Long walk</h2>"));
+        assert!(h.find("Slow start").unwrap() < h.find("Long walk").unwrap(), "newest first");
+        let txt = tmp("j.txt");
+        a.export(ExportFormat::Text, txt.clone(), None).unwrap();
+        let t = std::fs::read_to_string(txt).unwrap();
+        assert!(t.starts_with("Friday 2 October 2026\n"), "{t}");
+        assert!(!std::path::Path::new(&format!("{}.part", tmp("x"))).exists());
+    }
+
+    #[test]
+    fn day_one_json_dates_in_the_entry_time_zone() {
+        use crate::transfer::ImportSource;
+        let s = store();
+        let path = tmp("Journal.json");
+        std::fs::write(&path, r##"{"metadata":{"version":"1.0"},"entries":[
+          {"uuid":"A1","creationDate":"2026-10-02T23:30:00Z","timeZone":"Europe/London","text":"# Late\n\nWent to bed \\*very\\* late.\n![](dayone-moment://X)","tags":["Night"],"starred":true},
+          {"uuid":"B2","creationDate":"2026-10-03T07:00:00Z","timeZone":"America/New_York","text":"Early"}
+        ]}"##).unwrap();
+        let p = s.preview_import(path.clone()).unwrap();
+        assert_eq!((p.source, p.entries, p.skipped_images), (ImportSource::DayOne, 2, 1));
+        s.import_file(path.clone(), None).unwrap();
+        // 23:30 UTC on 2 Oct is 00:30 BST on 3 Oct.
+        let london = s.day("2026-10-03".into(), None).unwrap();
+        let late = london.iter().find(|e| e.excerpt.contains("bed")).expect("dated in London time");
+        assert_eq!(late.time.as_deref(), Some("00:30"));
+        assert!(late.is_favorite && late.tag_names == vec!["Night".to_string()]);
+        let full = s.entry(late.id.clone()).unwrap();
+        assert_eq!(full.body[0].kind, doc::BlockKind::Heading { level: 1 });
+        assert_eq!(full.body[1].text, "Went to bed *very* late.");
+        // 07:00 UTC is 03:00 in New York.
+        assert!(s.day("2026-10-03".into(), None).unwrap().iter().any(|e| e.time.as_deref() == Some("03:00")));
+        assert_eq!(s.import_file(path, None).unwrap().skipped, 2);
+    }
+
+    #[test]
+    fn daylio_csv_moods_activities_and_duplicate_times() {
+        use crate::transfer::ImportSource;
+        let s = store();
+        let path = tmp("daylio_export.csv");
+        std::fs::write(&path, "\u{feff}full_date,date,weekday,time,mood,activities,note_title,note\n\
+2026-10-02,October 2,Friday,9:15 PM,rad,friends | walk,Great day,Pub<br>then home\n\
+2026-10-02,October 2,Friday,9:15 PM,meh,,,\n\
+2026-10-01,October 1,Thursday,08:00,sleepy,work,,Tired\n").unwrap();
+        let p = s.preview_import(path.clone()).unwrap();
+        assert_eq!((p.source, p.entries), (ImportSource::Daylio, 3));
+        assert!(p.warnings.iter().any(|w| w.contains("sleepy")));
+        let r = s.import_file(path.clone(), None).unwrap();
+        assert_eq!(r.imported, 3);
+        let day = s.day("2026-10-02".into(), None).unwrap();
+        assert_eq!(day.len(), 2, "same date and time twice are two entries");
+        let great = day.iter().find(|e| e.title.as_deref() == Some("Great day")).unwrap();
+        assert_eq!((great.time.as_deref(), great.rating), (Some("21:15"), Some(5.0)));
+        assert_eq!(s.entry(great.id.clone()).unwrap().body.len(), 2, "<br> splits paragraphs");
+        let custom = &s.day("2026-10-01".into(), None).unwrap()[0];
+        assert_eq!(custom.rating, None);
+        assert!(custom.tag_names.contains(&"sleepy".to_string()));
+        assert_eq!(s.import_file(path, None).unwrap().imported, 0);
+    }
+
+    #[test]
+    fn markdown_folder_dates_from_front_matter_or_file_name() {
+        let s = store();
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("2026-09-30.md"), "Plain note with a **bold** bit").unwrap();
+        std::fs::write(dir.path().join("trip.md"), "---\ndate: 2026-09-29T14:05\ntags:\n  - travel\n---\nOn the train").unwrap();
+        std::fs::write(dir.path().join("undated.md"), "No date anywhere").unwrap();
+        std::fs::write(dir.path().join(".hidden.md"), "---\ndate: 2026-01-01\n---\nskip me").unwrap();
+        let path = dir.path().to_str().unwrap().to_string();
+        let p = s.preview_import(path.clone()).unwrap();
+        assert_eq!(p.entries, 2);
+        assert!(p.warnings.iter().any(|w| w.starts_with("1 file")));
+        s.import_file(path, None).unwrap();
+        let train = &s.day("2026-09-29".into(), None).unwrap()[0];
+        assert_eq!((train.time.as_deref(), train.tag_names.clone()), (Some("14:05"), vec!["travel".to_string()]));
+        let e = s.entry(s.day("2026-09-30".into(), None).unwrap()[0].id.clone()).unwrap();
+        assert_eq!(e.body[0].marks.len(), 1);
+    }
+
+    #[test]
+    fn unknown_files_are_refused_with_a_clear_error() {
+        let s = store();
+        let path = tmp("photo.png");
+        std::fs::write(&path, [0x89, b'P', b'N', b'G']).unwrap();
+        assert!(matches!(s.preview_import(path), Err(CoreError::Invalid(m)) if m.contains("not a format")));
     }
 
     #[test]

@@ -629,14 +629,23 @@ number of paying users, and how the next year's price was derived.
 
 ## 16. Import & export
 
-**Export** (any range / journal / tag): JSON (canonical, lossless,
-documented schema), Markdown with YAML front-matter (Obsidian-compatible),
-self-contained HTML site, DOCX, PDF book, plain text, and a full
-`.librelog-backup` (encrypted archive), with scheduled backups to any folder.
+Implemented in the core (`core/src/transfer.rs`), so every platform offers
+the same formats.
 
-**Import:** Day One, Apple Journal, Journey, Daylio (rating + trackers),
-Markdown folders with front-matter, Google Timeline, generic CSV with column
-mapping, own JSON/backup. Idempotent (`import_ref`), dry-run summary first.
+**Export** (whole journal or one journal): Librelog JSON (lossless; the way
+to move between installs without sync), a zip of Markdown files with YAML
+front matter (Obsidian-friendly, re-importable), one self-contained HTML
+page in the house style, and plain text. DOCX and PDF are later.
+
+**Import:** Librelog JSON, Day One (JSON export, zip or file — times placed
+in each entry's own time zone), Daylio CSV (moods → rating, activities →
+tags), and Markdown (a file, folder or zip; date from front matter or file
+name). Text only: images are skipped and counted.
+
+A **preview** comes first ("142 entries, 3 already imported, 7 images
+skipped"). Each imported entry records its origin in `entries.import_ref`,
+which syncs, so importing the same file again on any device adds nothing.
+An import is one transaction: all of it or none.
 
 ---
 

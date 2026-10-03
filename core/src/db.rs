@@ -15,7 +15,7 @@ pub const SYNCED: &[(&str, &[&str])] = &[
         "entries",
         &[
             "journal_id", "date", "time", "tz", "title", "body", "rating", "place_id",
-            "template_id", "is_favorite", "weather", "created_at", "deleted_at",
+            "template_id", "is_favorite", "weather", "created_at", "deleted_at", "import_ref",
         ],
     ),
     (
@@ -246,6 +246,12 @@ const MIGRATIONS: &[&str] = &[
       insert into entries_fts (rowid, title, body_text) values (new.rowid, new.title, new.body_text);
     end;
     "#,
+    // 2: where an imported entry came from ("dayone:<uuid>", "daylio:…"), so
+    // importing the same file again, on any device, skips what's there.
+    r#"
+    alter table entries add column import_ref text;
+    create unique index entries_import_ref on entries (import_ref) where import_ref is not null;
+    "#,
 ];
 
 pub fn open(path: &str) -> Result<Connection> {
@@ -290,7 +296,9 @@ mod tests {
     #[test]
     fn every_synced_column_exists() {
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(MIGRATIONS[0]).unwrap();
+        for m in MIGRATIONS {
+            conn.execute_batch(m).unwrap();
+        }
         for (table, fields) in SYNCED {
             for f in *fields {
                 conn.prepare(&format!("select {f} from {table}"))

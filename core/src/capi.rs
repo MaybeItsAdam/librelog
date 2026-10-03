@@ -165,6 +165,18 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
             let id = args!(id: String);
             ok(json!(s.restore_entry(id)?))
         }
+        "export" => {
+            let (format, path, journal_id) = args!(format: crate::transfer::ExportFormat, path: String, journal_id: Option<String>);
+            ok(json!(s.export(format, path, journal_id)?))
+        }
+        "preview_import" => {
+            let path = args!(path: String);
+            ok(json!(s.preview_import(path)?))
+        }
+        "import_file" => {
+            let (path, journal_id) = args!(path: String, journal_id: Option<String>);
+            ok(json!(s.import_file(path, journal_id)?))
+        }
         "day" => {
             let (date, journal_id) = args!(date: String, journal_id: Option<String>);
             ok(json!(s.day(date, journal_id)?))

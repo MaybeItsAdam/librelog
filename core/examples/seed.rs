@@ -20,7 +20,7 @@ fn main() {
     let years_ago = |n: i32| now.replace_year(now.year() - n).unwrap_or(now).format(&fmt).unwrap();
 
     let store = Store::open(path.clone()).expect("open");
-    let mut add = |date: &str, time: &str, title: Option<&str>, text: &str, rating: Option<f64>, tags: &[&str]| {
+    let add = |date: &str, time: &str, title: Option<&str>, text: &str, rating: Option<f64>, tags: &[&str]| {
         let e = store.create_entry(None, date.into(), Some(time.into())).unwrap();
         store.save_body(e.id.clone(), para(text)).unwrap();
         if let Some(t) = title {

@@ -187,40 +187,10 @@ pub fn to_markdown(blocks: &[Block], entry_title: &dyn Fn(&str) -> Option<String
 }
 
 fn render_inline(text: &str, marks: &[Mark], entry_title: &dyn Fn(&str) -> Option<String>) -> String {
-    if marks.is_empty() {
-        return text.to_string();
-    }
-    // Open/close tokens keyed by UTF-16 offset. Closes sort before opens at the
-    // same offset, and inner marks close before outer ones.
-    let mut events: Vec<(u32, bool, usize)> = Vec::new(); // (offset, is_open, mark index)
-    for (i, m) in marks.iter().enumerate() {
-        if m.start < m.end {
-            events.push((m.start, true, i));
-            events.push((m.end, false, i));
-        }
-    }
-    events.sort_by(|a, b| {
-        a.0.cmp(&b.0).then(a.1.cmp(&b.1)).then_with(|| {
-            let (ma, mb) = (&marks[a.2], &marks[b.2]);
-            if a.1 {
-                mb.end.cmp(&ma.end) // open the longer mark first
-            } else {
-                mb.start.cmp(&ma.start) // close the later-opened mark first
-            }
-        })
-    });
-
-    let units: Vec<u16> = text.encode_utf16().collect();
-    let mut out = String::new();
-    let mut at = 0u32;
-    for (offset, open, i) in events {
-        let offset = offset.min(units.len() as u32);
-        if offset > at {
-            out.push_str(&String::from_utf16_lossy(&units[at as usize..offset as usize]));
-            at = offset;
-        }
-        let m = &marks[i];
-        let token = match (&m.kind, open) {
+    render_marked(
+        text,
+        marks,
+        &|kind, open| match (kind, open) {
             (MarkKind::Bold, _) => "**".to_string(),
             (MarkKind::Italic, _) => "*".to_string(),
             (MarkKind::Underline, true) => "<u>".to_string(),
@@ -235,11 +205,51 @@ fn render_inline(text: &str, marks: &[Mark], entry_title: &dyn Fn(&str) -> Optio
                 Some(t) => format!("|{t}]]"),
                 None => "]]".to_string(),
             },
-        };
-        out.push_str(&token);
+        },
+        &|s| s.to_string(),
+    )
+}
+
+/// Walks `text` emitting `token(kind, opening)` at each mark boundary and
+/// `escape(run)` for the text between, with marks properly nested: at one
+/// offset closes come before opens, longer marks open first and the most
+/// recently opened closes first. Shared by the Markdown and HTML writers.
+pub(crate) fn render_marked(
+    text: &str,
+    marks: &[Mark],
+    token: &dyn Fn(&MarkKind, bool) -> String,
+    escape: &dyn Fn(&str) -> String,
+) -> String {
+    if marks.is_empty() {
+        return escape(text);
+    }
+    let mut events: Vec<(u32, bool, usize)> = Vec::new(); // (offset, is_open, mark index)
+    for (i, m) in marks.iter().enumerate() {
+        if m.start < m.end {
+            events.push((m.start, true, i));
+            events.push((m.end, false, i));
+        }
+    }
+    events.sort_by(|a, b| {
+        a.0.cmp(&b.0).then(a.1.cmp(&b.1)).then_with(|| {
+            let (ma, mb) = (&marks[a.2], &marks[b.2]);
+            if a.1 { mb.end.cmp(&ma.end) } else { mb.start.cmp(&ma.start) }
+        })
+    });
+
+    let units: Vec<u16> = text.encode_utf16().collect();
+    let mut out = String::new();
+    let mut at = 0u32;
+    for (offset, open, i) in events {
+        let offset = offset.min(units.len() as u32);
+        if offset > at {
+            out.push_str(&escape(&String::from_utf16_lossy(&units[at as usize..offset as usize])));
+            at = offset;
+        }
+        out.push_str(&token(&marks[i].kind, open));
     }
     if (at as usize) < units.len() {
-        out.push_str(&String::from_utf16_lossy(&units[at as usize..]));
+        out.push_str(&escape(&String::from_utf16_lossy(&units[at as usize..])));
     }
     out
 }

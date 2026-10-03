@@ -12,12 +12,15 @@ mod db;
 pub mod doc;
 mod error;
 mod hlc;
+mod markdown;
 mod model;
 mod pairing;
 mod search;
 mod store;
+mod transfer;
 
 pub use error::CoreError;
 pub use model::*;
 pub use pairing::*;
 pub use store::Store;
+pub use transfer::*;
