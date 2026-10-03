@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.work.Configuration
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
@@ -37,9 +38,16 @@ object Backend {
     const val PUBLISHABLE_KEY = "sb_publishable_tNzC2ZUmrDOFk_QTBWYY7A_KDfU-8aY"
 }
 
-class DailylogApplication : Application() {
+/**
+ * Provides WorkManager's configuration, so WorkManager starts on first use
+ * rather than at every launch (the manifest removes its auto-initializer).
+ */
+class DailylogApplication : Application(), Configuration.Provider {
     lateinit var model: AppModel
         private set
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().build()
 
     override fun onCreate() {
         super.onCreate()

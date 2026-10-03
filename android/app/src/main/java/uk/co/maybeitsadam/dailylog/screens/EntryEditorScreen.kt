@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -325,18 +326,27 @@ private fun FormatBar(controller: EditorController, wordCount: UInt, tick: Int) 
     Column(Modifier.fillMaxWidth().background(t.raised).navigationBarsPadding()) {
         Hairline()
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            FormatButton(Icons.Filled.FormatBold, "Bold", controller.isActive(MarkKind.Bold)) { controller.toggle(MarkKind.Bold) }
-            FormatButton(Icons.Filled.FormatItalic, "Italic", controller.isActive(MarkKind.Italic)) { controller.toggle(MarkKind.Italic) }
-            FormatButton(Icons.Filled.FormatUnderlined, "Underline", controller.isActive(MarkKind.Underline)) { controller.toggle(MarkKind.Underline) }
-            FormatButton(Icons.Filled.Highlight, "Highlight", controller.isActive(MarkKind.Highlight)) { controller.toggle(MarkKind.Highlight) }
-            Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(20.dp).background(t.hairline))
-            FormatButton(Icons.Filled.Title, "Heading", kind is BlockKind.Heading) { controller.setKind(BlockKind.Heading(2u)) }
-            FormatButton(Icons.AutoMirrored.Filled.FormatListBulleted, "Bulleted list", kind == BlockKind.Bullet) { controller.setKind(BlockKind.Bullet) }
-            FormatButton(Icons.Filled.FormatListNumbered, "Numbered list", kind == BlockKind.Numbered) { controller.setKind(BlockKind.Numbered) }
-            FormatButton(Icons.Filled.CheckBox, "Checklist", kind is BlockKind.Check) { controller.setKind(BlockKind.Check(false)) }
-            FormatButton(Icons.Filled.FormatQuote, "Quote", kind == BlockKind.Quote) { controller.setKind(BlockKind.Quote) }
-            Spacer(Modifier.weight(1f))
-            Text("$wordCount words", style = Typeface.mono(11), color = t.muted, modifier = Modifier.padding(end = 6.dp))
+            // Scrolls sideways on narrow phones rather than squeezing.
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                FormatButton(Icons.Filled.FormatBold, "Bold", controller.isActive(MarkKind.Bold)) { controller.toggle(MarkKind.Bold) }
+                FormatButton(Icons.Filled.FormatItalic, "Italic", controller.isActive(MarkKind.Italic)) { controller.toggle(MarkKind.Italic) }
+                FormatButton(Icons.Filled.FormatUnderlined, "Underline", controller.isActive(MarkKind.Underline)) { controller.toggle(MarkKind.Underline) }
+                FormatButton(Icons.Filled.Highlight, "Highlight", controller.isActive(MarkKind.Highlight)) { controller.toggle(MarkKind.Highlight) }
+                Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(20.dp).background(t.hairline))
+                FormatButton(Icons.Filled.Title, "Heading", kind is BlockKind.Heading) { controller.setKind(BlockKind.Heading(2u)) }
+                FormatButton(Icons.AutoMirrored.Filled.FormatListBulleted, "Bulleted list", kind == BlockKind.Bullet) { controller.setKind(BlockKind.Bullet) }
+                FormatButton(Icons.Filled.FormatListNumbered, "Numbered list", kind == BlockKind.Numbered) { controller.setKind(BlockKind.Numbered) }
+                FormatButton(Icons.Filled.CheckBox, "Checklist", kind is BlockKind.Check) { controller.setKind(BlockKind.Check(false)) }
+                FormatButton(Icons.Filled.FormatQuote, "Quote", kind == BlockKind.Quote) { controller.setKind(BlockKind.Quote) }
+            }
+            Text(
+                "$wordCount words",
+                style = Typeface.mono(11),
+                color = t.muted,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(start = 8.dp, end = 6.dp),
+            )
         }
     }
 }

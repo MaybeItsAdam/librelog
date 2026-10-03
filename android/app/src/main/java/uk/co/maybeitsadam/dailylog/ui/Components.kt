@@ -80,7 +80,8 @@ fun EntryRow(entry: EntrySummary, onClick: () -> Unit, showDate: Boolean = true,
 
 private fun highlighted(snippet: String, t: Tokens): AnnotatedString = buildAnnotatedString {
     var inMatch = false
-    for (ch in snippet) {
+    // One line, like the excerpt: paragraph breaks become spaces.
+    for (ch in snippet.replace(Regex("\\s+"), " ")) {
         when (ch) {
             '' -> inMatch = true
             '' -> inMatch = false
