@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 using QRCoder;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 
 namespace Librelog.App.Pages;
@@ -174,5 +175,165 @@ public sealed partial class SyncPage : Page
         var package = new DataPackage();
         package.SetText(text);
         Clipboard.SetContent(package);
+    }
+
+    // --- Import and export (SPEC.md §16) -------------------------------------------
+
+    private static readonly (ExportFormat Format, string Title, string Detail)[] ExportChoices =
+    [
+        (ExportFormat.Json, "Complete backup (JSON)", "Everything, exactly. Import it into Librelog on another device."),
+        (ExportFormat.Markdown, "Markdown files (.zip)", "One file per entry. Opens in Obsidian or any text editor."),
+        (ExportFormat.Html, "Web page (.html)", "Your journal as one page to read, share or print."),
+        (ExportFormat.Text, "Plain text (.txt)", "Just the words."),
+    ];
+
+    private static readonly string[] ImportTypes = [".json", ".zip", ".csv", ".md", ".markdown", ".txt"];
+
+    private static string Entries(uint n) => n == 1 ? "1 entry" : $"{n} entries";
+
+    /// File pickers need the window handle in a desktop app.
+    private static T WithWindow<T>(T picker) where T : class
+    {
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(Shell.Window));
+        return picker;
+    }
+
+    private ContentDialog Dialog(string title, object content, string primary) => new()
+    {
+        XamlRoot = XamlRoot,
+        Style = (Style)Application.Current.Resources["DefaultContentDialogStyle"],
+        Title = title,
+        Content = content,
+        PrimaryButtonText = primary,
+        CloseButtonText = "Cancel",
+        DefaultButton = ContentDialogButton.Primary,
+    };
+
+    private void ShowTransfer(string message, bool error = false)
+    {
+        TransferText.Text = message;
+        TransferText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[error ? "RaspberryBrush" : "InkBrush"];
+    }
+
+    private async void OnExport(object sender, RoutedEventArgs e)
+    {
+        // 1. Which format.
+        var options = new RadioButtons();
+        foreach (var (_, title, detail) in ExportChoices)
+        {
+            var label = new StackPanel { Spacing = 2 };
+            label.Children.Add(new TextBlock { Text = title, Style = (Style)Application.Current.Resources["BodyText"] });
+            label.Children.Add(new TextBlock
+            {
+                Text = detail,
+                Style = (Style)Application.Current.Resources["BodyText"],
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["MutedBrush"],
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+            });
+            options.Items.Add(new RadioButton { Content = label, Margin = new Thickness(0, 0, 0, 6) });
+        }
+        options.SelectedIndex = 0;
+        if (await Dialog("Export your journal", options, "Export…").ShowAsync() != ContentDialogResult.Primary) return;
+        var (format, kind, _) = ExportChoices[Math.Max(0, options.SelectedIndex)];
+
+        // 2. Where.
+        var picker = WithWindow(new FileSavePicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = $"Librelog {AppServices.Today}",
+        });
+        picker.FileTypeChoices.Add(kind, new List<string> { "." + format.Extension() });
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+
+        // 3. Write it, off the UI thread.
+        ShowTransfer("Exporting…");
+        try
+        {
+            var summary = await AppServices.Run(s => s.Export(format, file.Path));
+            ShowTransfer($"Exported {Entries(summary.Entries)} to {file.Name}.");
+        }
+        catch (CoreException ex)
+        {
+            ShowTransfer($"Couldn't export: {ex.Message}", error: true);
+        }
+    }
+
+    private async void OnImport(object sender, RoutedEventArgs e)
+    {
+        var picker = WithWindow(new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary });
+        foreach (var t in ImportTypes) picker.FileTypeFilter.Add(t);
+        var file = await picker.PickSingleFileAsync();
+        if (file is not null) await ImportFrom(file.Path);
+    }
+
+    /// A folder of Markdown notes (an Obsidian vault, say).
+    private async void OnImportFolder(object sender, RoutedEventArgs e)
+    {
+        var picker = WithWindow(new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary });
+        picker.FileTypeFilter.Add("*");
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is not null) await ImportFrom(folder.Path);
+    }
+
+    private async Task ImportFrom(string path)
+    {
+        ImportPreview preview;
+        try
+        {
+            ShowTransfer("Reading…");
+            preview = await AppServices.Run(s => s.PreviewImport(path));
+            ShowTransfer("");
+        }
+        catch (CoreException ex)
+        {
+            ShowTransfer(ex.Message, error: true);
+            return;
+        }
+
+        var dialog = Dialog(
+            $"Import from {preview.SourceName}",
+            PreviewContent(preview),
+            preview.ToImport == 0 ? "Nothing new to import" : $"Import {Entries(preview.ToImport)}");
+        dialog.IsPrimaryButtonEnabled = preview.ToImport > 0;
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        ShowTransfer("Importing…");
+        try
+        {
+            // Write refreshes every screen and schedules a sync push.
+            var result = await AppServices.Write(s => s.ImportFile(path));
+            ShowTransfer(result.Skipped == 0
+                ? $"Imported {Entries(result.Imported)}."
+                : $"Imported {Entries(result.Imported)}; skipped {result.Skipped} already in your journal.");
+        }
+        catch (CoreException ex)
+        {
+            ShowTransfer($"Couldn't import: {ex.Message}", error: true);
+        }
+    }
+
+    private static StackPanel PreviewContent(ImportPreview p)
+    {
+        var body = (Style)Application.Current.Resources["BodyText"];
+        var muted = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["MutedBrush"];
+        var panel = new StackPanel { Spacing = 8, MaxWidth = 420 };
+        void Line(string text, bool dim = false) => panel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Style = body,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = dim ? muted : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["InkBrush"],
+        });
+
+        var range = p.FirstDate is { } first && p.LastDate is { } last
+            ? first == last ? $" · {Format.ShortDate(first)}" : $" · {Format.ShortDate(first)} – {Format.ShortDate(last)}"
+            : "";
+        Line(Entries(p.Entries) + range);
+        if (p.AlreadyImported > 0) Line($"{p.AlreadyImported} already imported, will be skipped.", dim: true);
+        if (p.Tags > 0) Line(p.Tags == 1 ? "1 tag" : $"{p.Tags} tags", dim: true);
+        foreach (var w in p.Warnings) Line(w, dim: true);
+        return panel;
     }
 }

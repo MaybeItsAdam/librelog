@@ -100,5 +100,40 @@ public sealed record Shortcut(BlockKind Kind, uint PrefixLen);
 /// A scanned or pasted pairing code. PublicKey is base64.
 public sealed record PairingCode(string Id, string PublicKey);
 
+/// Export formats (core/src/transfer.rs). Sent to the core by name.
+public enum ExportFormat { Json, Markdown, Html, Text }
+
+public static class ExportFormats
+{
+    /// File extension, without the dot.
+    public static string Extension(this ExportFormat f) => f switch
+    {
+        ExportFormat.Json => "json",
+        ExportFormat.Markdown => "zip",
+        ExportFormat.Html => "html",
+        _ => "txt",
+    };
+}
+
+public sealed record ExportSummary(uint Entries, string Path);
+
+/// What importing a file would do. Source is "Librelog", "DayOne", "Daylio"
+/// or "Markdown" (kept a string so the JSON stays reflection-free).
+public sealed record ImportPreview(
+    string Source, uint Entries, uint AlreadyImported, uint Tags,
+    string? FirstDate, string? LastDate, uint SkippedImages, IReadOnlyList<string> Warnings)
+{
+    public uint ToImport => Entries - Math.Min(AlreadyImported, Entries);
+
+    public string SourceName => Source switch
+    {
+        "DayOne" => "Day One",
+        "Librelog" => "Librelog backup",
+        _ => Source,
+    };
+}
+
+public sealed record ImportResult(string Source, uint Imported, uint Skipped);
+
 /// Error envelope from the C ABI.
 public sealed record CoreErrorBody(string Kind, string Message);
