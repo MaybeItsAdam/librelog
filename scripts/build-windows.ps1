@@ -58,7 +58,17 @@ foreach ($platform in $Platforms) {
     Write-Host "› build app ($platform)"
     dotnet build $app -c Debug -p:Platform=$platform -r $rid --nologo
   }
-  if ($LASTEXITCODE -ne 0) { throw "app build failed for $platform" }
+  if ($LASTEXITCODE -ne 0) {
+    # The XAML compiler reports its errors in output.json, which `dotnet
+    # build` never prints: "XamlCompiler.exe exited with code 1" is all you
+    # get. Show them.
+    $obj = Join-Path (Split-Path $app) 'obj'
+    Get-ChildItem $obj -Recurse -Filter output.json -ErrorAction SilentlyContinue | ForEach-Object {
+      Write-Host "--- $($_.FullName)"
+      Get-Content $_.FullName | Write-Host
+    }
+    throw "app build failed for $platform"
+  }
 }
 
 Write-Host '✓ done'
