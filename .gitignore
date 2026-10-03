@@ -1,2 +1,8 @@
 .env*.local
 supabase/.temp/
+
+# Apple build artifacts (scripts/build-apple.sh and `xcodegen` recreate them)
+apple/Dailylog.xcodeproj/
+apple/DailylogCore.xcframework/
+xcuserdata/
+.DS_Store

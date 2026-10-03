@@ -353,3 +353,28 @@ mod tests {
         assert_eq!(shortcut("plain"), None);
     }
 }
+
+// --- Exported to the apps -----------------------------------------------------
+
+/// A Markdown shortcut typed at the start of a block.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Shortcut {
+    pub kind: BlockKind,
+    /// UTF-16 units of typed prefix to remove.
+    pub prefix_len: u32,
+}
+
+#[uniffi::export]
+pub fn markdown_shortcut(text: String) -> Option<Shortcut> {
+    shortcut(&text).map(|(kind, prefix_len)| Shortcut { kind, prefix_len })
+}
+
+#[uniffi::export]
+pub fn blocks_to_markdown(blocks: Vec<Block>) -> String {
+    to_markdown(&blocks, &|_| None)
+}
+
+#[uniffi::export]
+pub fn blocks_word_count(blocks: Vec<Block>) -> u32 {
+    word_count(&blocks)
+}
