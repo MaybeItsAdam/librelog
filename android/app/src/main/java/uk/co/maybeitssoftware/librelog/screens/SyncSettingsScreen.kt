@@ -97,6 +97,7 @@ fun SyncSettingsScreen(app: AppModel) {
             SyncEngine.Phase.NeedsKey -> KeySetup(app)
             SyncEngine.Phase.On -> Status(app)
         }
+        ImportExportSection(app)
         Text(
             "Entries are encrypted on this device before they're uploaded. The server only ever stores ciphertext; " +
                 "without your recovery phrase nobody, including us, can read them. Photos and other files stay on " +
@@ -374,7 +375,7 @@ private fun PhraseGrid(phrase: String) {
 // MARK: Pieces
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         MicroLabel(title)
         Hairline()
@@ -445,7 +446,7 @@ private fun Field(
 /** Dialogs are bottom sheets on phones (house touch rules). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Sheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun Sheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val t = tokens
     ModalBottomSheet(
         onDismissRequest = onDismiss,

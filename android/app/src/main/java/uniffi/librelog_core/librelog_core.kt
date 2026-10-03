@@ -683,6 +683,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_func_parse_pairing_qr(
     ): Int
+    external fun uniffi_librelog_core_checksum_func_export_extension(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_pairingsession_id(
     ): Int
     external fun uniffi_librelog_core_checksum_method_pairingsession_qr_payload(
@@ -707,9 +709,13 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_entry(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_export(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_forget_journal_key(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_generate_journal_key(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_import_file(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_journals(
     ): Int
@@ -730,6 +736,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_librelog_core_checksum_method_store_outgoing_batch(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_pending_count(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_preview_import(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_push_succeeded(
     ): Int
@@ -837,9 +845,13 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_entry(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_export(`ptr`: Long,`format`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,`journalId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_forget_journal_key(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_generate_journal_key(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_import_file(`ptr`: Long,`path`: RustBuffer.ByValue,`journalId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_journals(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -861,6 +873,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_pending_count(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_librelog_core_fn_method_store_preview_import(`ptr`: Long,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_push_succeeded(`ptr`: Long,`batchId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_recovery_phrase(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -914,6 +928,8 @@ internal object UniffiLib {
     external fun uniffi_librelog_core_fn_func_markdown_shortcut(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_func_parse_pairing_qr(`qr`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_func_export_extension(`format`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun ffi_librelog_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1046,6 +1062,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_func_parse_pairing_qr() and 0xFFFF) != 37035) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_func_export_extension() and 0xFFFF) != 64865) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_method_pairingsession_id() and 0xFFFF) != 28292) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1082,10 +1101,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_entry() and 0xFFFF) != 55598) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_method_store_export() and 0xFFFF) != 8854) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_method_store_forget_journal_key() and 0xFFFF) != 34284) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_generate_journal_key() and 0xFFFF) != 37272) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_import_file() and 0xFFFF) != 5324) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_journals() and 0xFFFF) != 23588) {
@@ -1116,6 +1141,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_pending_count() and 0xFFFF) != 28793) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_preview_import() and 0xFFFF) != 22638) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_push_succeeded() and 0xFFFF) != 15783) {
@@ -2017,6 +2045,12 @@ public interface StoreInterface {
     
     fun `entry`(`id`: kotlin.String): Entry
     
+    /**
+     * Writes the journal (or one journal) to `path` in `format`. Name the
+     * file with `export_extension(format)`.
+     */
+    fun `export`(`format`: ExportFormat, `path`: kotlin.String, `journalId`: kotlin.String?): ExportSummary
+    
     fun `forgetJournalKey`()
     
     /**
@@ -2024,6 +2058,13 @@ public interface StoreInterface {
      * the keychain and passes it to `set_journal_key` on every launch.
      */
     fun `generateJournalKey`(): kotlin.ByteArray
+    
+    /**
+     * Imports `path` into `journal_id` (or each entry's own journal for a
+     * Librelog export, else the default). Entries already imported are
+     * skipped, so running this twice is safe. All or nothing.
+     */
+    fun `importFile`(`path`: kotlin.String, `journalId`: kotlin.String?): ImportResult
     
     fun `journals`(): List<Journal>
     
@@ -2064,6 +2105,12 @@ public interface StoreInterface {
     fun `outgoingBatch`(`maxOps`: kotlin.UInt): OutgoingBatch?
     
     fun `pendingCount`(): kotlin.UInt
+    
+    /**
+     * Reads `path` (a file, folder or zip) and says what importing it would
+     * do, without changing anything.
+     */
+    fun `previewImport`(`path`: kotlin.String): ImportPreview
     
     /**
      * The server accepted `batch_id`: drop those ops from the queue.
@@ -2412,6 +2459,27 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     }
     
 
+    
+    /**
+     * Writes the journal (or one journal) to `path` in `format`. Name the
+     * file with `export_extension(format)`.
+     */
+    @Throws(CoreException::class)override fun `export`(`format`: ExportFormat, `path`: kotlin.String, `journalId`: kotlin.String?): ExportSummary {
+            return FfiConverterTypeExportSummary.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_export(
+        it,
+        
+        FfiConverterTypeExportFormat.lower(`format`),
+        FfiConverterString.lower(`path`),
+        FfiConverterOptionalString.lower(`journalId`),_status)
+}
+    }
+    )
+    }
+    
+
     override fun `forgetJournalKey`()
         = 
     callWithHandle {
@@ -2436,6 +2504,27 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     UniffiLib.uniffi_librelog_core_fn_method_store_generate_journal_key(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Imports `path` into `journal_id` (or each entry's own journal for a
+     * Librelog export, else the default). Entries already imported are
+     * skipped, so running this twice is safe. All or nothing.
+     */
+    @Throws(CoreException::class)override fun `importFile`(`path`: kotlin.String, `journalId`: kotlin.String?): ImportResult {
+            return FfiConverterTypeImportResult.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_import_file(
+        it,
+        
+        FfiConverterString.lower(`path`),
+        FfiConverterOptionalString.lower(`journalId`),_status)
 }
     }
     )
@@ -2605,6 +2694,25 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     UniffiLib.uniffi_librelog_core_fn_method_store_pending_count(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Reads `path` (a file, folder or zip) and says what importing it would
+     * do, without changing anything.
+     */
+    @Throws(CoreException::class)override fun `previewImport`(`path`: kotlin.String): ImportPreview {
+            return FfiConverterTypeImportPreview.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_preview_import(
+        it,
+        
+        FfiConverterString.lower(`path`),_status)
 }
     }
     )
@@ -3315,6 +3423,164 @@ public object FfiConverterTypeEntrySummary: FfiConverterRustBuffer<EntrySummary>
             FfiConverterOptionalDouble.write(value.`rating`, buf)
             FfiConverterBoolean.write(value.`isFavorite`, buf)
             FfiConverterSequenceString.write(value.`tagNames`, buf)
+    }
+}
+
+
+
+data class ExportSummary (
+    var `entries`: kotlin.UInt
+    , 
+    var `path`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExportSummary: FfiConverterRustBuffer<ExportSummary> {
+    override fun read(buf: ByteBuffer): ExportSummary {
+        return ExportSummary(
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ExportSummary) = (
+            FfiConverterUInt.allocationSize(value.`entries`) +
+            FfiConverterString.allocationSize(value.`path`)
+    )
+
+    override fun write(value: ExportSummary, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`entries`, buf)
+            FfiConverterString.write(value.`path`, buf)
+    }
+}
+
+
+
+data class ImportPreview (
+    var `source`: ImportSource
+    , 
+    /**
+     * Entries found in the file.
+     */
+    var `entries`: kotlin.UInt
+    , 
+    /**
+     * Of those, how many are already in this journal and will be skipped.
+     */
+    var `alreadyImported`: kotlin.UInt
+    , 
+    var `tags`: kotlin.UInt
+    , 
+    var `firstDate`: kotlin.String?
+    , 
+    var `lastDate`: kotlin.String?
+    , 
+    var `skippedImages`: kotlin.UInt
+    , 
+    /**
+     * Things worth telling the user before they go ahead.
+     */
+    var `warnings`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeImportPreview: FfiConverterRustBuffer<ImportPreview> {
+    override fun read(buf: ByteBuffer): ImportPreview {
+        return ImportPreview(
+            FfiConverterTypeImportSource.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ImportPreview) = (
+            FfiConverterTypeImportSource.allocationSize(value.`source`) +
+            FfiConverterUInt.allocationSize(value.`entries`) +
+            FfiConverterUInt.allocationSize(value.`alreadyImported`) +
+            FfiConverterUInt.allocationSize(value.`tags`) +
+            FfiConverterOptionalString.allocationSize(value.`firstDate`) +
+            FfiConverterOptionalString.allocationSize(value.`lastDate`) +
+            FfiConverterUInt.allocationSize(value.`skippedImages`) +
+            FfiConverterSequenceString.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: ImportPreview, buf: ByteBuffer) {
+            FfiConverterTypeImportSource.write(value.`source`, buf)
+            FfiConverterUInt.write(value.`entries`, buf)
+            FfiConverterUInt.write(value.`alreadyImported`, buf)
+            FfiConverterUInt.write(value.`tags`, buf)
+            FfiConverterOptionalString.write(value.`firstDate`, buf)
+            FfiConverterOptionalString.write(value.`lastDate`, buf)
+            FfiConverterUInt.write(value.`skippedImages`, buf)
+            FfiConverterSequenceString.write(value.`warnings`, buf)
+    }
+}
+
+
+
+data class ImportResult (
+    var `source`: ImportSource
+    , 
+    var `imported`: kotlin.UInt
+    , 
+    var `skipped`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeImportResult: FfiConverterRustBuffer<ImportResult> {
+    override fun read(buf: ByteBuffer): ImportResult {
+        return ImportResult(
+            FfiConverterTypeImportSource.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ImportResult) = (
+            FfiConverterTypeImportSource.allocationSize(value.`source`) +
+            FfiConverterUInt.allocationSize(value.`imported`) +
+            FfiConverterUInt.allocationSize(value.`skipped`)
+    )
+
+    override fun write(value: ImportResult, buf: ByteBuffer) {
+            FfiConverterTypeImportSource.write(value.`source`, buf)
+            FfiConverterUInt.write(value.`imported`, buf)
+            FfiConverterUInt.write(value.`skipped`, buf)
     }
 }
 
@@ -4263,6 +4529,90 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
 
 
 
+
+enum class ExportFormat {
+    
+    /**
+     * `.json` — everything, losslessly; re-importable.
+     */
+    JSON,
+    /**
+     * `.zip` of Markdown files with YAML front matter; re-importable.
+     */
+    MARKDOWN,
+    /**
+     * `.html` — one self-contained page.
+     */
+    HTML,
+    /**
+     * `.txt`
+     */
+    TEXT;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExportFormat: FfiConverterRustBuffer<ExportFormat> {
+    override fun read(buf: ByteBuffer) = try {
+        ExportFormat.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ExportFormat) = 4UL
+
+    override fun write(value: ExportFormat, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class ImportSource {
+    
+    LIBRELOG,
+    DAY_ONE,
+    DAYLIO,
+    MARKDOWN;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeImportSource: FfiConverterRustBuffer<ImportSource> {
+    override fun read(buf: ByteBuffer) = try {
+        ImportSource.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ImportSource) = 4UL
+
+    override fun write(value: ImportSource, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 sealed class MarkKind {
     
     object Bold : MarkKind()
@@ -4910,6 +5260,17 @@ public object FfiConverterSequenceTypeTag: FfiConverterRustBuffer<List<Tag>> {
     
         
         FfiConverterString.lower(`qr`),_status)
+}
+    )
+    }
+    
+ fun `exportExtension`(`format`: ExportFormat): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_librelog_core_fn_func_export_extension(
+    
+        
+        FfiConverterTypeExportFormat.lower(`format`),_status)
 }
     )
     }
