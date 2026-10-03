@@ -1017,7 +1017,7 @@ mod tests {
     }
 
     /// Two installs syncing through a fake server that behaves like
-    /// dailylog.push_ops / pull_ops: a shared, seq-ordered log.
+    /// librelog.push_ops / pull_ops: a shared, seq-ordered log.
     #[test]
     fn two_devices_sync_end_to_end_through_ciphertext() {
         let (a, b) = (store(), store());

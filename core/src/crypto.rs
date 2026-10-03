@@ -32,16 +32,16 @@ pub enum Purpose {
 impl Purpose {
     fn context(self) -> &'static str {
         match self {
-            Purpose::Ops => "dailylog 2026-10 sync ops",
-            Purpose::Snapshot => "dailylog 2026-10 sync snapshot",
-            Purpose::DeviceName => "dailylog 2026-10 device name",
-            Purpose::KeyCheck => "dailylog 2026-10 key check",
+            Purpose::Ops => "librelog 2026-10 sync ops",
+            Purpose::Snapshot => "librelog 2026-10 sync snapshot",
+            Purpose::DeviceName => "librelog 2026-10 device name",
+            Purpose::KeyCheck => "librelog 2026-10 key check",
         }
     }
 }
 
 /// The plaintext sealed for `key_check`: if it opens, the key is right.
-const KEY_CHECK: &[u8] = b"dailylog journal key";
+const KEY_CHECK: &[u8] = b"librelog journal key";
 
 pub struct JournalKey(Zeroizing<[u8; 32]>);
 
@@ -197,7 +197,7 @@ impl PairingRequest {
     }
 }
 
-const PAIRING_CONTEXT: &str = "dailylog 2026-10 device pairing";
+const PAIRING_CONTEXT: &str = "librelog 2026-10 device pairing";
 
 /// Run on the existing device: seals `key` for the device that showed
 /// `new_device_public`. Returns the payload for `pairing_fulfil`.

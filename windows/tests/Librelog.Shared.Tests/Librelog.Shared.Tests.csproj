@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Librelog.Tests</RootNamespace>
+    <!-- The core, built in release with the capi feature (scripts/build-windows.ps1). -->
+    <CoreLibDir Condition="'$(CoreLibDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\core\target\capi\release\</CoreLibDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\Librelog.Shared\Librelog.Shared.csproj" />
+  </ItemGroup>
+
+  <!-- Without the native core, the interop and sync tests fail with
+       DllNotFoundException, which hides the real cause. Say it up front. -->
+  <Target Name="RequireNativeCore" BeforeTargets="Build"
+          Condition="!Exists('$(CoreLibDir)librelog_core.dll') And !Exists('$(CoreLibDir)liblibrelog_core.dylib') And !Exists('$(CoreLibDir)liblibrelog_core.so')">
+    <Error Text="No native core in $(CoreLibDir). Build it first: cargo build --release --features capi --target-dir core/target/capi --manifest-path core/Cargo.toml" />
+  </Target>
+
+  <!-- Whichever native core exists for this OS goes next to the tests. -->
+  <ItemGroup>
+    <None Include="$(CoreLibDir)librelog_core.dll" Link="librelog_core.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CoreLibDir)librelog_core.dll')" />
+    <None Include="$(CoreLibDir)liblibrelog_core.dylib" Link="liblibrelog_core.dylib" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CoreLibDir)liblibrelog_core.dylib')" />
+    <None Include="$(CoreLibDir)liblibrelog_core.so" Link="liblibrelog_core.so" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CoreLibDir)liblibrelog_core.so')" />
+  </ItemGroup>
+</Project>

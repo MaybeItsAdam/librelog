@@ -1,5 +1,5 @@
 import XCTest
-@testable import Dailylog
+@testable import Librelog
 
 /// The editor must save exactly what it loaded: blocks → attributed string →
 /// blocks is the identity, marks and all.

@@ -1,6 +1,6 @@
-# Dailylog sync backend
+# Librelog sync backend
 
-Supabase project `dailylog` (ref `wzkhuilypzapqkrjxeku`, `eu-west-2`, Free
+Supabase project `librelog` (ref `wzkhuilypzapqkrjxeku`, `eu-west-2`, Free
 plan in the `maybeitsadam` org). There is no server of our own: the apps call
 Postgres functions through the Data API. SPEC.md §12.5 is the design; this
 file is the contract the Rust core's sync client codes against.
@@ -10,8 +10,9 @@ file is the contract the Rust core's sync client codes against.
 | Path | What |
 | --- | --- |
 | `migrations/20261003150000_sync_schema.sql` | Tables, RLS, every client function |
-| `migrations/20261003150100_maintenance_cron.sql` | Nightly `dailylog.maintenance()` at 03:17 UTC |
+| `migrations/20261003150100_maintenance_cron.sql` | Nightly `librelog.maintenance()` at 03:17 UTC |
 | `migrations/20261003150200_realtime_auth.sql` | Lets a device receive on its own Realtime channel |
+| `migrations/20261003170000_rename_to_librelog.sql` | Rebuilds the three above under the `librelog` schema (the app was Dailylog) and drops `dailylog` |
 | `templates/sign_in_code.html` | Sign-in code email, enabled once custom SMTP is set up |
 | `tests/` | `run.sh` tests the migrations on a throwaway local Postgres 17 |
 | `config.toml` | Pushed with `supabase config push` |
@@ -24,7 +25,7 @@ with:
 ```
 apikey: <publishable key>
 Authorization: Bearer <user's access token>
-Content-Profile: dailylog
+Content-Profile: librelog
 Content-Type: application/json
 ```
 
@@ -46,7 +47,7 @@ strings without line breaks.
 | `delete_account` | — | — deletes the auth user and every row |
 
 Plain `GET /rest/v1/accounts` and `/rest/v1/devices` (same `Accept-Profile:
-dailylog` header) read the user's own rows for the settings screen.
+librelog` header) read the user's own rows for the settings screen.
 
 ## Errors
 
@@ -70,7 +71,7 @@ cursor and `device_id` isn't this device, pull.
 Until checkout exists, in the SQL editor:
 
 ```sql
-select dailylog.admin_set_sync_until('you@example.com', now() + interval '1 year');
+select librelog.admin_set_sync_until('you@example.com', now() + interval '1 year');
 ```
 
 The user must have signed in once first.

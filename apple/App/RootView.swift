@@ -72,7 +72,7 @@ struct RootView: View {
             List(Tab.allCases, selection: Binding(get: { tab }, set: { if let t = $0 { tab = t; path = NavigationPath() } })) { t in
                 Label(t.title, systemImage: t.symbol).tag(t)
             }
-            .navigationTitle("Dailylog")
+            .navigationTitle("Librelog")
             .navigationSplitViewColumnWidth(min: 180, ideal: 210)
         } detail: {
             stack(for: tab)

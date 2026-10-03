@@ -9,15 +9,15 @@
          servers; the rules below exclude them, and the journal itself is
          synced (or exported) by the app instead. -->
     <application
-        android:name=".DailylogApplication"
+        android:name=".LibrelogApplication"
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="Dailylog"
+        android:label="Librelog"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Dailylog">
+        android:theme="@style/Theme.Librelog">
 
         <activity
             android:name=".MainActivity"
@@ -28,16 +28,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- The sign-in email's link: dailylog://auth#access_token=… -->
+            <!-- The sign-in email's link: librelog://auth#access_token=… -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="dailylog" android:host="auth" />
+                <data android:scheme="librelog" android:host="auth" />
             </intent-filter>
         </activity>
 
-        <!-- WorkManager is started on demand from DailylogApplication. -->
+        <!-- WorkManager is started on demand from LibrelogApplication. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

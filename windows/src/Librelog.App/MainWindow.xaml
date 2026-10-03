@@ -1,0 +1,43 @@
+<Window
+    x:Class="Librelog.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Librelog">
+
+    <Grid Background="{ThemeResource PaperBrush}">
+        <NavigationView
+            x:Name="Nav"
+            PaneDisplayMode="Left"
+            IsSettingsVisible="False"
+            IsBackButtonVisible="Auto"
+            IsBackEnabled="{x:Bind ContentFrame.CanGoBack, Mode=OneWay}"
+            OpenPaneLength="220"
+            ItemInvoked="OnItemInvoked"
+            BackRequested="OnBackRequested">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Today" Tag="today">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Calendar" Tag="calendar">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Calendar" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Timeline" Tag="timeline">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="List" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Search" Tag="search">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Find" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="Sync" Tag="sync">
+                    <NavigationViewItem.Icon><SymbolIcon Symbol="Sync" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <!-- Hairline between the pane and the page, not a shadow. -->
+            <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="1,0,0,0">
+                <Frame x:Name="ContentFrame" Navigated="OnNavigated" />
+            </Border>
+        </NavigationView>
+    </Grid>
+</Window>

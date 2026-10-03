@@ -48,6 +48,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dailylog-windows-${{ matrix.platform }}
-          path: windows/src/Dailylog.App/AppPackages/**
+          name: librelog-windows-${{ matrix.platform }}
+          path: windows/src/Librelog.App/AppPackages/**
           if-no-files-found: warn

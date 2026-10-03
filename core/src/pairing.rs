@@ -15,8 +15,8 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64URL;
 use crate::crypto::PairingRequest;
 use crate::error::{CoreError, Result};
 
-/// QR contents: `dailylog-pair:1:<pairing id>:<base64url public key>`.
-const QR_PREFIX: &str = "dailylog-pair:1:";
+/// QR contents: `librelog-pair:1:<pairing id>:<base64url public key>`.
+const QR_PREFIX: &str = "librelog-pair:1:";
 
 #[derive(uniffi::Object)]
 pub struct PairingSession {
@@ -67,7 +67,7 @@ pub fn parse_pairing_qr(qr: String) -> Result<PairingCode> {
 }
 
 fn not_ours() -> CoreError {
-    CoreError::Invalid("not a Dailylog pairing code".into())
+    CoreError::Invalid("not a Librelog pairing code".into())
 }
 
 #[cfg(test)]

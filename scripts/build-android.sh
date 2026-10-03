@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds the Rust core for Android and generates its Kotlin bindings:
 #
-#   android/app/src/main/jniLibs/<abi>/libdailylog_core.so   (not committed)
-#   android/app/src/main/java/uniffi/dailylog_core/          (committed)
+#   android/app/src/main/jniLibs/<abi>/liblibrelog_core.so   (not committed)
+#   android/app/src/main/java/uniffi/librelog_core/          (committed)
 #
 # plus a host build in core/target/<host>/ that the JVM unit tests load through
 # JNA. Run after any change to core/.
@@ -32,8 +32,8 @@ echo "› android (arm64-v8a, armeabi-v7a, x86_64)"
 echo "› host"
 cargo build -q $flag --manifest-path "$core/Cargo.toml" --lib
 case "$(uname)" in
-  Darwin) host_lib="$core/target/$profile/libdailylog_core.dylib" ;;
-  *) host_lib="$core/target/$profile/libdailylog_core.so" ;;
+  Darwin) host_lib="$core/target/$profile/liblibrelog_core.dylib" ;;
+  *) host_lib="$core/target/$profile/liblibrelog_core.so" ;;
 esac
 
 # Kotlin bindings (library mode reads `cargo metadata`, so run inside core/).

@@ -18,6 +18,9 @@ psql=("$pgbin/psql" -h "$dir" -p "$port" -U postgres -d postgres -q -v ON_ERROR_
 "${psql[@]}" -f "$here/stubs.sql"
 # The cron migration needs pg_cron, which a plain Postgres doesn't have;
 # maintenance() itself is exercised directly by the tests.
-"${psql[@]}" -f "$here/../migrations/20261003150000_sync_schema.sql"
-"${psql[@]}" -f "$here/../migrations/20261003150200_realtime_auth.sql"
+# Every migration, in order, as `supabase db push` applies them. The stubs
+# stand in for pg_cron, so `create extension pg_cron` is skipped.
+for m in "$here"/../migrations/*.sql; do
+  sed 's/^create extension if not exists pg_cron;/-- (pg_cron stubbed)/' "$m" | "${psql[@]}" -f -
+done
 "${psql[@]}" -f "$here/sync_test.sql"

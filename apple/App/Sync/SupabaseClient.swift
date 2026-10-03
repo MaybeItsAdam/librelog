@@ -35,7 +35,7 @@ enum SyncError: Error, LocalizedError, Equatable {
     }
 }
 
-/// Supabase Auth and the `dailylog` RPCs over plain URLSession. No SDK: the
+/// Supabase Auth and the `librelog` RPCs over plain URLSession. No SDK: the
 /// surface is a handful of POSTs, and owning it keeps the app small.
 actor SupabaseClient {
     private let url: URL
@@ -61,7 +61,7 @@ actor SupabaseClient {
     /// into the app; with the custom template it's a 6-digit code.
     func sendSignInEmail(to email: String) async throws {
         var comps = URLComponents(url: url.appending(path: "auth/v1/otp"), resolvingAgainstBaseURL: false)!
-        comps.queryItems = [URLQueryItem(name: "redirect_to", value: "dailylog://auth")]
+        comps.queryItems = [URLQueryItem(name: "redirect_to", value: "librelog://auth")]
         _ = try await post(comps.url!, body: ["email": email, "create_user": true], auth: false)
     }
 
@@ -78,7 +78,7 @@ actor SupabaseClient {
         try store(sessionJSON: data)
     }
 
-    /// The `dailylog://auth#access_token=…` link from the sign-in email.
+    /// The `librelog://auth#access_token=…` link from the sign-in email.
     func handleRedirect(_ redirect: URL) async throws {
         guard let fragment = redirect.fragment ?? URLComponents(url: redirect, resolvingAgainstBaseURL: false)?.query else {
             throw SyncError.signedOut
@@ -125,7 +125,7 @@ actor SupabaseClient {
 
     // MARK: RPC
 
-    /// Calls `dailylog.<name>` and decodes its JSON result.
+    /// Calls `librelog.<name>` and decodes its JSON result.
     func rpc<T: Decodable>(_ name: String, _ args: [String: any Sendable], as: T.Type = T.self) async throws -> T {
         let data = try await post(url.appending(path: "rest/v1/rpc/\(name)"), body: args, auth: true)
         if T.self == Empty.self { return Empty() as! T }
@@ -149,7 +149,7 @@ actor SupabaseClient {
         req.setValue(key, forHTTPHeaderField: "apikey")
         if auth {
             req.setValue("Bearer \(try await accessToken())", forHTTPHeaderField: "Authorization")
-            req.setValue("dailylog", forHTTPHeaderField: "Content-Profile")
+            req.setValue("librelog", forHTTPHeaderField: "Content-Profile")
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 

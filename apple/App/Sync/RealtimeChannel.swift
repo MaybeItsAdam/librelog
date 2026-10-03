@@ -11,7 +11,7 @@ final class RealtimeChannel: @unchecked Sendable {
     private let topic: String
     private let client: SupabaseClient
     private let onPing: @Sendable () -> Void
-    private let queue = DispatchQueue(label: "dailylog.realtime")
+    private let queue = DispatchQueue(label: "librelog.realtime")
     private var task: URLSessionWebSocketTask?
     private var heartbeat: DispatchSourceTimer?
     private var ref = 0

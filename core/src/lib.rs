@@ -1,4 +1,4 @@
-//! Dailylog's shared core: the local database, the journal model, search,
+//! Librelog's shared core: the local database, the journal model, search,
 //! stats and sync. Every platform's UI calls into this through UniFFI; nothing
 //! here knows about any UI toolkit. SPEC.md §3 is the design.
 

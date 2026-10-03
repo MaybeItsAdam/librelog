@@ -294,11 +294,11 @@ private struct PairingApproveView: View {
                     Button("Scan code") { scanning = true }
                 }
                 #endif
-                TextField("dailylog-pair:…", text: $code, axis: .vertical)
+                TextField("librelog-pair:…", text: $code, axis: .vertical)
                     .font(Typeface.mono(12))
                     .autocorrectionDisabled()
                 Button("Send journal key") { Task { await approve(code) } }
-                    .disabled(!code.hasPrefix("dailylog-pair:"))
+                    .disabled(!code.hasPrefix("librelog-pair:"))
                 if let state {
                     Text(state).font(.system(size: 13)).foregroundStyle(Color.muted)
                 }

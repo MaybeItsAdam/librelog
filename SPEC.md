@@ -1,4 +1,4 @@
-# Dailylog — Product & Technical Specification
+# Librelog — Product & Technical Specification
 
 > A private, local-first journal for phone, tablet and desktop, modelled on the
 > feature set of Diarium (diariumapp.com). This is a functional clone spec: it
@@ -16,7 +16,7 @@ sync, sold yearly at what its hosting actually costs.
 
 ## 1. Product summary
 
-Dailylog is a journal you can open and write in within a minute — no account,
+Librelog is a journal you can open and write in within a minute — no account,
 no login, no ads, no paywalled features. Entries live on the device and every
 feature works offline, for free, forever.
 
@@ -337,7 +337,7 @@ servers. OAuth tokens live in the OS keychain per device and are never synced.
 
 ```
 <app-data>/
-  dailylog.sqlite        WAL mode
+  librelog.sqlite        WAL mode
   media/<hash>           originals, content-addressed
   thumbs/<hash>-256|1024
   backups/               rolling local backups (7 daily, 4 weekly)
@@ -394,12 +394,12 @@ produces sealed batches and snapshots, and merges what the apps hand back
 client (URLSession, OkHttp, HttpClient), which keeps TLS, proxies and
 background transfers native and the core trivially testable.
 
-**Schema** (own `dailylog` schema, exposed to the Data API):
+**Schema** (own `librelog` schema, exposed to the Data API):
 
 ```sql
-create schema dailylog;
+create schema librelog;
 
-create table dailylog.accounts (
+create table librelog.accounts (
   user_id     uuid primary key references auth.users on delete cascade,
   last_seq    bigint not null default 0,
   bytes_used  bigint not null default 0,
@@ -407,32 +407,32 @@ create table dailylog.accounts (
   key_check   bytea                      -- encrypted constant, verifies the journal key
 );
 
-create table dailylog.devices (
+create table librelog.devices (
   id          uuid primary key,
-  user_id     uuid not null references dailylog.accounts on delete cascade,
+  user_id     uuid not null references librelog.accounts on delete cascade,
   name_enc    bytea not null,
   acked_seq   bigint not null default 0,
   last_seen   timestamptz not null default now()
 );
 
-create table dailylog.ops (
-  user_id     uuid not null references dailylog.accounts on delete cascade,
+create table librelog.ops (
+  user_id     uuid not null references librelog.accounts on delete cascade,
   seq         bigint not null,
   device_id   uuid not null,
   payload     bytea not null,            -- encrypted batch of row changes
   primary key (user_id, seq)
 );
 
-create table dailylog.snapshots (
-  user_id     uuid not null references dailylog.accounts on delete cascade,
+create table librelog.snapshots (
+  user_id     uuid not null references librelog.accounts on delete cascade,
   seq         bigint not null,           -- snapshot covers ops <= seq
   payload     bytea not null,
   primary key (user_id, seq)
 );
 
-create table dailylog.pairings (
+create table librelog.pairings (
   id          uuid primary key,
-  user_id     uuid not null references dailylog.accounts on delete cascade,
+  user_id     uuid not null references librelog.accounts on delete cascade,
   payload     bytea,                     -- journal key encrypted to the new device
   expires_at  timestamptz not null
 );
@@ -492,7 +492,7 @@ are **no direct insert/update policies** on `ops`, `snapshots` or
 - Account deletion is immediate and complete (`on delete cascade` from
   `auth.users`), leaving backups on their 7-day rotation.
 
-**Project:** a dedicated `dailylog` project from day one, created on the
+**Project:** a dedicated `librelog` project from day one, created on the
 **Free plan** in a personal org while you're the only user ($0). Free
 projects pause after a week with no API requests (daily syncing prevents
 that) and have no automatic backups (acceptable: every device holds a full
@@ -635,7 +635,7 @@ number of paying users, and how the next year's price was derived.
 **Export** (any range / journal / tag): JSON (canonical, lossless,
 documented schema), Markdown with YAML front-matter (Obsidian-compatible),
 self-contained HTML site, DOCX, PDF book, plain text, and a full
-`.dailylog-backup` (encrypted archive), with scheduled backups to any folder.
+`.librelog-backup` (encrypted archive), with scheduled backups to any folder.
 
 **Import:** Day One, Apple Journal, Journey, Daylio (rating + trackers),
 Markdown folders with front-matter, Google Timeline, generic CSV with column
@@ -707,7 +707,7 @@ property-based tests proving merge convergence across 3 simulated devices.
    Supabase Storage with the same E2E encryption, priced per GB on top of
    text sync. *Recommendation:* ship text-only, and add it only on demand.
 6. **When to leave the shared project.** *Recommendation:* create the
-   dedicated `dailylog` project before the first external beta, so its
+   dedicated `librelog` project before the first external beta, so its
    sign-in emails and user pool are its own from day one.
-7. **Product name & icon:** "Dailylog" is a working title; check trademark
+7. **Product name & icon:** "Librelog" is a working title; check trademark
    and store availability before M6.

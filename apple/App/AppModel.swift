@@ -41,7 +41,7 @@ final class AppModel {
 
     private static func databasePath() -> String {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Dailylog", isDirectory: true)
+            .appendingPathComponent("Librelog", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("journal.sqlite").path
     }

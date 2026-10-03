@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Dailylog"
+rootProject.name = "Librelog"
 include(":app")

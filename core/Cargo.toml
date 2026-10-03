@@ -1,12 +1,12 @@
 [package]
-name = "dailylog-core"
+name = "librelog-core"
 version = "0.1.0"
 edition = "2024"
 publish = false
 
 [lib]
 crate-type = ["lib", "staticlib", "cdylib"]
-name = "dailylog_core"
+name = "librelog_core"
 
 [[bin]]
 name = "uniffi-bindgen"

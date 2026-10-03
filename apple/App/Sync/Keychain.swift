@@ -10,7 +10,7 @@ enum Keychain {
         case session = "supabase-session"
     }
 
-    private static let service = "uk.co.maybeitsadam.dailylog"
+    private static let service = "uk.co.maybeitssoftware.librelog"
 
     static func read(_ item: Item) -> Data? {
         var query = base(item)

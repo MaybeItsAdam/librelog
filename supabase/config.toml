@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "dailylog"
+project_id = "librelog"
 
 [api]
 enabled = true
@@ -10,7 +10,7 @@ enabled = true
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public", "dailylog"]
+schemas = ["public", "graphql_public", "librelog"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
@@ -157,11 +157,11 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "dailylog://auth"
+site_url = "librelog://auth"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["dailylog://auth", "dailylog://auth/callback"]
+additional_redirect_urls = ["librelog://auth", "librelog://auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -249,11 +249,11 @@ otp_expiry = 600
 # projects can only change templates once [auth.email.smtp] is configured,
 # so these stay commented out until then.
 # [auth.email.template.magic_link]
-# subject = "Your Dailylog sign-in code"
+# subject = "Your Librelog sign-in code"
 # content_path = "./supabase/templates/sign_in_code.html"
 #
 # [auth.email.template.confirmation]
-# subject = "Your Dailylog sign-in code"
+# subject = "Your Librelog sign-in code"
 # content_path = "./supabase/templates/sign_in_code.html"
 
 # Uncomment to customize email template
@@ -335,10 +335,10 @@ max_frequency = "5s"
 # Native Sign in with Apple only: the apps get an ID token from
 # AuthenticationServices and exchange it with signInWithIdToken, which needs
 # the bundle ID as client_id and no secret. The secret is only for the web
-# OAuth flow, which Dailylog doesn't use.
+# OAuth flow, which Librelog doesn't use.
 [auth.external.apple]
 enabled = true
-client_id = "uk.co.maybeitsadam.dailylog"
+client_id = "uk.co.maybeitssoftware.librelog"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
 # Overrides the default auth callback URL derived from auth.external_url.

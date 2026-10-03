@@ -5,14 +5,14 @@ plugins {
 }
 
 android {
-    namespace = "uk.co.maybeitsadam.dailylog"
+    namespace = "uk.co.maybeitssoftware.librelog"
     // Current AndroidX, Compose and OkHttp releases require 37.2.
     compileSdk {
         version = release(37) { minorApiLevel = 2 }
     }
 
     defaultConfig {
-        applicationId = "uk.co.maybeitsadam.dailylog"
+        applicationId = "uk.co.maybeitssoftware.librelog"
         // scripts/build-android.sh builds the core for this API level too.
         minSdk = 28
         targetSdk = 36

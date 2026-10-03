@@ -126,7 +126,7 @@ final class SyncEngine {
     }
 
     func handle(url: URL) async {
-        guard url.scheme == "dailylog", url.host == "auth" else { return }
+        guard url.scheme == "librelog", url.host == "auth" else { return }
         do {
             try await client.handleRedirect(url)
             await adoptAccount()

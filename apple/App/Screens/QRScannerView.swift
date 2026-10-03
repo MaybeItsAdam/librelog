@@ -34,7 +34,7 @@ struct QRScannerView: UIViewControllerRepresentable {
 
         func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
             for case .barcode(let code) in items {
-                guard !done, let text = code.payloadStringValue, text.hasPrefix("dailylog-pair:") else { continue }
+                guard !done, let text = code.payloadStringValue, text.hasPrefix("librelog-pair:") else { continue }
                 done = true
                 scanner.stopScanning()
                 onScan(text)

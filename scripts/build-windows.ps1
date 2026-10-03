@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   1. Builds core/ with the C ABI (the capi feature) for each platform, giving
-     core/target/<triple>/release/dailylog_core.dll, which the app bundles.
+     core/target/<triple>/release/librelog_core.dll, which the app bundles.
      (The Windows app calls the core through core/src/capi.rs rather than
      generated UniFFI bindings: uniffi-bindgen-cs trails the core's uniffi-rs.)
   2. Builds core/ for the host as well, so the .NET tests can load it.
@@ -44,11 +44,11 @@ if (-not $SkipTests) {
   if ($LASTEXITCODE -ne 0) { throw 'cargo build failed for the host' }
 
   Write-Host '› .NET tests'
-  dotnet test (Join-Path $windows 'tests/Dailylog.Shared.Tests') --nologo
+  dotnet test (Join-Path $windows 'tests/Librelog.Shared.Tests') --nologo
   if ($LASTEXITCODE -ne 0) { throw 'dotnet test failed' }
 }
 
-$app = Join-Path $windows 'src/Dailylog.App/Dailylog.App.csproj'
+$app = Join-Path $windows 'src/Librelog.App/Librelog.App.csproj'
 foreach ($platform in $Platforms) {
   $rid = if ($platform -eq 'ARM64') { 'win-arm64' } else { 'win-x64' }
   if ($Publish) {
