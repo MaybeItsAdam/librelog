@@ -25,6 +25,7 @@ struct SyncSettingsView: View {
             if let message {
                 Section { Text(message).font(.system(size: 13)).foregroundStyle(Color.danger) }
             }
+            TransferSection()
             Section {
                 Text("Entries are encrypted on this device before they're uploaded. The server only ever stores ciphertext; without your recovery phrase nobody, including us, can read them. Photos and other files stay on the device they were added on.")
                     .font(.system(size: 12))
@@ -34,7 +35,7 @@ struct SyncSettingsView: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .background(Color.paper)
-        .navigationTitle("Sync")
+        .navigationTitle("Settings")
         .sheet(item: Binding(get: { sync.newRecoveryPhrase.map(Phrase.init) },
                              set: { sync.newRecoveryPhrase = $0?.words })) { p in
             RecoveryPhraseSheet(phrase: p.words)

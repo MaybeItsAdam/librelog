@@ -839,6 +839,12 @@ public protocol StoreProtocol: AnyObject, Sendable {
     
     func entry(id: String) throws  -> Entry
     
+    /**
+     * Writes the journal (or one journal) to `path` in `format`. Name the
+     * file with `export_extension(format)`.
+     */
+    func export(format: ExportFormat, path: String, journalId: String?) throws  -> ExportSummary
+    
     func forgetJournalKey() 
     
     /**
@@ -846,6 +852,13 @@ public protocol StoreProtocol: AnyObject, Sendable {
      * the keychain and passes it to `set_journal_key` on every launch.
      */
     func generateJournalKey() throws  -> Data
+    
+    /**
+     * Imports `path` into `journal_id` (or each entry's own journal for a
+     * Librelog export, else the default). Entries already imported are
+     * skipped, so running this twice is safe. All or nothing.
+     */
+    func importFile(path: String, journalId: String?) throws  -> ImportResult
     
     func journals() throws  -> [Journal]
     
@@ -886,6 +899,12 @@ public protocol StoreProtocol: AnyObject, Sendable {
     func outgoingBatch(maxOps: UInt32) throws  -> OutgoingBatch?
     
     func pendingCount() throws  -> UInt32
+    
+    /**
+     * Reads `path` (a file, folder or zip) and says what importing it would
+     * do, without changing anything.
+     */
+    func previewImport(path: String) throws  -> ImportPreview
     
     /**
      * The server accepted `batch_id`: drop those ops from the queue.
@@ -1153,6 +1172,22 @@ open func entry(id: String)throws  -> Entry  {
 })
 }
     
+    /**
+     * Writes the journal (or one journal) to `path` in `format`. Name the
+     * file with `export_extension(format)`.
+     */
+open func export(format: ExportFormat, path: String, journalId: String?)throws  -> ExportSummary  {
+    return try  FfiConverterTypeExportSummary_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_export(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeExportFormat_lower(format),
+        FfiConverterString.lower(path),
+        FfiConverterOptionString.lower(journalId),uniffiCallStatus
+    )
+})
+}
+    
 open func forgetJournalKey()  {try! rustCall() {
         uniffiCallStatus in
     uniffi_librelog_core_fn_method_store_forget_journal_key(
@@ -1170,6 +1205,22 @@ open func generateJournalKey()throws  -> Data  {
         uniffiCallStatus in
     uniffi_librelog_core_fn_method_store_generate_journal_key(
             self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Imports `path` into `journal_id` (or each entry's own journal for a
+     * Librelog export, else the default). Entries already imported are
+     * skipped, so running this twice is safe. All or nothing.
+     */
+open func importFile(path: String, journalId: String?)throws  -> ImportResult  {
+    return try  FfiConverterTypeImportResult_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_import_file(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(path),
+        FfiConverterOptionString.lower(journalId),uniffiCallStatus
     )
 })
 }
@@ -1289,6 +1340,20 @@ open func pendingCount()throws  -> UInt32  {
         uniffiCallStatus in
     uniffi_librelog_core_fn_method_store_pending_count(
             self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Reads `path` (a file, folder or zip) and says what importing it would
+     * do, without changing anything.
+     */
+open func previewImport(path: String)throws  -> ImportPreview  {
+    return try  FfiConverterTypeImportPreview_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_preview_import(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(path),uniffiCallStatus
     )
 })
 }
@@ -1930,6 +1995,214 @@ public func FfiConverterTypeEntrySummary_lift(_ buf: RustBuffer) throws -> Entry
 #endif
 public func FfiConverterTypeEntrySummary_lower(_ value: EntrySummary) -> RustBuffer {
     return FfiConverterTypeEntrySummary.lower(value)
+}
+
+
+public struct ExportSummary: Equatable, Hashable {
+    public var entries: UInt32
+    public var path: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(entries: UInt32, path: String) {
+        self.entries = entries
+        self.path = path
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ExportSummary: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExportSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExportSummary {
+        return
+            try ExportSummary(
+                entries: FfiConverterUInt32.read(from: &buf), 
+                path: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ExportSummary, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.entries, into: &buf)
+        FfiConverterString.write(value.path, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExportSummary_lift(_ buf: RustBuffer) throws -> ExportSummary {
+    return try FfiConverterTypeExportSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExportSummary_lower(_ value: ExportSummary) -> RustBuffer {
+    return FfiConverterTypeExportSummary.lower(value)
+}
+
+
+public struct ImportPreview: Equatable, Hashable {
+    public var source: ImportSource
+    /**
+     * Entries found in the file.
+     */
+    public var entries: UInt32
+    /**
+     * Of those, how many are already in this journal and will be skipped.
+     */
+    public var alreadyImported: UInt32
+    public var tags: UInt32
+    public var firstDate: String?
+    public var lastDate: String?
+    public var skippedImages: UInt32
+    /**
+     * Things worth telling the user before they go ahead.
+     */
+    public var warnings: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(source: ImportSource, 
+        /**
+         * Entries found in the file.
+         */entries: UInt32, 
+        /**
+         * Of those, how many are already in this journal and will be skipped.
+         */alreadyImported: UInt32, tags: UInt32, firstDate: String?, lastDate: String?, skippedImages: UInt32, 
+        /**
+         * Things worth telling the user before they go ahead.
+         */warnings: [String]) {
+        self.source = source
+        self.entries = entries
+        self.alreadyImported = alreadyImported
+        self.tags = tags
+        self.firstDate = firstDate
+        self.lastDate = lastDate
+        self.skippedImages = skippedImages
+        self.warnings = warnings
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ImportPreview: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeImportPreview: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ImportPreview {
+        return
+            try ImportPreview(
+                source: FfiConverterTypeImportSource.read(from: &buf), 
+                entries: FfiConverterUInt32.read(from: &buf), 
+                alreadyImported: FfiConverterUInt32.read(from: &buf), 
+                tags: FfiConverterUInt32.read(from: &buf), 
+                firstDate: FfiConverterOptionString.read(from: &buf), 
+                lastDate: FfiConverterOptionString.read(from: &buf), 
+                skippedImages: FfiConverterUInt32.read(from: &buf), 
+                warnings: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ImportPreview, into buf: inout [UInt8]) {
+        FfiConverterTypeImportSource.write(value.source, into: &buf)
+        FfiConverterUInt32.write(value.entries, into: &buf)
+        FfiConverterUInt32.write(value.alreadyImported, into: &buf)
+        FfiConverterUInt32.write(value.tags, into: &buf)
+        FfiConverterOptionString.write(value.firstDate, into: &buf)
+        FfiConverterOptionString.write(value.lastDate, into: &buf)
+        FfiConverterUInt32.write(value.skippedImages, into: &buf)
+        FfiConverterSequenceString.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImportPreview_lift(_ buf: RustBuffer) throws -> ImportPreview {
+    return try FfiConverterTypeImportPreview.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImportPreview_lower(_ value: ImportPreview) -> RustBuffer {
+    return FfiConverterTypeImportPreview.lower(value)
+}
+
+
+public struct ImportResult: Equatable, Hashable {
+    public var source: ImportSource
+    public var imported: UInt32
+    public var skipped: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(source: ImportSource, imported: UInt32, skipped: UInt32) {
+        self.source = source
+        self.imported = imported
+        self.skipped = skipped
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ImportResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeImportResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ImportResult {
+        return
+            try ImportResult(
+                source: FfiConverterTypeImportSource.read(from: &buf), 
+                imported: FfiConverterUInt32.read(from: &buf), 
+                skipped: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ImportResult, into buf: inout [UInt8]) {
+        FfiConverterTypeImportSource.write(value.source, into: &buf)
+        FfiConverterUInt32.write(value.imported, into: &buf)
+        FfiConverterUInt32.write(value.skipped, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImportResult_lift(_ buf: RustBuffer) throws -> ImportResult {
+    return try FfiConverterTypeImportResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImportResult_lower(_ value: ImportResult) -> RustBuffer {
+    return FfiConverterTypeImportResult.lower(value)
 }
 
 
@@ -3075,6 +3348,178 @@ public func FfiConverterTypeCoreError_lower(_ value: CoreError) -> RustBuffer {
 
 
 
+public enum ExportFormat: Equatable, Hashable {
+    
+    /**
+     * `.json` — everything, losslessly; re-importable.
+     */
+    case json
+    /**
+     * `.zip` of Markdown files with YAML front matter; re-importable.
+     */
+    case markdown
+    /**
+     * `.html` — one self-contained page.
+     */
+    case html
+    /**
+     * `.txt`
+     */
+    case text
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ExportFormat: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExportFormat: FfiConverterRustBuffer {
+    typealias SwiftType = ExportFormat
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExportFormat {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .json
+        
+        case 2: return .markdown
+        
+        case 3: return .html
+        
+        case 4: return .text
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExportFormat, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .json:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .markdown:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .html:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .text:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExportFormat_lift(_ buf: RustBuffer) throws -> ExportFormat {
+    return try FfiConverterTypeExportFormat.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExportFormat_lower(_ value: ExportFormat) -> RustBuffer {
+    return FfiConverterTypeExportFormat.lower(value)
+}
+
+
+
+
+public enum ImportSource: Equatable, Hashable {
+    
+    case librelog
+    case dayOne
+    case daylio
+    case markdown
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ImportSource: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeImportSource: FfiConverterRustBuffer {
+    typealias SwiftType = ImportSource
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ImportSource {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .librelog
+        
+        case 2: return .dayOne
+        
+        case 3: return .daylio
+        
+        case 4: return .markdown
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ImportSource, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .librelog:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .dayOne:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .daylio:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .markdown:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImportSource_lift(_ buf: RustBuffer) throws -> ImportSource {
+    return try FfiConverterTypeImportSource.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImportSource_lower(_ value: ImportSource) -> RustBuffer {
+    return FfiConverterTypeImportSource.lower(value)
+}
+
+
+
+
 public enum MarkKind: Equatable, Hashable {
     
     case bold
@@ -3591,6 +4036,14 @@ public func parsePairingQr(qr: String)throws  -> PairingCode  {
     )
 })
 }
+public func exportExtension(format: ExportFormat) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_func_export_extension(
+        FfiConverterTypeExportFormat_lower(format),uniffiCallStatus
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -3617,6 +4070,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_func_parse_pairing_qr() != 37035) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_func_export_extension() != 64865) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_pairingsession_id() != 28292) {
@@ -3655,10 +4111,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_entry() != 55598) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_librelog_core_checksum_method_store_export() != 8854) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_librelog_core_checksum_method_store_forget_journal_key() != 34284) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_generate_journal_key() != 37272) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_import_file() != 5324) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_journals() != 23588) {
@@ -3689,6 +4151,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_pending_count() != 28793) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_preview_import() != 22638) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_push_succeeded() != 15783) {
