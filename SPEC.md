@@ -387,9 +387,12 @@ no object storage and no server of our own.
 There is **no sync server of our own**. Clients talk directly to Supabase:
 Auth for sign-in, Postgres (via PostgREST RPC) for the op log, Realtime
 Broadcast for "new data" pings, Edge Functions for payment webhooks, and
-`pg_cron` for housekeeping. The Rust core implements the client over plain
-HTTPS and one WebSocket — no Supabase SDK needed in the core, so all four
-platforms share one implementation.
+`pg_cron` for housekeeping. The Rust core does no networking itself: it
+produces sealed batches and snapshots, and merges what the apps hand back
+(`outgoing_batch`, `push_succeeded`, `apply_incoming`, `snapshot`,
+`apply_snapshot`). Each app makes the HTTPS calls with its platform's own
+client (URLSession, OkHttp, HttpClient), which keeps TLS, proxies and
+background transfers native and the core trivially testable.
 
 **Schema** (own `dailylog` schema, exposed to the Data API):
 
