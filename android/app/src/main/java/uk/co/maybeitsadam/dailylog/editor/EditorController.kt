@@ -9,9 +9,9 @@ import uniffi.dailylog_core.markdownShortcut
 
 /** What the controller needs from a text view. */
 interface EditorHost {
-    val text: Editable
-    val selectionStart: Int
-    val selectionEnd: Int
+    val buffer: Editable
+    val caretStart: Int
+    val caretEnd: Int
     fun select(start: Int, end: Int = start)
 }
 
@@ -52,17 +52,17 @@ class EditorController(private val style: EditorStyle?) {
     fun load(blocks: List<Block>) {
         val h = host ?: return
         applying = true
-        h.text.replace(0, h.text.length, BlockText.spannable(blocks, style))
+        h.buffer.replace(0, h.buffer.length, BlockText.spannable(blocks, style))
         trailingKind = "p" to 0
         applying = false
-        h.select(h.text.length)
+        h.select(h.buffer.length)
     }
 
     fun blocks(): List<Block> {
         val h = host ?: return emptyList()
-        val out = BlockText.blocks(h.text).toMutableList()
+        val out = BlockText.blocks(h.buffer).toMutableList()
         // The empty last paragraph's kind lives here, not in a span.
-        if (out.isNotEmpty() && out.last().text.isEmpty() && (h.text.isEmpty() || h.text.last() == '\n')) {
+        if (out.isNotEmpty() && out.last().text.isEmpty() && (h.buffer.isEmpty() || h.buffer.last() == '\n')) {
             val (k, i) = trailingKind
             out[out.lastIndex] = out.last().copy(kind = BlockText.decode(k), indent = i.toUByte())
         }
@@ -78,15 +78,15 @@ class EditorController(private val style: EditorStyle?) {
         changeInserted = inserted
         // Backspace into a list marker: the edit removes one marker character.
         deletedIntoMarker = removed == 1 && inserted == 0 &&
-            h.text.getSpans(start, start + 1, MarkerSpan::class.java).any {
-                h.text.getSpanStart(it) <= start && h.text.getSpanEnd(it) > start
+            h.buffer.getSpans(start, start + 1, MarkerSpan::class.java).any {
+                h.buffer.getSpanStart(it) <= start && h.buffer.getSpanEnd(it) > start
             }
     }
 
     fun afterChange() {
         if (applying) return
         val h = host ?: return
-        val e = h.text
+        val e = h.buffer
         applying = true
         try {
             val start = changeStart.coerceIn(0, e.length)
@@ -107,7 +107,7 @@ class EditorController(private val style: EditorStyle?) {
             if (inserted != "\n") shortcutAtCaret()
             repairMarkers()
             style?.let { BlockText.restyle(e, 0, e.length, it) }
-            expectedCaret = h.selectionStart
+            expectedCaret = h.caretStart
         } finally {
             applying = false
             deletedIntoMarker = false
@@ -119,7 +119,7 @@ class EditorController(private val style: EditorStyle?) {
     fun selectionChanged() {
         if (applying) return
         val h = host ?: return
-        if (h.selectionStart != expectedCaret) {
+        if (h.caretStart != expectedCaret) {
             typingOn.clear()
             typingOff.clear()
         }
@@ -131,12 +131,12 @@ class EditorController(private val style: EditorStyle?) {
     val currentKind: BlockKind
         get() {
             val h = host ?: return BlockText.decode(null)
-            return kindAt(BlockText.paragraphStart(h.text, h.selectionStart))
+            return kindAt(BlockText.paragraphStart(h.buffer, h.caretStart))
         }
 
     fun isActive(kind: MarkKind): Boolean {
         val h = host ?: return false
-        val (s, e) = h.selectionStart to h.selectionEnd
+        val (s, e) = h.caretStart to h.caretEnd
         if (s == e) {
             if (kind in typingOn) return true
             if (kind in typingOff) return false
@@ -148,7 +148,7 @@ class EditorController(private val style: EditorStyle?) {
     /** Bold, italic, etc. With no selection it changes what you type next. */
     fun toggle(kind: MarkKind) {
         val h = host ?: return
-        val (s, e) = h.selectionStart to h.selectionEnd
+        val (s, e) = h.caretStart to h.caretEnd
         if (s == e) {
             val on = !isActive(kind)
             typingOn.remove(kind)
@@ -160,9 +160,9 @@ class EditorController(private val style: EditorStyle?) {
         }
         edit {
             if (hasFlag(s, s + 1, kind)) {
-                BlockText.clear(h.text, s, e, FlagSpan::class.java, { it.kind == kind }) { FlagSpan(it.kind) }
+                BlockText.clear(h.buffer, s, e, FlagSpan::class.java, { it.kind == kind }) { FlagSpan(it.kind) }
             } else {
-                h.text.setSpan(FlagSpan(kind), s, e, Spanned.SPAN_EXCLUSIVE_INCLUSIVE)
+                h.buffer.setSpan(FlagSpan(kind), s, e, Spanned.SPAN_EXCLUSIVE_INCLUSIVE)
             }
         }
         h.select(s, e)
@@ -172,10 +172,10 @@ class EditorController(private val style: EditorStyle?) {
     fun setKind(kind: BlockKind) {
         val h = host ?: return
         val target = if (currentKind == kind) BlockKind.Paragraph else kind
-        val e = h.text
+        val e = h.buffer
         val starts = mutableListOf<Int>()
-        var p = BlockText.paragraphStart(e, h.selectionStart)
-        val last = BlockText.paragraphStart(e, h.selectionEnd)
+        var p = BlockText.paragraphStart(e, h.caretStart)
+        val last = BlockText.paragraphStart(e, h.caretEnd)
         while (true) {
             starts += p
             if (p >= last) break
@@ -183,7 +183,7 @@ class EditorController(private val style: EditorStyle?) {
             if (next > e.length || next <= p) break
             p = next
         }
-        val caretFromEnd = e.length - h.selectionStart
+        val caretFromEnd = e.length - h.caretStart
         edit {
             for (start in starts.reversed()) setKindAt(start, target)
         }
@@ -193,27 +193,27 @@ class EditorController(private val style: EditorStyle?) {
     /** Nests or un-nests list items; other paragraphs don't indent. */
     fun indent(delta: Int) {
         val h = host ?: return
-        val start = BlockText.paragraphStart(h.text, h.selectionStart)
+        val start = BlockText.paragraphStart(h.buffer, h.caretStart)
         val kind = kindAt(start)
         if (!BlockText.isList(kind)) return
-        val now = BlockText.kindSpanAt(h.text, start)?.indent ?: 0
+        val now = BlockText.kindSpanAt(h.buffer, start)?.indent ?: 0
         val end = paragraphEndWithNewline(start)
-        edit { BlockText.setKindSpan(h.text, start, end, kind, (now + delta).coerceIn(0, 4)) }
+        edit { BlockText.setKindSpan(h.buffer, start, end, kind, (now + delta).coerceIn(0, 4)) }
     }
 
     /** Flips a checkbox when its marker is tapped. Returns true if it was one. */
     fun toggleCheck(index: Int): Boolean {
         val h = host ?: return false
-        if (index < 0 || index >= h.text.length) return false
-        val onMarker = h.text.getSpans(index, index + 1, MarkerSpan::class.java).any {
-            h.text.getSpanStart(it) <= index && h.text.getSpanEnd(it) > index
+        if (index < 0 || index >= h.buffer.length) return false
+        val onMarker = h.buffer.getSpans(index, index + 1, MarkerSpan::class.java).any {
+            h.buffer.getSpanStart(it) <= index && h.buffer.getSpanEnd(it) > index
         }
         if (!onMarker) return false
-        val start = BlockText.paragraphStart(h.text, index)
+        val start = BlockText.paragraphStart(h.buffer, index)
         val kind = kindAt(start) as? BlockKind.Check ?: return false
-        val (s, e) = h.selectionStart to h.selectionEnd
+        val (s, e) = h.caretStart to h.caretEnd
         edit { setKindAt(start, BlockKind.Check(!kind.checked)) }
-        h.select(s.coerceAtMost(h.text.length), e.coerceAtMost(h.text.length))
+        h.select(s.coerceAtMost(h.buffer.length), e.coerceAtMost(h.buffer.length))
         return true
     }
 
@@ -221,7 +221,7 @@ class EditorController(private val style: EditorStyle?) {
 
     private fun handleReturn(newline: Int) {
         val h = host ?: return
-        val e = h.text
+        val e = h.buffer
         val paraStart = BlockText.paragraphStart(e, newline)
         val span = BlockText.kindSpanAt(e, paraStart)
         val kind = BlockText.decode(span?.kind)
@@ -263,7 +263,7 @@ class EditorController(private val style: EditorStyle?) {
 
     /** The first characters typed into an empty last paragraph take its kind. */
     private fun claimTrailing(start: Int, end: Int) {
-        val e = host?.text ?: return
+        val e = host?.buffer ?: return
         val (k, i) = trailingKind
         BlockText.setKindSpan(e, start, maxOf(end, BlockText.paragraphEnd(e, start)), BlockText.decode(k), i)
         trailingKind = "p" to 0
@@ -275,7 +275,7 @@ class EditorController(private val style: EditorStyle?) {
     }
 
     private fun applyTyping(start: Int, end: Int) {
-        val e = host?.text ?: return
+        val e = host?.buffer ?: return
         if (end <= start) return
         for (k in typingOn) {
             BlockText.clear(e, start, end, FlagSpan::class.java, { it.kind == k }) { FlagSpan(it.kind) }
@@ -294,8 +294,8 @@ class EditorController(private val style: EditorStyle?) {
 
     private fun shortcutAtCaret() {
         val h = host ?: return
-        val e = h.text
-        val caret = h.selectionStart
+        val e = h.buffer
+        val caret = h.caretStart
         val paraStart = BlockText.paragraphStart(e, caret)
         if (caret <= paraStart) return
         val kind = kindAt(paraStart)
@@ -315,8 +315,8 @@ class EditorController(private val style: EditorStyle?) {
      */
     private fun repairMarkers() {
         val h = host ?: return
-        val e = h.text
-        var caret = h.selectionStart
+        val e = h.buffer
+        var caret = h.caretStart
         var start = 0
         var number = 0
         while (start <= e.length) {
@@ -350,7 +350,7 @@ class EditorController(private val style: EditorStyle?) {
     }
 
     private fun removeStrayMarkers(paraStart: Int) {
-        val e = host?.text ?: return
+        val e = host?.buffer ?: return
         val end = BlockText.paragraphEnd(e, paraStart)
         val strays = e.getSpans(paraStart, end, MarkerSpan::class.java).filter { e.getSpanStart(it) > paraStart }
         for (span in strays.sortedByDescending { e.getSpanStart(it) }) {
@@ -364,7 +364,7 @@ class EditorController(private val style: EditorStyle?) {
     // MARK: Paragraph surgery
 
     private fun kindAt(paraStart: Int): BlockKind {
-        val e = host?.text ?: return BlockKind.Paragraph
+        val e = host?.buffer ?: return BlockKind.Paragraph
         val end = BlockText.paragraphEnd(e, paraStart)
         // An empty last paragraph has no characters; its kind is held here.
         if (paraStart >= e.length || (end == paraStart && paraStart == e.length)) return BlockText.decode(trailingKind.first)
@@ -372,7 +372,7 @@ class EditorController(private val style: EditorStyle?) {
     }
 
     private fun markerEnd(paraStart: Int): Int? {
-        val e = host?.text ?: return null
+        val e = host?.buffer ?: return null
         if (paraStart >= e.length) return null
         return e.getSpans(paraStart, paraStart + 1, MarkerSpan::class.java)
             .filter { e.getSpanStart(it) == paraStart }
@@ -380,14 +380,14 @@ class EditorController(private val style: EditorStyle?) {
     }
 
     private fun paragraphEndWithNewline(paraStart: Int): Int {
-        val e = host?.text ?: return paraStart
+        val e = host?.buffer ?: return paraStart
         val end = BlockText.paragraphEnd(e, paraStart)
         return if (end < e.length) end + 1 else end
     }
 
     /** Re-kinds the paragraph starting at [start], swapping its list marker. */
     private fun setKindAt(start: Int, kind: BlockKind) {
-        val e = host?.text ?: return
+        val e = host?.buffer ?: return
         val indent = BlockText.kindSpanAt(e, start)?.indent ?: trailingKind.second
         markerEnd(start)?.let { e.delete(start, it) }
         BlockText.markerText(kind, 1)?.let { m ->
@@ -399,7 +399,7 @@ class EditorController(private val style: EditorStyle?) {
     }
 
     private fun hasFlag(from: Int, to: Int, kind: MarkKind): Boolean {
-        val e = host?.text ?: return false
+        val e = host?.buffer ?: return false
         if (from < 0 || to > e.length || from >= to) return false
         return e.getSpans(from, to, FlagSpan::class.java).any {
             it.kind == kind && e.getSpanStart(it) <= from && e.getSpanEnd(it) >= to
@@ -412,10 +412,10 @@ class EditorController(private val style: EditorStyle?) {
         applying = true
         try {
             block()
-            BlockText.normalizeKinds(h.text)
+            BlockText.normalizeKinds(h.buffer)
             repairMarkers()
-            style?.let { BlockText.restyle(h.text, 0, h.text.length, it) }
-            expectedCaret = h.selectionStart
+            style?.let { BlockText.restyle(h.buffer, 0, h.buffer.length, it) }
+            expectedCaret = h.caretStart
         } finally {
             applying = false
         }

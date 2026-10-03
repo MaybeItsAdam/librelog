@@ -21,12 +21,12 @@ import uniffi.dailylog_core.MarkKind
 @Config(sdk = [35], application = android.app.Application::class)
 class EditorControllerTest {
     private class FakeHost : EditorHost {
-        override val text: Editable = SpannableStringBuilder()
-        override var selectionStart = 0
-        override var selectionEnd = 0
+        override val buffer: Editable = SpannableStringBuilder()
+        override var caretStart = 0
+        override var caretEnd = 0
         override fun select(start: Int, end: Int) {
-            selectionStart = start
-            selectionEnd = end
+            caretStart = start
+            caretEnd = end
         }
     }
 
@@ -42,18 +42,18 @@ class EditorControllerTest {
 
     private fun type(s: String) {
         for (ch in s) {
-            val at = host.selectionStart
-            c.beforeChange(at, host.selectionEnd - at, 1)
-            host.text.replace(at, host.selectionEnd, ch.toString())
+            val at = host.caretStart
+            c.beforeChange(at, host.caretEnd - at, 1)
+            host.buffer.replace(at, host.caretEnd, ch.toString())
             host.select(at + 1)
             c.afterChange()
         }
     }
 
     private fun backspace() {
-        val at = host.selectionStart
+        val at = host.caretStart
         c.beforeChange(at - 1, 1, 0)
-        host.text.delete(at - 1, at)
+        host.buffer.delete(at - 1, at)
         host.select(at - 1)
         c.afterChange()
     }
@@ -76,7 +76,7 @@ class EditorControllerTest {
     @Test
     fun numberedItemsCountUp() {
         type("1. one\ntwo\nthree")
-        val lines = host.text.toString().split("\n")
+        val lines = host.buffer.toString().split("\n")
         assertTrue(lines[0].startsWith("1."))
         assertTrue(lines[1].startsWith("2."))
         assertTrue(lines[2].startsWith("3."))
