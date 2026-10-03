@@ -14,7 +14,7 @@
         </Grid.RowDefinitions>
         <Grid>
             <StackPanel Spacing="4">
-                <TextBlock Text="Timeline" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="TIMELINE" Style="{StaticResource MicroLabel}" />
                 <TextBlock Text="Every entry" Style="{StaticResource TitleText}" />
             </StackPanel>
             <ToggleButton x:Name="FavoritesToggle" Content="Favourites only" CornerRadius="6"

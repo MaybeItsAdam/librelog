@@ -12,7 +12,7 @@
         <StackPanel MaxWidth="760" Padding="40,32,40,64" Spacing="16">
             <Grid>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Version history" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Text="VERSION HISTORY" Style="{StaticResource MicroLabel}" />
                     <TextBlock x:Name="HeadingText" Style="{StaticResource TitleText}" />
                 </StackPanel>
                 <Button x:Name="ReviewedButton" Style="{StaticResource PrimaryButton}" Content="Mark reviewed"

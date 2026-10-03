@@ -33,7 +33,7 @@ public sealed partial class HistoryPage : Page
 
     private static string Label(Revision r) =>
         DateTimeOffset.TryParse(r.CreatedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
-            ? at.ToLocalTime().ToString("f", CultureInfo.CurrentCulture)
+            ? Format.Caps(at.ToLocalTime().ToString("f", CultureInfo.CurrentCulture))
             : r.CreatedAt;
 
     private void OnCopy(object sender, RoutedEventArgs e)

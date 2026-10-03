@@ -53,12 +53,13 @@
     <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
+    <!-- WinUI's TextBlock has no uppercase transform, so micro-label text is
+         uppercased where it's set: literally in XAML, Format.Caps in code. -->
     <Style x:Key="MicroLabel" TargetType="TextBlock">
         <Setter Property="FontSize" Value="10" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="CharacterSpacing" Value="150" />
         <Setter Property="Foreground" Value="{ThemeResource MutedBrush}" />
-        <Setter Property="TextTransform" Value="Uppercase" />
     </Style>
 
     <Style x:Key="TitleText" TargetType="TextBlock">

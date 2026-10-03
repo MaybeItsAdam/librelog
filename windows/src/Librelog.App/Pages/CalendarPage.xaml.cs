@@ -36,7 +36,7 @@ public sealed partial class CalendarPage : Page
             WeekdayHeader.ColumnDefinitions.Add(new ColumnDefinition());
             var label = new TextBlock
             {
-                Text = names[(i + FirstDayOfWeek) % 7],
+                Text = Format.Caps(names[(i + FirstDayOfWeek) % 7]),
                 Style = (Style)Application.Current.Resources["MicroLabel"],
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 4, 0, 8),
@@ -58,7 +58,7 @@ public sealed partial class CalendarPage : Page
         if (shown != month) return;
         MonthText.Text = Format.Month(shown);
         DrawGrid(shown, marks.ToDictionary(m => m.Date));
-        SelectedText.Text = Format.LongDate(day);
+        SelectedText.Text = Format.Caps(Format.LongDate(day));
         DayList.ItemsSource = entries;
         NothingText.Visibility = Format.Shown(entries.Count == 0);
     }

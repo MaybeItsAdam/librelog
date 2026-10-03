@@ -14,7 +14,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <StackPanel Spacing="4">
-            <TextBlock Text="Search" Style="{StaticResource MicroLabel}" />
+            <TextBlock Text="SEARCH" Style="{StaticResource MicroLabel}" />
             <TextBlock Text="Find anything" Style="{StaticResource TitleText}" />
         </StackPanel>
 
@@ -23,7 +23,7 @@
 
         <Grid Grid.Row="2">
             <StackPanel x:Name="ExamplesPanel" Spacing="8">
-                <TextBlock Text="Try" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="TRY" Style="{StaticResource MicroLabel}" />
                 <ItemsControl x:Name="Examples">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="pages:SearchExample">

@@ -34,7 +34,7 @@
             <!-- Write: a prompt when the day is empty, its entries otherwise. -->
             <Border Style="{StaticResource Card}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Write" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Text="WRITE" Style="{StaticResource MicroLabel}" />
                     <StackPanel x:Name="PromptPanel" Spacing="12">
                         <TextBlock x:Name="PromptText" Style="{StaticResource HeadlineText}" FontSize="22" />
                         <HyperlinkButton Content="Start writing" Click="OnNew" Padding="0" Foreground="{StaticResource AzureBrush}" />
@@ -50,7 +50,7 @@
             </Border>
 
             <StackPanel x:Name="MemoriesPanel" Spacing="8">
-                <TextBlock Text="On this day" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="ON THIS DAY" Style="{StaticResource MicroLabel}" />
                 <ListView x:Name="MemoryList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnEntryClick">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="core:EntrySummary">
@@ -61,7 +61,7 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
-                <TextBlock Text="Streak" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="STREAK" Style="{StaticResource MicroLabel}" />
                 <Grid BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition /><ColumnDefinition /><ColumnDefinition />

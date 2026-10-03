@@ -12,7 +12,7 @@
         <StackPanel MaxWidth="760" Padding="40,32,40,64" Spacing="20">
             <Grid>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Calendar" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Text="CALENDAR" Style="{StaticResource MicroLabel}" />
                     <TextBlock x:Name="MonthText" Style="{StaticResource TitleText}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">

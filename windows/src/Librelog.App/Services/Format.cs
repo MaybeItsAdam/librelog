@@ -19,6 +19,9 @@ public static class Format
 
     public static string ShortDate(string ymd) => Date(ymd).ToString("ddd d MMM yyyy", Culture);
 
+    /// Micro-label casing, done on the text because TextBlock can't.
+    public static string Caps(string s) => s.ToUpper(CultureInfo.CurrentCulture);
+
     public static string Weekday(string ymd) => Date(ymd).ToString("dddd", Culture);
 
     public static string Month(DateOnly firstOfMonth) => firstOfMonth.ToString("MMMM yyyy", Culture);

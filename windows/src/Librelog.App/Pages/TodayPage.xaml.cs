@@ -36,7 +36,7 @@ public sealed partial class TodayPage : Page
         var (entries, memories, stats) = await AppServices.Run(s => (s.Day(day), s.OnThisDay(day), s.Stats(AppServices.Today)));
         if (day != date) return; // the user moved on while loading
 
-        WeekdayText.Text = Format.Weekday(day);
+        WeekdayText.Text = Format.Caps(Format.Weekday(day));
         DayText.Text = Format.DayTitle(day);
         TodayButton.IsEnabled = day != AppServices.Today;
         PromptText.Text = Prompts.For(day);

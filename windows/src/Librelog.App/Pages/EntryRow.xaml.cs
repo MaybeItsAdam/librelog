@@ -38,7 +38,7 @@ public sealed partial class EntryRow : UserControl
     private void Update()
     {
         if (entry is not { } e) return;
-        DateText.Text = ShowDate ? Format.ShortDate(e.Date) : "";
+        DateText.Text = ShowDate ? Format.Caps(Format.ShortDate(e.Date)) : "";
         TimeText.Text = Format.Time(e.Time);
         TitleText.Text = e.Title ?? "";
         TitleText.Visibility = Format.Shown(!string.IsNullOrEmpty(e.Title));

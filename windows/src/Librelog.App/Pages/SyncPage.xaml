@@ -9,7 +9,7 @@
     <ScrollViewer>
         <StackPanel MaxWidth="640" Padding="40,32,40,64" Spacing="20">
             <StackPanel Spacing="4">
-                <TextBlock Text="Sync" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="SYNC" Style="{StaticResource MicroLabel}" />
                 <TextBlock Text="Your journal on every device" Style="{StaticResource TitleText}" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -18,7 +18,7 @@
             <!-- Shown once, right after this device created the journal key. -->
             <Border x:Name="NewPhrasePanel" Style="{StaticResource Card}" BorderBrush="{StaticResource AmberBrush}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Your recovery phrase" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Text="YOUR RECOVERY PHRASE" Style="{StaticResource MicroLabel}" />
                     <TextBlock Style="{StaticResource BodyText}"
                                Text="These 24 words are the only way back into your synced journal if you lose every device. Write them down and keep them somewhere safe. We can't reset them." />
                     <TextBlock x:Name="NewPhraseText" FontFamily="{StaticResource Mono}" FontSize="15" TextWrapping="Wrap"
@@ -30,7 +30,7 @@
             <!-- Off: sign in. -->
             <Border x:Name="SignInPanel" Style="{StaticResource Card}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Sign in" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Text="SIGN IN" Style="{StaticResource MicroLabel}" />
                     <TextBlock Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}"
                                Text="Entries are encrypted on this PC before they're uploaded. The server only ever stores ciphertext." />
                     <TextBox x:Name="EmailBox" PlaceholderText="you@example.com" InputScope="EmailSmtpAddress" CornerRadius="6" />
@@ -49,7 +49,7 @@
             <!-- NeedsKey: unlock with the phrase or by pairing. -->
             <Border x:Name="KeyPanel" Style="{StaticResource Card}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Unlock your journal" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Text="UNLOCK YOUR JOURNAL" Style="{StaticResource MicroLabel}" />
                     <TextBlock Style="{StaticResource BodyText}"
                                Text="This account already has a journal key. Bring it to this PC from a device that's syncing, or type your recovery phrase." />
                     <Button x:Name="PairButton" Style="{StaticResource PrimaryButton}" Content="Pair with another device" Click="OnPair" />
@@ -74,7 +74,7 @@
                         </StackPanel>
                         <Button Style="{StaticResource PlainButton}" Content="Cancel" Click="OnCancelPairing" />
                     </StackPanel>
-                    <TextBlock Text="Or use your recovery phrase" Style="{StaticResource MicroLabel}" Margin="0,8,0,0" />
+                    <TextBlock Text="OR USE YOUR RECOVERY PHRASE" Style="{StaticResource MicroLabel}" Margin="0,8,0,0" />
                     <TextBox x:Name="PhraseBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
                              FontFamily="{StaticResource Mono}" PlaceholderText="24 words" CornerRadius="6" />
                     <Button Style="{StaticResource PlainButton}" Content="Unlock" Click="OnUsePhrase" />
@@ -86,7 +86,7 @@
             <StackPanel x:Name="OnPanel" Spacing="20">
                 <Border Style="{StaticResource Card}">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="Status" Style="{StaticResource MicroLabel}" />
+                        <TextBlock Text="STATUS" Style="{StaticResource MicroLabel}" />
                         <TextBlock x:Name="EmailText" Style="{StaticResource HeadlineText}" />
                         <TextBlock x:Name="StatusText" Style="{StaticResource MonoText}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -100,7 +100,7 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="Add a device" Style="{StaticResource MicroLabel}" />
+                        <TextBlock Text="ADD A DEVICE" Style="{StaticResource MicroLabel}" />
                         <TextBlock Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}"
                                    Text="On the new device, choose Pair with another device. Paste the code it shows here." />
                         <TextBox x:Name="ApproveBox" PlaceholderText="librelog-pair:1:…" FontFamily="{StaticResource Mono}" FontSize="12" CornerRadius="6" />
