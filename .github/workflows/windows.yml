@@ -53,5 +53,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: librelog-windows-${{ matrix.platform }}
-          path: windows/src/Librelog.App/AppPackages/**
-          if-no-files-found: warn
+          # MSBuild writes packages under bin/<platform>/Release/<tfm>/<rid>/AppPackages.
+          path: windows/src/Librelog.App/bin/**/AppPackages/**
+          if-no-files-found: error
