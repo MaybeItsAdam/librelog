@@ -6,3 +6,6 @@ apple/Dailylog.xcodeproj/
 apple/DailylogCore.xcframework/
 xcuserdata/
 .DS_Store
+
+# Claude Code agent worktrees
+.claude/
