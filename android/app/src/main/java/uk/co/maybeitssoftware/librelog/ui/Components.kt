@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarHalf
 import androidx.compose.material.icons.outlined.StarOutline
@@ -216,27 +217,17 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
     }
 }
 
-/**
- * Rotating reflection prompts (SPEC.md §6.1). Picked by date, so a day always
- * shows the same one; the same hash as the Apple app, so devices agree.
- */
-object Prompts {
-    val all = listOf(
-        "What's on your mind today?",
-        "What made today different from yesterday?",
-        "What are you looking forward to?",
-        "Three things you're grateful for.",
-        "What took most of your energy today?",
-        "Who did you spend time with?",
-        "What would you tell yourself a year ago?",
-        "What did you learn today?",
-        "What's one small win from today?",
-        "Where did the day go?",
-    )
-
-    fun today(date: String): String {
-        var n = 0L
-        for (c in date) n = (n * 31 + c.code) // wraps like Swift's &* and &+ on 64-bit Int
-        return all[(Math.floorMod(kotlin.math.abs(n), all.size.toLong())).toInt()]
+/** The one primary action: a square-cornered azure "New entry" button, no shadow. */
+@Composable
+fun NewEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .padding(20.dp)
+            .size(56.dp)
+            .background(tokens.primary, RoundedCornerShape(Radius.card))
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.Add, "New entry", Modifier.size(26.dp), tint = Color.White)
     }
 }

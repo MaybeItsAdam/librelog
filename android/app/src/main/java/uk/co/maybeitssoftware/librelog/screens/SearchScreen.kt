@@ -1,5 +1,6 @@
 package uk.co.maybeitssoftware.librelog.screens
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,7 +59,7 @@ private val examples = listOf(
 @Composable
 fun SearchScreen(app: AppModel, openEntry: (String) -> Unit) {
     val t = tokens
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var hits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
 
     LaunchedEffect(query, app.revision) {

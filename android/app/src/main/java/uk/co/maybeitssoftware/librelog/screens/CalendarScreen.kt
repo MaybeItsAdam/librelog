@@ -1,5 +1,9 @@
 package uk.co.maybeitssoftware.librelog.screens
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import uk.co.maybeitssoftware.librelog.ui.NewEntryButton
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,9 +64,9 @@ import uniffi.librelog_core.EntrySummary
 @Composable
 fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
     val t = tokens
-    var month by remember { mutableStateOf(YearMonth.now()) }
+    var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     var marks by remember { mutableStateOf<Map<String, DayMark>>(emptyMap()) }
-    var selected by remember { mutableStateOf(Day.today) }
+    var selected by rememberSaveable { mutableStateOf(Day.today) }
     var dayEntries by remember { mutableStateOf<List<EntrySummary>>(emptyList()) }
 
     LaunchedEffect(month, app.revision) {
@@ -74,13 +78,14 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
         dayEntries = runCatching { app.run { it.day(d, null) } }.getOrDefault(emptyList())
     }
 
+    val scope = rememberCoroutineScope()
+    Box(Modifier.fillMaxSize().background(t.paper)) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(t.paper)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(bottom = 40.dp)
+            .padding(bottom = 100.dp)
             .widthIn(max = 720.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
@@ -130,6 +135,9 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
                 Hairline()
             }
         }
+    }
+    // New entry on the selected day; untimed unless it's today.
+    NewEntryButton({ scope.launch { app.newEntry(selected)?.let(openEntry) } }, Modifier.align(Alignment.BottomEnd))
     }
 }
 
