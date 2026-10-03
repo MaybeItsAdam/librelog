@@ -22,11 +22,13 @@ public static class Program
         }
         main.Activated += (_, args) => App.Current?.HandleActivation(args);
 
-        Application.Start(_ =>
+        // A lone `_` lambda parameter is a real parameter, not a discard, so
+        // it's named here and the App is constructed as a plain statement.
+        Application.Start(init =>
         {
             var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
             SynchronizationContext.SetSynchronizationContext(context);
-            _ = new App(activation);
+            new App(activation);
         });
         return 0;
     }
