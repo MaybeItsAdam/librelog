@@ -120,7 +120,6 @@ object Typeface {
     val title = TextStyle(fontFamily = serif, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp)
     val headline = TextStyle(fontFamily = serif, fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 24.sp)
     val body = TextStyle(fontFamily = serif, fontSize = 17.sp, lineHeight = 24.sp)
-    val prompt = TextStyle(fontFamily = serif, fontSize = 19.sp, lineHeight = 26.sp)
     val ui = TextStyle(fontSize = 15.sp)
     val small = TextStyle(fontSize = 13.sp)
 

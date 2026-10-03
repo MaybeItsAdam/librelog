@@ -64,7 +64,6 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
     /** Bumped after any write or merged pull, so screens reload. */
     var revision by mutableIntStateOf(0)
         private set
-    var selectedDate by mutableStateOf(Day.today)
     var lastError by mutableStateOf<String?>(null)
 
     init {
@@ -88,8 +87,8 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
         revision++
     }
 
-    suspend fun newEntry(date: String? = null): String? {
-        val day = date ?: selectedDate
+    suspend fun newEntry(date: String = Day.today): String? {
+        val day = date
         val time = if (day == Day.today) Day.nowTime else null
         return try {
             val entry = run { it.createEntry(null, day, time) }
