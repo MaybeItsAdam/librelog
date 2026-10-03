@@ -1,0 +1,37 @@
+<!-- Every entry, newest first, a page at a time (SPEC.md §6.4). -->
+<Page
+    x:Class="Dailylog.App.Pages.TimelinePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:Dailylog.Core"
+    xmlns:pages="using:Dailylog.App.Pages"
+    Background="{ThemeResource PaperBrush}">
+
+    <Grid MaxWidth="760" Padding="40,32,40,0" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Timeline" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="Every entry" Style="{StaticResource TitleText}" />
+            </StackPanel>
+            <ToggleButton x:Name="FavoritesToggle" Content="Favourites only" CornerRadius="6"
+                          HorizontalAlignment="Right" VerticalAlignment="Center" Click="OnFilterChanged" />
+        </Grid>
+
+        <ListView x:Name="List" Grid.Row="1" SelectionMode="None" IsItemClickEnabled="True"
+                  ItemClick="OnEntryClick" Padding="0,0,0,48">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="core:EntrySummary">
+                    <pages:EntryRow Entry="{x:Bind}" />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+            <ListView.Footer>
+                <TextBlock x:Name="EmptyText" Text="Nothing here yet." Style="{StaticResource BodyText}"
+                           Foreground="{ThemeResource MutedBrush}" Margin="0,16" />
+            </ListView.Footer>
+        </ListView>
+    </Grid>
+</Page>

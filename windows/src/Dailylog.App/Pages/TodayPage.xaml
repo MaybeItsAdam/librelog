@@ -1,0 +1,85 @@
+<!-- The start screen (SPEC.md §6.1). -->
+<Page
+    x:Class="Dailylog.App.Pages.TodayPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:Dailylog.Core"
+    xmlns:pages="using:Dailylog.App.Pages"
+    Background="{ThemeResource PaperBrush}">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="760" Padding="40,32,40,64" Spacing="24" HorizontalAlignment="Stretch">
+            <Grid>
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="WeekdayText" Style="{StaticResource MicroLabel}" />
+                    <TextBlock x:Name="DayText" Style="{StaticResource TitleText}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Style="{StaticResource PlainButton}" Click="OnPrevious" ToolTipService.ToolTip="Previous day">
+                        <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                    </Button>
+                    <Button x:Name="TodayButton" Style="{StaticResource PlainButton}" Content="Today" Click="OnToday" />
+                    <Button Style="{StaticResource PlainButton}" Click="OnNext" ToolTipService.ToolTip="Next day">
+                        <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                    </Button>
+                    <Button Style="{StaticResource PrimaryButton}" Click="OnNew" ToolTipService.ToolTip="New entry (Ctrl+N)">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE710;" FontSize="12" />
+                            <TextBlock Text="New entry" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Write: a prompt when the day is empty, its entries otherwise. -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Write" Style="{StaticResource MicroLabel}" />
+                    <StackPanel x:Name="PromptPanel" Spacing="12">
+                        <TextBlock x:Name="PromptText" Style="{StaticResource HeadlineText}" FontSize="22" />
+                        <HyperlinkButton Content="Start writing" Click="OnNew" Padding="0" Foreground="{StaticResource AzureBrush}" />
+                    </StackPanel>
+                    <ListView x:Name="EntryList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnEntryClick">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="core:EntrySummary">
+                                <pages:EntryRow Entry="{x:Bind}" ShowDate="False" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
+            <StackPanel x:Name="MemoriesPanel" Spacing="8">
+                <TextBlock Text="On this day" Style="{StaticResource MicroLabel}" />
+                <ListView x:Name="MemoryList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnEntryClick">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="core:EntrySummary">
+                            <pages:EntryRow Entry="{x:Bind}" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="Streak" Style="{StaticResource MicroLabel}" />
+                <Grid BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition /><ColumnDefinition /><ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Padding="16,12" Spacing="2">
+                        <TextBlock x:Name="CurrentText" FontFamily="{StaticResource Mono}" FontSize="24" Foreground="{ThemeResource InkBrush}" />
+                        <TextBlock Text="days running" Foreground="{ThemeResource MutedBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Padding="16,12" Spacing="2" BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="1,0,0,0">
+                        <TextBlock x:Name="LongestText" FontFamily="{StaticResource Mono}" FontSize="24" Foreground="{ThemeResource InkBrush}" />
+                        <TextBlock Text="longest" Foreground="{ThemeResource MutedBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Padding="16,12" Spacing="2" BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="1,0,0,0">
+                        <TextBlock x:Name="WordsText" FontFamily="{StaticResource Mono}" FontSize="24" Foreground="{ThemeResource InkBrush}" />
+                        <TextBlock Text="words" Foreground="{ThemeResource MutedBrush}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
