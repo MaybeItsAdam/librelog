@@ -38,7 +38,9 @@ foreach ($platform in $Platforms) {
 
 if (-not $SkipTests) {
   Write-Host '› core for the test host'
-  cargo build --release --lib --features capi --manifest-path (Join-Path $core 'Cargo.toml')
+  # Own target dir: the Apple and Android scripts also build the host
+  # library, without the C ABI, and would otherwise overwrite this one.
+  cargo build --release --lib --features capi --target-dir (Join-Path $core 'target/capi') --manifest-path (Join-Path $core 'Cargo.toml')
   if ($LASTEXITCODE -ne 0) { throw 'cargo build failed for the host' }
 
   Write-Host '› .NET tests'

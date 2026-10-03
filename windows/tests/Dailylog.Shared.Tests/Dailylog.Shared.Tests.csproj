@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
     <RootNamespace>Dailylog.Tests</RootNamespace>
     <!-- The core, built in release with the capi feature (scripts/build-windows.ps1). -->
-    <CoreLibDir Condition="'$(CoreLibDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\core\target\release\</CoreLibDir>
+    <CoreLibDir Condition="'$(CoreLibDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\core\target\capi\release\</CoreLibDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,7 +22,7 @@
        DllNotFoundException, which hides the real cause. Say it up front. -->
   <Target Name="RequireNativeCore" BeforeTargets="Build"
           Condition="!Exists('$(CoreLibDir)dailylog_core.dll') And !Exists('$(CoreLibDir)libdailylog_core.dylib') And !Exists('$(CoreLibDir)libdailylog_core.so')">
-    <Error Text="No native core in $(CoreLibDir). Build it first: cargo build --release --features capi --manifest-path core/Cargo.toml" />
+    <Error Text="No native core in $(CoreLibDir). Build it first: cargo build --release --features capi --target-dir core/target/capi --manifest-path core/Cargo.toml" />
   </Target>
 
   <!-- Whichever native core exists for this OS goes next to the tests. -->
