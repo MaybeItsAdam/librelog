@@ -56,7 +56,8 @@ foreach ($platform in $Platforms) {
   # code 1". Falls back to the .NET SDK when MSBuild isn't on PATH.
   $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue
   $config = if ($Publish) { 'Release' } else { 'Debug' }
-  $extra = if ($Publish) { @('/p:GenerateAppxPackageOnBuild=true', '/p:PublishAot=true') } else { @() }
+  # NativeAOT only works self-contained: the app carries its own runtime.
+  $extra = if ($Publish) { @('/p:GenerateAppxPackageOnBuild=true', '/p:SelfContained=true', '/p:PublishAot=true') } else { @() }
   Write-Host "› $(if ($Publish) { 'publish' } else { 'build' }) app ($platform, $config, $(if ($msbuild) { 'MSBuild' } else { 'dotnet' }))"
   if ($msbuild) {
     & $msbuild.Source $app /restore /m /nologo /v:minimal "/p:Configuration=$config" "/p:Platform=$platform" "/p:RuntimeIdentifier=$rid" @extra
