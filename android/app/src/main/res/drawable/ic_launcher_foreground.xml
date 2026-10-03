@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder mark matching the Apple icon: ruled lines in grape with one
+     azure line. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#007FFF" android:pathData="M32,30h12v3h-12z" />
+    <path android:fillColor="#444054" android:pathData="M32,40h40v3h-40z" />
+    <path android:fillColor="#444054" android:pathData="M32,51h44v3h-44z" />
+    <path android:fillColor="#444054" android:pathData="M32,62h44v3h-44z" />
+    <path android:fillColor="#444054" android:pathData="M32,73h28v3h-28z" />
+</vector>

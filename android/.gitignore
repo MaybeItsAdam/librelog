@@ -1,0 +1,11 @@
+# Gradle and IDE state
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+
+# Built by scripts/build-android.sh
+app/src/main/jniLibs/
