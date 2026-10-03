@@ -32,6 +32,10 @@ jobs:
         with:
           global-json-file: windows/global.json
 
+      # WinUI's XAML compiler only reports its errors when it runs inside
+      # Visual Studio's MSBuild; under `dotnet build` it can exit 1 silently.
+      - uses: microsoft/setup-msbuild@v2
+
       - name: Core tests (with the C ABI)
         if: matrix.platform == 'x64'
         run: cargo test --release --features capi --manifest-path core/Cargo.toml

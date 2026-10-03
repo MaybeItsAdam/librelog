@@ -51,11 +51,18 @@ if (-not $SkipTests) {
 $app = Join-Path $windows 'src/Librelog.App/Librelog.App.csproj'
 foreach ($platform in $Platforms) {
   $rid = if ($platform -eq 'ARM64') { 'win-arm64' } else { 'win-x64' }
-  if ($Publish) {
-    Write-Host "› publish app ($platform, NativeAOT, MSIX)"
+  # Prefer Visual Studio's MSBuild: it runs the XAML compiler in-process and
+  # reports its errors, where `dotnet build` can fail with only "exited with
+  # code 1". Falls back to the .NET SDK when MSBuild isn't on PATH.
+  $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue
+  $config = if ($Publish) { 'Release' } else { 'Debug' }
+  $extra = if ($Publish) { @('/p:GenerateAppxPackageOnBuild=true', '/p:PublishAot=true') } else { @() }
+  Write-Host "› $(if ($Publish) { 'publish' } else { 'build' }) app ($platform, $config, $(if ($msbuild) { 'MSBuild' } else { 'dotnet' }))"
+  if ($msbuild) {
+    & $msbuild.Source $app /restore /m /nologo /v:minimal "/p:Configuration=$config" "/p:Platform=$platform" "/p:RuntimeIdentifier=$rid" @extra
+  } elseif ($Publish) {
     dotnet publish $app -c Release -p:Platform=$platform -r $rid -p:GenerateAppxPackageOnBuild=true --nologo
   } else {
-    Write-Host "› build app ($platform)"
     dotnet build $app -c Debug -p:Platform=$platform -r $rid --nologo
   }
   if ($LASTEXITCODE -ne 0) {
