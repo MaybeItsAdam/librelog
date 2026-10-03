@@ -158,34 +158,31 @@ dividers.
 
 ## 5. Information architecture
 
-Bottom tab bar on phones; sidebar on tablet/desktop.
+Three places, the same on every platform: a bottom tab bar on phones, a
+sidebar on tablet and desktop.
 
-1. **Today** (start screen)
+1. **Journal** (home)
 2. **Calendar**
-3. **Timeline**
-4. **Explore** — Map · Gallery · Attachments · On This Day · Places · People
-5. **Stats**
-6. **Search** (also `⌘/Ctrl+K`)
-7. **Settings**
+3. **Search** (also `⌘/Ctrl+K`)
 
-Journal switcher at the top of the sidebar / Today header, including an
-"All journals" view.
+Settings opens from a gear (Journal toolbar on phones, sidebar footer on
+desktop). There is one primary action everywhere, **New entry** (`⌘/Ctrl+N`),
+on Journal and Calendar; on Calendar it writes on the selected day.
 
 ---
 
 ## 6. Screens
 
-### 6.1 Today / start screen
+### 6.1 Journal (home)
 
-- Large date header; swipe (or `←`/`→`) between days.
-- Reorderable, hideable cards:
-  - *Write* — the day's entries, or "Start writing" with a template picker.
-  - *On this day* — same date in previous years.
-  - *Rating & trackers* — quick-entry row (§8).
-  - *Integrations* — weather, photos, events, tasks, health, music… (§11).
-  - *Streak & word goal*.
-  - *Prompt of the day* — user-editable rotating list.
-- "+" button → new entry at current time.
+- One newest-first list of every entry, grouped by day under micro-label
+  day headers, loaded a page at a time.
+- Today's group is always first. With nothing written yet it shows a single
+  quiet "New entry" row — no writing prompts.
+- **On this day:** when earlier years have entries on today's date, one
+  compact row under today, "On this day · N", expands in place to show them.
+- No streaks, day-by-day arrows or filters on the home screen; search covers
+  filtering (`is:favorite`, `tag:`, `rating:` …).
 
 ### 6.2 Entry editor
 
@@ -216,7 +213,7 @@ Journal switcher at the top of the sidebar / Today header, including an
 - Week strip and year heat-map variants.
 - Tap → day preview sheet; long-press/double-click → editor.
 
-### 6.4 Timeline
+### 6.4 Timeline (merged into Journal, §6.1)
 
 - Reverse-chronological virtualised list: date eyebrow, time, title/first
   line, two-line excerpt, thumbnail, tags, rating.

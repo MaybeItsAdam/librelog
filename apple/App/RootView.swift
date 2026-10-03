@@ -4,27 +4,25 @@ enum Route: Hashable {
     case entry(String)
 }
 
+/// Three places: the journal itself, a calendar to jump around in, and
+/// search. Settings opens from the Journal toolbar.
 enum Tab: String, CaseIterable, Identifiable {
-    case today, calendar, timeline, search, settings
+    case journal, calendar, search
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
         switch self {
-        case .today: "Today"
+        case .journal: "Journal"
         case .calendar: "Calendar"
-        case .timeline: "Timeline"
         case .search: "Search"
-        case .settings: "Settings"
         }
     }
 
     var symbol: String {
         switch self {
-        case .today: "sun.max"
+        case .journal: "book"
         case .calendar: "calendar"
-        case .timeline: "list.bullet.below.rectangle"
         case .search: "magnifyingglass"
-        case .settings: "gearshape"
         }
     }
 }
@@ -33,7 +31,7 @@ enum Tab: String, CaseIterable, Identifiable {
 struct RootView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var tab: Tab = .today
+    @State private var tab: Tab = .journal
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -93,11 +91,9 @@ struct RootView: View {
     @ViewBuilder
     private func screen(_ t: Tab) -> some View {
         switch t {
-        case .today: TodayView()
+        case .journal: JournalView()
         case .calendar: CalendarView()
-        case .timeline: TimelineView()
         case .search: SearchView()
-        case .settings: SyncSettingsView()
         }
     }
 }

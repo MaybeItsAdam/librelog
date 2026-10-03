@@ -20,13 +20,10 @@ struct CalendarView: View {
                 if let selected {
                     SectionHeader(title: Day.title(selected), trailing: dayEntries.isEmpty ? nil : "\(dayEntries.count)")
                     if dayEntries.isEmpty {
-                        Button("Write on this day") {
-                            Task { await app.newEntry(on: selected) }
-                        }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.primary)
-                        .buttonStyle(.plain)
-                        .frame(minHeight: 44)
+                        Text("No entries")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.muted)
+                            .frame(minHeight: 44)
                     }
                     ForEach(dayEntries, id: \.id) { e in
                         NavigationLink(value: Route.entry(e.id)) { EntryRow(entry: e, showDate: false) }
@@ -36,11 +33,12 @@ struct CalendarView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 40)
+            .padding(.bottom, 100) // clear of the new-entry button
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
         .background(Color.paper)
+        .overlay(alignment: .bottomTrailing) { NewEntryButton(date: selected) }
         .navigationTitle("Calendar")
         .task(id: "\(month)|\(app.revision)") { await loadMonth() }
         .task(id: "\(selected ?? "")|\(app.revision)") { await loadDay() }
