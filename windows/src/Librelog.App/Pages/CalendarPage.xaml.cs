@@ -145,7 +145,7 @@ public sealed partial class CalendarPage : Page
     private void OnPrevious(object sender, RoutedEventArgs e) => Shift(-1);
     private void OnNext(object sender, RoutedEventArgs e) => Shift(1);
 
-    private void OnWrite(object sender, RoutedEventArgs e) => _ = TodayPage.NewEntry(selected);
+    private void OnNew(object sender, RoutedEventArgs e) => _ = JournalPage.NewEntry(selected);
 
     private void OnEntryClick(object sender, ItemClickEventArgs e)
     {

@@ -12,9 +12,8 @@ public sealed partial class MainWindow : Window
 {
     private static readonly Dictionary<string, Type> Pages = new()
     {
-        ["today"] = typeof(TodayPage),
+        ["journal"] = typeof(JournalPage),
         ["calendar"] = typeof(CalendarPage),
-        ["timeline"] = typeof(TimelinePage),
         ["search"] = typeof(SearchPage),
         ["sync"] = typeof(SyncPage),
     };
@@ -23,10 +22,10 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1180, 820));
-        AddShortcut(VirtualKey.N, () => _ = TodayPage.NewEntry(AppServices.Today));
+        AddShortcut(VirtualKey.N, () => _ = JournalPage.NewEntry(AppServices.Today));
         AddShortcut(VirtualKey.K, () => Go("search"));
         AddShortcut(VirtualKey.F, () => Go("search"));
-        Go("today");
+        Go("journal");
     }
 
     public void Go(string tag)
@@ -48,7 +47,8 @@ public sealed partial class MainWindow : Window
 
     private void OnItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (args.InvokedItemContainer?.Tag is string tag) Go(tag);
+        if (args.IsSettingsInvoked) Go("sync");
+        else if (args.InvokedItemContainer?.Tag is string tag) Go(tag);
     }
 
     private void OnBackRequested(NavigationView sender, NavigationViewBackRequestedEventArgs args) => GoBack();
@@ -57,9 +57,11 @@ public sealed partial class MainWindow : Window
     private void OnNavigated(object sender, NavigationEventArgs e)
     {
         var tag = Pages.FirstOrDefault(kv => kv.Value == e.SourcePageType).Key;
-        Nav.SelectedItem = Nav.MenuItems.Concat(Nav.FooterMenuItems)
-            .OfType<NavigationViewItem>()
-            .FirstOrDefault(i => (string)i.Tag == tag);
+        // The editor and history keep the pane on whatever opened them.
+        if (tag is null) return;
+        Nav.SelectedItem = tag == "sync"
+            ? Nav.SettingsItem
+            : Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag);
     }
 
     private void AddShortcut(VirtualKey key, Action action)

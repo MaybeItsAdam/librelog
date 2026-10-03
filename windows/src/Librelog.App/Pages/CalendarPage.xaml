@@ -22,6 +22,12 @@
                     <Button Style="{StaticResource PlainButton}" Click="OnNext" ToolTipService.ToolTip="Next month">
                         <FontIcon Glyph="&#xE76C;" FontSize="12" />
                     </Button>
+                    <Button Style="{StaticResource PrimaryButton}" Click="OnNew" ToolTipService.ToolTip="New entry on the selected day">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE710;" FontSize="12" />
+                            <TextBlock Text="New entry" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
 
@@ -42,7 +48,6 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-                <Button Style="{StaticResource PlainButton}" Content="Write on this day" Click="OnWrite" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

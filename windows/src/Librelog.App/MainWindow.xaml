@@ -8,31 +8,24 @@
         <NavigationView
             x:Name="Nav"
             PaneDisplayMode="Left"
-            IsSettingsVisible="False"
+            IsSettingsVisible="True"
             IsBackButtonVisible="Auto"
             IsBackEnabled="{x:Bind ContentFrame.CanGoBack, Mode=OneWay}"
             OpenPaneLength="220"
             ItemInvoked="OnItemInvoked"
             BackRequested="OnBackRequested">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="Today" Tag="today">
+                <NavigationViewItem Content="Journal" Tag="journal">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="Calendar" Tag="calendar">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Calendar" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Timeline" Tag="timeline">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="List" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
                 <NavigationViewItem Content="Search" Tag="search">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Find" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
-            <NavigationView.FooterMenuItems>
-                <NavigationViewItem Content="Sync" Tag="sync">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Sync" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.FooterMenuItems>
+            <!-- Sync lives behind the built-in Settings item in the pane footer. -->
 
             <!-- Hairline between the pane and the page, not a shadow. -->
             <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="1,0,0,0">

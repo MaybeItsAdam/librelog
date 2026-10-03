@@ -1,4 +1,4 @@
-<!-- One entry in Today, Timeline, Search and Calendar. -->
+<!-- One entry in Journal, Search and Calendar. -->
 <UserControl
     x:Class="Librelog.App.Pages.EntryRow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
