@@ -4,6 +4,8 @@
 
 uniffi::setup_scaffolding!();
 
+#[cfg(feature = "capi")]
+pub mod capi;
 mod changes;
 mod crypto;
 mod db;
