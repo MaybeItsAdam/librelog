@@ -332,9 +332,13 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+# Native Sign in with Apple only: the apps get an ID token from
+# AuthenticationServices and exchange it with signInWithIdToken, which needs
+# the bundle ID as client_id and no secret. The secret is only for the web
+# OAuth flow, which Dailylog doesn't use.
 [auth.external.apple]
-enabled = false
-client_id = ""
+enabled = true
+client_id = "uk.co.maybeitsadam.dailylog"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
 # Overrides the default auth callback URL derived from auth.external_url.
