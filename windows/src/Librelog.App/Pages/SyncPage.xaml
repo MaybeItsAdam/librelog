@@ -111,6 +111,21 @@
 
                 <Button Style="{StaticResource PlainButton}" Content="Sign out" Click="OnSignOut" Foreground="{StaticResource RaspberryBrush}" />
             </StackPanel>
+
+            <!-- Import and export work with or without sync. -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="IMPORT &amp; EXPORT" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}"
+                               Text="Save your journal as a backup, Markdown, a web page or text. Bring in entries from Day One, Daylio, Markdown notes or a Librelog backup." />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Style="{StaticResource PrimaryButton}" Content="Export…" Click="OnExport" />
+                        <Button Style="{StaticResource PlainButton}" Content="Import…" Click="OnImport" />
+                        <Button Style="{StaticResource PlainButton}" Content="Import folder…" Click="OnImportFolder" />
+                    </StackPanel>
+                    <TextBlock x:Name="TransferText" Style="{StaticResource BodyText}" />
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </Page>

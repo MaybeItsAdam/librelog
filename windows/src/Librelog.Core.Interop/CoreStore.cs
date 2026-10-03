@@ -101,6 +101,21 @@ public sealed class CoreStore : IDisposable
         Get("apply_snapshot", CoreJson.Default.PullResult, ("seq", seq), ("payload", payload))!;
     public void ResetSync() => Call("reset_sync");
 
+    // --- Import and export ------------------------------------------------------
+
+    /// Writes the journal (or one journal) to `path`; name it with
+    /// format.Extension().
+    public ExportSummary Export(ExportFormat format, string path, string? journalId = null) =>
+        Get("export", CoreJson.Default.ExportSummary, ("format", format.ToString()), ("path", path), ("journal_id", journalId))!;
+
+    /// Reads a file, folder or zip and says what importing it would do.
+    public ImportPreview PreviewImport(string path) =>
+        Get("preview_import", CoreJson.Default.ImportPreview, ("path", path))!;
+
+    /// Imports it; entries already imported are skipped. All or nothing.
+    public ImportResult ImportFile(string path, string? journalId = null) =>
+        Get("import_file", CoreJson.Default.ImportResult, ("path", path), ("journal_id", journalId))!;
+
     // --- Plumbing ---------------------------------------------------------------
 
     private JsonElement Call(string method, params (string, JsonNode?)[] args)
