@@ -15,6 +15,9 @@ required-features = ["bindgen"]
 
 [features]
 bindgen = ["uniffi/cli"]
+# A plain C ABI (JSON in, JSON out) for the Windows app, whose UniFFI C#
+# generator lags uniffi-rs. See src/capi.rs.
+capi = []
 
 [dependencies]
 uniffi = "0.32"

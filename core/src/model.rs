@@ -3,7 +3,7 @@
 
 use crate::doc::Block;
 
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct Journal {
     pub id: String,
     pub name: String,
@@ -11,7 +11,7 @@ pub struct Journal {
     pub is_default: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct Entry {
     pub id: String,
     pub journal_id: String,
@@ -30,7 +30,7 @@ pub struct Entry {
 }
 
 /// One row in Timeline, Search, On This Day and the day view.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct EntrySummary {
     pub id: String,
     pub journal_id: String,
@@ -45,14 +45,14 @@ pub struct EntrySummary {
 }
 
 /// One day cell in the Calendar.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct DayMark {
     pub date: String,
     pub entry_count: u32,
     pub rating: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct Tag {
     pub id: String,
     pub name: String,
@@ -62,7 +62,7 @@ pub struct Tag {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct SearchHit {
     pub entry: EntrySummary,
     /// Snippet with matches wrapped in U+E000 / U+E001, which the UI swaps
@@ -71,7 +71,7 @@ pub struct SearchHit {
     pub snippet: String,
 }
 
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct Stats {
     pub entries: u32,
     pub words: u64,
@@ -82,7 +82,8 @@ pub struct Stats {
 }
 
 /// Filters for Timeline. Empty / none means "don't filter on this".
-#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct TimelineFilter {
     pub journal_id: Option<String>,
     pub tag_ids: Vec<String>,
@@ -91,7 +92,7 @@ pub struct TimelineFilter {
 }
 
 /// Where Timeline paging continues from: the last row already shown.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct TimelineCursor {
     pub date: String,
     pub time: Option<String>,
@@ -103,7 +104,7 @@ pub struct TimelineCursor {
 /// `push_succeeded` with the same `batch_id` once the server accepts it.
 /// Retrying after a failure returns the same batch with the same id, so the
 /// server's idempotency check makes a retried push harmless.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct OutgoingBatch {
     pub batch_id: String,
     pub payload: String,
@@ -111,14 +112,14 @@ pub struct OutgoingBatch {
 }
 
 /// One row from `pull_ops`, as the server returned it.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct IncomingOps {
     pub seq: i64,
     pub device_id: String,
     pub payload: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct PullResult {
     /// Rows merged into the local database.
     pub changed: u32,
@@ -128,7 +129,7 @@ pub struct PullResult {
     pub cursor: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct Revision {
     pub id: String,
     pub body: Vec<Block>,
@@ -138,7 +139,7 @@ pub struct Revision {
 }
 
 /// Full sealed state for `put_snapshot`, covering every op up to `seq`.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct OutgoingSnapshot {
     pub seq: i64,
     pub payload: String,

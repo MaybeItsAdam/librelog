@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Everything in the Windows app that isn't drawing: the editor's document
+       model and rules, Supabase, sync and Realtime. No WinUI dependency, so it
+       builds and tests on any OS. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Dailylog</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dailylog.Core.Interop\Dailylog.Core.Interop.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dailylog.Shared.Tests" />
+  </ItemGroup>
+</Project>

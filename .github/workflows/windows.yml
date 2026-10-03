@@ -1,0 +1,53 @@
+# Builds the Rust core for Windows, runs the .NET tests against it, and
+# builds the WinUI app. The app can only build on Windows, so this is where
+# it's first compiled.
+name: windows
+
+on:
+  push:
+    paths: ['core/**', 'windows/**', 'scripts/build-windows.ps1', '.github/workflows/windows.yml']
+  pull_request:
+    paths: ['core/**', 'windows/**', 'scripts/build-windows.ps1', '.github/workflows/windows.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: windows/global.json
+
+      - name: Core tests (with the C ABI)
+        if: matrix.platform == 'x64'
+        run: cargo test --release --features capi --manifest-path core/Cargo.toml
+
+      - name: Build core, run .NET tests, build the app
+        shell: pwsh
+        run: |
+          $skip = '${{ matrix.platform }}' -ne 'x64'   # tests run once, on the x64 host
+          scripts/build-windows.ps1 -Platforms ${{ matrix.platform }} -SkipTests:$skip
+
+      - name: Publish (NativeAOT, MSIX)
+        shell: pwsh
+        run: scripts/build-windows.ps1 -Platforms ${{ matrix.platform }} -Publish -SkipTests
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dailylog-windows-${{ matrix.platform }}
+          path: windows/src/Dailylog.App/AppPackages/**
+          if-no-files-found: warn
