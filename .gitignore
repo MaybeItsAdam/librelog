@@ -2,8 +2,8 @@
 supabase/.temp/
 
 # Apple build artifacts (scripts/build-apple.sh and `xcodegen` recreate them)
-apple/Librelog.xcodeproj/
-apple/LibrelogCore.xcframework/
+apple/*.xcodeproj/
+apple/*.xcframework/
 xcuserdata/
 .DS_Store
 
