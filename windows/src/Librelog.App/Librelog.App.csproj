@@ -19,6 +19,12 @@
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- IL2104/IL3053 are one-line summaries for third-party assemblies that
+         aren't trim/AOT-annotated; here only WebView2, which the Windows App
+         SDK brings in and Librelog never calls. Keep them as warnings. Our
+         own code's trim and AOT warnings are reported individually (IL2026,
+         IL3050, …) and still fail the build. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2104;IL3053</WarningsNotAsErrors>
     <!-- The core, built for the matching Windows target with the capi feature. -->
     <CoreRustTarget Condition="'$(Platform)' == 'ARM64'">aarch64-pc-windows-msvc</CoreRustTarget>
     <CoreRustTarget Condition="'$(CoreRustTarget)' == ''">x86_64-pc-windows-msvc</CoreRustTarget>
