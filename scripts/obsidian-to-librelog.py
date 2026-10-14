@@ -4,7 +4,7 @@ imports (Settings → Import & export → Import…). Standard library only.
 
     scripts/obsidian-to-librelog.py [--vault ~/Documents/Life] [--out file.zip]
                                     [--folders Log Journal] [--skip Entities Places]
-                                    [--dry-run]
+                                    [--simplenote export.zip ...] [--dry-run]
 
 Each note becomes a Markdown file with front matter the core's Markdown
 importer reads (date, time, title, tags). A note's date comes from, in order:
@@ -12,11 +12,16 @@ importer reads (date, time, title, tags). A note's date comes from, in order:
   1. `date:` in its front matter (event notes: `2026-08-16T22:36`)
   2. a YYYY-MM-DD in its file name (daily notes)
   3. a month and year in its title ("Exeter Trip Mid May 2025")
-  4. the file's creation time
+  4. when the note was created in Simplenote, if it came from there
+     (--simplenote takes the export zips or their source/notes.json)
+  5. the file's creation time
 
 Notes kept as a run of dated headings (`## 15/12`, `## 21/6/24 - The End`)
 are split into one entry per heading, the year taken from the heading or the
 note's title ("Winter 25", "Summer '24").
+
+Simplenote notes tagged Journal, MOSTLL or Memoirs that never made it into
+the vault are added too.
 
 File names inside the zip are stable, so importing a newer zip again only adds
 what's new: the core skips anything it has imported before.
@@ -25,6 +30,7 @@ what's new: the core skips anything it has imported before.
 import argparse
 import datetime as dt
 import io
+import json
 import os
 import re
 import sys
@@ -97,6 +103,35 @@ def created(path):
     return dt.datetime.fromtimestamp(getattr(st, "st_birthtime", st.st_mtime))
 
 
+SIMPLENOTE_DIARY_TAGS = {"journal", "mostll", "memoirs"}
+
+
+def norm_title(s):
+    return re.sub(r"\W+", " ", s).strip().lower()
+
+
+def simplenote_notes(paths):
+    """Active notes from Simplenote exports, newest export winning, as
+    {normalised title: (title, created, tags, body)}."""
+    notes = {}
+    for p in paths:
+        p = Path(p).expanduser()
+        if p.suffix == ".zip":
+            with zipfile.ZipFile(p) as z:
+                data = json.loads(z.read("source/notes.json"))
+        else:
+            data = json.loads(p.read_text())
+        for n in data.get("activeNotes", []):
+            text = n["content"].replace("\r\n", "\n").replace("\r", "\n")
+            first, _, body = text.partition("\n")
+            title = first.lstrip("# ").strip()
+            created = dt.datetime.fromisoformat(n["creationDate"].replace("Z", "+00:00")).astimezone()
+            key = norm_title(title)
+            if key not in notes or created < notes[key][1]:
+                notes[key] = (title, created, [t.lower() for t in n.get("tags") or []], body.strip())
+    return notes
+
+
 def split_days(title, body):
     """Splits a note made of `## d/m` sections into (date, heading, text)
     triples, or returns None if it isn't one."""
@@ -157,8 +192,8 @@ def entry_file(date, time, title, tags, body):
     return "---\n" + "\n".join(fm) + "\n---\n\n" + body + "\n"
 
 
-def gather(vault, folders, skip):
-    entries, seen_reviews = [], set()
+def gather(vault, folders, skip, simplenote):
+    entries, seen_reviews, seen_titles = [], set(), set()
     for folder in folders:
         for path in sorted((vault / folder).rglob("*.md")):
             rel = path.relative_to(vault)
@@ -170,6 +205,7 @@ def gather(vault, folders, skip):
             if not body:
                 continue
             title = path.stem
+            seen_titles.add(norm_title(title))
             # The same review is sometimes in Journal and Log/Reviews; keep one.
             if title in seen_reviews:
                 continue
@@ -197,11 +233,27 @@ def gather(vault, folders, skip):
                 is_daily = False
                 c = created(path)
                 date, how = title_date(title, c.year), "title"
+                sn = simplenote.get(norm_title(title))
+                if not date and sn:
+                    date, how, time = sn[1].date(), "Simplenote", sn[1].strftime("%H:%M")
                 if not date:
                     date, how = c.date(), "created"
                     time = c.strftime("%H:%M")
             entries.append(dict(rel=rel, date=date, time=time, title=None if is_daily else title,
                                 tags=[tag], body=body, how=how))
+    # A Simplenote note counts as already in the vault if most of its lines
+    # are somewhere in it, whatever it's called there now.
+    vault_text = norm_title("\n".join(
+        p.read_text(encoding="utf-8", errors="replace") for p in vault.rglob("*.md")
+        if not any(q.startswith(".") for q in p.relative_to(vault).parts))) if simplenote else ""
+    for key, (title, when, tags, body) in simplenote.items():
+        if key in seen_titles or not SIMPLENOTE_DIARY_TAGS & set(tags) or not body:
+            continue
+        lines = [norm_title(l) for l in body.splitlines() if len(l.split()) >= 6]
+        if lines and sum(l[:60] in vault_text for l in lines) * 2 >= len(lines):
+            continue
+        entries.append(dict(rel=Path("Simplenote") / title, date=when.date(), time=when.strftime("%H:%M"),
+                            title=title, tags=["Simplenote"], body=clean(body), how="Simplenote (not in vault)"))
     # Notes copied into the vault together all share one creation day, which
     # says nothing about when they were written: tag them so they're easy to
     # find and re-date in the app.
@@ -225,10 +277,12 @@ def main():
                     help="folder names to leave out (reference pages, not diary)")
     ap.add_argument("--out", type=Path,
                     default=Path.home() / "Downloads" / f"Librelog import {dt.date.today().isoformat()}.zip")
+    ap.add_argument("--simplenote", nargs="*", default=[],
+                    help="Simplenote export zips (or notes.json) to date notes by and fill gaps from")
     ap.add_argument("--dry-run", action="store_true", help="list what would be written")
     a = ap.parse_args()
 
-    entries = gather(a.vault.expanduser(), a.folders, set(a.skip))
+    entries = gather(a.vault.expanduser(), a.folders, set(a.skip), simplenote_notes(a.simplenote))
     if not entries:
         sys.exit("Nothing found to import.")
     entries.sort(key=lambda e: (e["date"], e["time"] or "", str(e["rel"])))
@@ -236,7 +290,11 @@ def main():
     names, buf = set(), io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for e in entries:
-            stem = re.sub(r"[^\w' &-]+", " ", f"{e['date']} {e['rel'].with_suffix('')}").strip()
+            # The name is what makes re-importing idempotent, so it only
+            # carries the date for notes split into days, whose dates are fixed:
+            # correcting a guessed date later mustn't make a new entry.
+            label = f"{e['date']} {e['rel'].with_suffix('')}" if e["how"] == "heading" else str(e["rel"].with_suffix(""))
+            stem = re.sub(r"[^\w' &-]+", " ", label).strip()
             name = f"{stem}.md"
             # Split notes: one file per day, named after the note and the day.
             n = 2
@@ -251,7 +309,7 @@ def main():
     print(f"{len(entries)} entries, {entries[0]['date']} – {entries[-1]['date']}")
     for how, es in sorted(by_how.items()):
         print(f"  {len(es):4}  dated by {how}")
-    guessed = [e for e in entries if e["how"] not in ("front matter", "file name", "heading")]
+    guessed = [e for e in entries if e["how"] not in ("front matter", "file name", "heading", "Simplenote")]
     if guessed:
         print("\nDates guessed from the title or file creation time (fix in the app if wrong):")
         for e in guessed:

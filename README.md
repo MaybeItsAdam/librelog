@@ -59,6 +59,7 @@ Markdown directly. For an Obsidian vault, gather it into one zip first:
 ```sh
 scripts/obsidian-to-librelog.py --vault ~/Documents/Life   # writes ~/Downloads/Librelog import <date>.zip
 scripts/obsidian-to-librelog.py --dry-run                  # just list the guessed dates
+scripts/obsidian-to-librelog.py --simplenote export.zip    # date notes by when they were made in Simplenote
 ```
 
 Daily notes are dated by file name, event notes by their `date:` front matter,
