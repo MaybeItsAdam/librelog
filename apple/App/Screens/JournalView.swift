@@ -11,9 +11,12 @@ struct JournalView: View {
     @State private var showSettings = false
     @State private var done = false
     @State private var loading = false
+    /// True until shortly after the first page is in, while rows fade in.
+    @State private var firstLoad = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let pageSize: UInt32 = 50
-    private static let noFilter = TimelineFilter(journalId: nil, tagIds: [], minRating: nil, favoritesOnly: false)
+    private nonisolated static let noFilter = TimelineFilter(journalId: nil, tagIds: [], minRating: nil, favoritesOnly: false)
 
     var body: some View {
         List {
@@ -22,10 +25,12 @@ struct JournalView: View {
                 Section {
                     ForEach(day.entries, id: \.id) { e in
                         row(e)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                             .onAppear { if e.id == entries.last?.id { Task { await loadMore() } } }
                     }
                 } header: {
                     Text(Day.title(day.date)).microLabel()
+                        .reveal(firstLoad, index: order[day.entries[0].id] ?? 0)
                 }
             }
         }
@@ -74,11 +79,14 @@ struct JournalView: View {
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.pressable)
                 .listRowBackground(Color.paper)
                 .listRowSeparatorTint(Color.hairline)
+                .transition(.opacity)
             } else {
-                ForEach(todayEntries, id: \.id) { e in row(e) }
+                ForEach(todayEntries, id: \.id) { e in
+                    row(e).transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
             if !memories.isEmpty { onThisDay }
         } header: {
@@ -88,7 +96,7 @@ struct JournalView: View {
 
     @ViewBuilder
     private var onThisDay: some View {
-        Button { withAnimation(.snappy) { showMemories.toggle() } } label: {
+        Button { withMotion(Motion.snappy, reduce: reduceMotion) { showMemories.toggle() } } label: {
             HStack {
                 Text("On this day · \(memories.count)")
                     .font(.system(size: 14, weight: .medium))
@@ -102,13 +110,15 @@ struct JournalView: View {
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
         .listRowBackground(Color.paper)
         .listRowSeparatorTint(Color.hairline)
         .accessibilityHint(showMemories ? "Hides earlier years" : "Shows entries from this date in earlier years")
 
         if showMemories {
-            ForEach(memories, id: \.id) { e in row(e) }
+            ForEach(memories, id: \.id) { e in
+                row(e).transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
     }
 
@@ -133,10 +143,17 @@ struct JournalView: View {
         return out
     }
 
+    /// Each loaded entry's position, for staggering the first fade-in.
+    private var order: [String: Int] {
+        Dictionary(entries.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
     private func row(_ e: EntrySummary) -> some View {
         NavigationLink(value: Route.entry(e.id)) {
             EntryRow(entry: e, showDate: false)
         }
+        .buttonStyle(.pressable)
+        .reveal(firstLoad, index: order[e.id] ?? 0)
         .listRowBackground(Color.paper)
         .listRowSeparatorTint(Color.hairline)
     }
@@ -151,9 +168,16 @@ struct JournalView: View {
              try store.onThisDay(date: today))
         }
         guard let (page, m) = result else { return }
-        entries = page
-        memories = m
+        // The first load fades in; later ones animate what changed.
+        withMotion(Motion.snappy, reduce: reduceMotion || firstLoad) {
+            entries = page
+            memories = m
+        }
         done = page.count < Int(pageSize)
+        if firstLoad {
+            try? await Task.sleep(for: .milliseconds(600))
+            firstLoad = false
+        }
     }
 
     private func loadMore() async {
@@ -181,8 +205,9 @@ struct NewEntryButton: View {
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
                 .background(Color.primary, in: RoundedRectangle(cornerRadius: Radius.card))
+                .contentShape(RoundedRectangle(cornerRadius: Radius.card))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable(scale: 0.92))
         .padding(20)
         .accessibilityLabel("New entry")
         .keyboardShortcut("n", modifiers: .command)

@@ -309,6 +309,7 @@ struct EntryEditorView: View {
 struct RatingPicker: View {
     let rating: Double?
     let set: (Double?) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 2) {
@@ -320,6 +321,10 @@ struct RatingPicker: View {
                     Image(systemName: (rating ?? 0) >= value ? "star.fill" : (rating ?? 0) >= value - 0.5 ? "star.leadinghalf.filled" : "star")
                         .font(.system(size: 16))
                         .foregroundStyle((rating ?? 0) >= value - 0.5 ? Color.warning : Color.dim)
+                        // Filled stars pop when the rating changes; the rest stay still.
+                        .symbolEffect(.bounce.up, options: .speed(1.6), value: (rating ?? 0) >= value - 0.5 ? rating : nil)
+                        .symbolEffectsRemoved(reduceMotion)
+                        .animation(Motion.gentle, value: rating)
                         .frame(width: 28, height: 44) // 44pt hit target, 16pt glyph
                         .contentShape(Rectangle())
                 }
@@ -327,6 +332,7 @@ struct RatingPicker: View {
                 .accessibilityLabel("\(i) stars")
             }
         }
+        .sensoryFeedback(.selection, trigger: rating)
     }
 }
 

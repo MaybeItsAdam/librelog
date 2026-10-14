@@ -8,6 +8,11 @@ struct CalendarView: View {
     @State private var marks: [String: DayMark] = [:]
     @State private var selected: String?
     @State private var dayEntries: [EntrySummary] = []
+    /// +1 when the last move was forward a month, -1 when back: the side the
+    /// new month slides in from.
+    @State private var direction = 1
+    @Namespace private var selection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
@@ -26,9 +31,12 @@ struct CalendarView: View {
                             .frame(minHeight: 44)
                     }
                     ForEach(dayEntries, id: \.id) { e in
-                        NavigationLink(value: Route.entry(e.id)) { EntryRow(entry: e, showDate: false) }
-                            .buttonStyle(.plain)
-                        Divider().overlay(Color.hairline)
+                        VStack(spacing: 0) {
+                            NavigationLink(value: Route.entry(e.id)) { EntryRow(entry: e, showDate: false) }
+                                .buttonStyle(.pressable)
+                            Divider().overlay(Color.hairline)
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
             }
@@ -40,6 +48,8 @@ struct CalendarView: View {
         .background(Color.paper)
         .overlay(alignment: .bottomTrailing) { NewEntryButton(date: selected) }
         .navigationTitle("Calendar")
+        .sensoryFeedback(.selection, trigger: selected)
+        .sensoryFeedback(.selection, trigger: month)
         .task(id: "\(month)|\(app.revision)") { await loadMonth() }
         .task(id: "\(selected ?? "")|\(app.revision)") { await loadDay() }
     }
@@ -47,13 +57,14 @@ struct CalendarView: View {
     private var header: some View {
         HStack {
             Text(monthTitle).font(Typeface.headline).foregroundStyle(Color.ink)
+                .contentTransition(.numericText(countsDown: direction < 0))
             Spacer()
             Button { shift(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
                 .accessibilityLabel("Previous month")
             Button { shift(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
                 .accessibilityLabel("Next month")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable(scale: 0.9))
         .foregroundStyle(Color.ink)
         .padding(.top, 16)
     }
@@ -70,16 +81,40 @@ struct CalendarView: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Color.hairline).frame(height: 1) }
     }
 
+    /// The month's days. A new month slides in from the side it came from;
+    /// swiping across the grid moves a month too.
     private var grid: some View {
-        LazyVGrid(columns: columns, spacing: 0) {
-            ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
-                if let day {
-                    dayCell(day)
-                } else {
-                    Color.clear.frame(height: 48)
+        ZStack(alignment: .top) {
+            LazyVGrid(columns: columns, spacing: 0) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
+                    if let day {
+                        dayCell(day)
+                    } else {
+                        Color.clear.frame(height: 48)
+                    }
                 }
             }
+            .id(month)
+            .transition(monthTransition)
         }
+        .clipped()
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { g in
+                    let dx = g.translation.width
+                    guard abs(dx) > 60, abs(dx) > abs(g.translation.height) * 1.5 else { return }
+                    shift(dx < 0 ? 1 : -1)
+                }
+        )
+    }
+
+    private var monthTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let incoming: Edge = direction > 0 ? .trailing : .leading
+        let outgoing: Edge = direction > 0 ? .leading : .trailing
+        return .asymmetric(insertion: .move(edge: incoming).combined(with: .opacity),
+                           removal: .move(edge: outgoing).combined(with: .opacity))
     }
 
     private func dayCell(_ day: String) -> some View {
@@ -87,7 +122,7 @@ struct CalendarView: View {
         let isToday = day == Day.today
         let isSelected = day == selected
         return Button {
-            selected = (selected == day) ? nil : day
+            withMotion(Motion.snappy, reduce: reduceMotion) { selected = (selected == day) ? nil : day }
         } label: {
             VStack(spacing: 3) {
                 Text(String(Int(day.suffix(2)) ?? 0))
@@ -98,12 +133,20 @@ struct CalendarView: View {
                     .frame(width: 6, height: 6)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(isSelected ? Color.primary.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
-            .overlay(RoundedRectangle(cornerRadius: Radius.control)
-                .strokeBorder(isSelected ? Color.primary : isToday ? Color.hairline : .clear))
+            .background {
+                // One selection ring, which travels between days.
+                if isSelected {
+                    RoundedRectangle(cornerRadius: Radius.control)
+                        .fill(Color.primary.opacity(0.1))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.primary))
+                        .matchedGeometryEffect(id: "selection", in: selection)
+                } else if isToday {
+                    RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline)
+                }
+            }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable(scale: 0.92))
         .accessibilityLabel("\(Day.title(day)), \(mark?.entryCount ?? 0) entries")
     }
 
@@ -134,19 +177,26 @@ struct CalendarView: View {
     private func shift(_ months: Int) {
         guard let d = Day.date("\(month)-01"),
               let n = Calendar.current.date(byAdding: .month, value: months, to: d) else { return }
-        month = String(Day.string(n).prefix(7))
-        selected = nil
+        direction = months > 0 ? 1 : -1
+        withMotion(Motion.page, reduce: reduceMotion) {
+            month = String(Day.string(n).prefix(7))
+            selected = nil
+        }
     }
 
     private func loadMonth() async {
         let m = month
         if let list = try? await app.run({ try $0.month(yearMonth: m, journalId: nil) }) {
-            marks = Dictionary(uniqueKeysWithValues: list.map { ($0.date, $0) })
+            // Dots fade in rather than blinking on.
+            withAnimation(Motion.gentle) {
+                marks = Dictionary(uniqueKeysWithValues: list.map { ($0.date, $0) })
+            }
         }
     }
 
     private func loadDay() async {
         guard let day = selected else { dayEntries = []; return }
-        dayEntries = (try? await app.run { try $0.day(date: day, journalId: nil) }) ?? []
+        let list = (try? await app.run { try $0.day(date: day, journalId: nil) }) ?? []
+        withMotion(Motion.snappy, reduce: reduceMotion) { dayEntries = list }
     }
 }

@@ -177,18 +177,29 @@ final class EditorController {
         changed()
     }
 
+    /// Whether `index` is a checkbox's marker, i.e. tapping it toggles it.
+    func isCheckMarker(atCharacter index: Int) -> Bool {
+        checkParagraph(atCharacter: index) != nil
+    }
+
     /// Flips a checkbox when its marker is tapped or clicked.
     func toggleCheck(atCharacter index: Int) -> Bool {
-        guard let host, index < host.storage.length,
-              host.storage.attribute(BlockText.marker, at: index, effectiveRange: nil) != nil else { return false }
-        let ns = host.storage.string as NSString
-        let para = ns.paragraphRange(for: NSRange(location: index, length: 0))
-        guard case .check(let checked) = kindOf(paragraph: para) else { return false }
+        guard let (para, checked) = checkParagraph(atCharacter: index) else { return false }
+        guard let host else { return false }
         let sel = host.selection
         setKind(.check(checked: !checked), paragraphAt: para.location)
         host.selection = sel
         changed()
         return true
+    }
+
+    private func checkParagraph(atCharacter index: Int) -> (NSRange, Bool)? {
+        guard let host, index >= 0, index < host.storage.length,
+              host.storage.attribute(BlockText.marker, at: index, effectiveRange: nil) != nil else { return nil }
+        let ns = host.storage.string as NSString
+        let para = ns.paragraphRange(for: NSRange(location: index, length: 0))
+        guard case .check(let checked) = kindOf(paragraph: para) else { return nil }
+        return (para, checked)
     }
 
     // MARK: Paragraph surgery
