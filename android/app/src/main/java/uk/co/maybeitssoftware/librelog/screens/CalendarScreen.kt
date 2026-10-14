@@ -1,12 +1,21 @@
 package uk.co.maybeitssoftware.librelog.screens
 
-import androidx.compose.runtime.saveable.rememberSaveable
-import uk.co.maybeitssoftware.librelog.ui.NewEntryButton
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,11 +39,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.time.DayOfWeek
@@ -43,31 +56,42 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
+import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
 import uk.co.maybeitssoftware.librelog.ui.EntryRow
 import uk.co.maybeitssoftware.librelog.ui.Hairline
+import uk.co.maybeitssoftware.librelog.ui.Haptics
 import uk.co.maybeitssoftware.librelog.ui.IconAction
 import uk.co.maybeitssoftware.librelog.ui.MicroLabel
+import uk.co.maybeitssoftware.librelog.ui.Motion
+import uk.co.maybeitssoftware.librelog.ui.NewEntryButton
 import uk.co.maybeitssoftware.librelog.ui.Radius
+import uk.co.maybeitssoftware.librelog.ui.Reveal
 import uk.co.maybeitssoftware.librelog.ui.SectionHeader
 import uk.co.maybeitssoftware.librelog.ui.Tokens
 import uk.co.maybeitssoftware.librelog.ui.Typeface
+import uk.co.maybeitssoftware.librelog.ui.motion
+import uk.co.maybeitssoftware.librelog.ui.pressable
 import uk.co.maybeitssoftware.librelog.ui.tokens
 import uniffi.librelog_core.DayMark
 import uniffi.librelog_core.EntrySummary
 
 /**
  * Month grid (SPEC.md §6.3). Days with entries are tinted by their rating;
- * tapping one shows that day's entries underneath.
+ * tapping one shows that day's entries underneath. Swipe or use the arrows
+ * to change month.
  */
 @Composable
 fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
     val t = tokens
+    val m = motion
+    val haptics = LocalHapticFeedback.current
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     var marks by remember { mutableStateOf<Map<String, DayMark>>(emptyMap()) }
     var selected by rememberSaveable { mutableStateOf(Day.today) }
     var dayEntries by remember { mutableStateOf<List<EntrySummary>>(emptyList()) }
+    var shownDay by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(month, app.revision) {
         val ym = month.toString()
@@ -76,6 +100,17 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
     LaunchedEffect(selected, app.revision) {
         val d = selected
         dayEntries = runCatching { app.run { it.day(d, null) } }.getOrDefault(emptyList())
+        shownDay = d
+    }
+
+    val canGoForward = month < YearMonth.now()
+    fun step(by: Long) {
+        if (by > 0 && !canGoForward) {
+            Haptics.reject(haptics)
+            return
+        }
+        Haptics.tick(haptics)
+        month = month.plusMonths(by)
     }
 
     val scope = rememberCoroutineScope()
@@ -91,14 +126,12 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
         Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 MicroLabel("Calendar")
-                Text(Day.monthTitle(month.toString()), style = Typeface.title, color = t.ink)
+                AnimatedContent(month, transitionSpec = { monthSlide(m, targetState > initialState) }, label = "title") {
+                    Text(Day.monthTitle(it.toString()), style = Typeface.title, color = t.ink)
+                }
             }
-            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous month", { month = month.minusMonths(1) })
-            IconAction(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month",
-                { month = month.plusMonths(1) },
-                enabled = month < YearMonth.now(),
-            )
+            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous month", { step(-1) })
+            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month", { step(1) }, enabled = canGoForward)
         }
 
         val firstDay = WeekFields.of(Locale.getDefault()).firstDayOfWeek
@@ -113,13 +146,44 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
         }
         Hairline()
 
-        val cells = cells(month, firstDay)
-        cells.chunked(7).forEach { week ->
-            Row(Modifier.fillMaxWidth()) {
-                week.forEach { date ->
-                    Box(Modifier.weight(1f).aspectRatio(1f).padding(2.dp)) {
-                        if (date != null) {
-                            DayCell(date, marks[date], selected == date, date == Day.today, date > Day.today, t) { selected = date }
+        // The grid follows a horizontal swipe a little, then changes month
+        // once it passes the threshold.
+        val drag = remember { Animatable(0f) }
+        AnimatedContent(
+            month,
+            transitionSpec = { monthSlide(m, targetState > initialState) },
+            modifier = Modifier
+                .graphicsLayer { translationX = drag.value }
+                .pointerInput(canGoForward) {
+                    val threshold = 64.dp.toPx()
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val d = drag.value
+                            if (d <= -threshold) step(1) else if (d >= threshold) step(-1)
+                            scope.launch { drag.animateTo(0f, m.glide()) }
+                        },
+                        onDragCancel = { scope.launch { drag.animateTo(0f, m.glide()) } },
+                    ) { change, amount ->
+                        change.consume()
+                        // Resists past the threshold, and towards future months.
+                        val resist = if (drag.value < 0 && !canGoForward) 0.15f else 0.4f
+                        scope.launch { drag.snapTo(drag.value + amount * resist) }
+                    }
+                },
+            label = "grid",
+        ) { shown ->
+            Column {
+                cells(shown, firstDay).chunked(7).forEach { week ->
+                    Row(Modifier.fillMaxWidth()) {
+                        week.forEach { date ->
+                            Box(Modifier.weight(1f).aspectRatio(1f).padding(2.dp)) {
+                                if (date != null) {
+                                    DayCell(date, marks[date], selected == date, date == Day.today, date > Day.today, t, m) {
+                                        if (selected != date) Haptics.tick(haptics)
+                                        selected = date
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -127,30 +191,69 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
         }
 
         SectionHeader(Day.title(selected), trailing = if (dayEntries.isEmpty()) null else dayEntries.size.toString()) {
-            if (dayEntries.isEmpty()) {
-                Text("Nothing written.", style = Typeface.small, color = t.muted, modifier = Modifier.padding(vertical = 14.dp))
-            }
-            dayEntries.forEach { e ->
-                EntryRow(e, onClick = { openEntry(e.id) }, showDate = false)
-                Hairline()
+            // Waits for the chosen day's entries before swapping, so the old
+            // day's rows don't flash under the new title.
+            Column(Modifier.animateContentSize(m.glide())) {
+                AnimatedContent(
+                    shownDay to dayEntries,
+                    transitionSpec = { fadeIn(m.standard()) togetherWith fadeOut(m.quick()) },
+                    contentKey = { it.first },
+                    label = "day",
+                ) { (_, list) ->
+                    Column {
+                        if (list.isEmpty()) {
+                            Text("Nothing written.", style = Typeface.small, color = t.muted, modifier = Modifier.padding(vertical = 14.dp))
+                        }
+                        list.forEachIndexed { i, e ->
+                            Reveal(i, active = true) {
+                                EntryRow(e, onClick = { openEntry(e.id) }, showDate = false)
+                                Hairline()
+                            }
+                        }
+                    }
+                }
             }
         }
     }
     // New entry on the selected day; untimed unless it's today.
-    NewEntryButton({ scope.launch { app.newEntry(selected)?.let(openEntry) } }, Modifier.align(Alignment.BottomEnd))
+    NewEntryButton(
+        {
+            scope.launch {
+                app.newEntry(selected)?.let {
+                    Haptics.confirm(haptics)
+                    openEntry(it)
+                }
+            }
+        },
+        Modifier.align(Alignment.BottomEnd),
+    )
     }
 }
 
+/** Months slide sideways: later months come in from the right. */
+private fun monthSlide(m: Motion, forward: Boolean): ContentTransform {
+    if (m.reduced) return EnterTransition.None togetherWith ExitTransition.None
+    val dir = if (forward) 1 else -1
+    return (slideInHorizontally(m.glide()) { dir * it / 4 } + fadeIn(m.standard()))
+        .togetherWith(slideOutHorizontally(m.glide()) { -dir * it / 4 } + fadeOut(m.quick()))
+}
+
 @Composable
-private fun DayCell(date: String, mark: DayMark?, selected: Boolean, today: Boolean, future: Boolean, t: Tokens, onClick: () -> Unit) {
+private fun DayCell(date: String, mark: DayMark?, selected: Boolean, today: Boolean, future: Boolean, t: Tokens, m: Motion, onClick: () -> Unit) {
     val shape = RoundedCornerShape(Radius.control)
     val tint = mark?.let { ratingColor(it.rating, t) }
+    val fill by animateColorAsState(tint?.copy(alpha = 0.14f) ?: Color.Transparent, m.standard(), label = "fill")
+    val ring by animateColorAsState(
+        if (selected) t.primary else tint?.copy(alpha = 0.4f) ?: Color.Transparent,
+        m.quick(),
+        label = "ring",
+    )
     Box(
         Modifier
             .fillMaxSize()
-            .background(tint?.copy(alpha = 0.14f) ?: Color.Transparent, shape)
-            .border(1.dp, if (selected) t.primary else tint?.copy(alpha = 0.4f) ?: Color.Transparent, shape)
-            .clickable(enabled = !future, role = Role.Button, onClick = onClick),
+            .pressable(enabled = !future, pressedScale = 0.88f, onClick = onClick)
+            .background(fill, shape)
+            .border(if (selected) 1.5.dp else 1.dp, ring, shape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -162,14 +265,13 @@ private fun DayCell(date: String, mark: DayMark?, selected: Boolean, today: Bool
                 else -> t.ink
             },
         )
-        if (mark != null) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 5.dp)
-                    .size(4.dp)
-                    .background(tint ?: t.muted, CircleShape),
-            )
+        androidx.compose.animation.AnimatedVisibility(
+            visible = mark != null,
+            enter = if (m.reduced) EnterTransition.None else scaleIn(m.settle()) + fadeIn(m.quick()),
+            exit = fadeOut(m.quick()),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp),
+        ) {
+            Box(Modifier.size(4.dp).background(tint ?: t.muted, CircleShape))
         }
     }
 }
