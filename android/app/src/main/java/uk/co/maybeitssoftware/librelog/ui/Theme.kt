@@ -155,7 +155,7 @@ fun LibrelogTheme(content: @Composable () -> Unit) {
         secondaryContainer = t.well,
         onSecondaryContainer = t.ink,
     )
-    CompositionLocalProvider(LocalTokens provides t) {
+    CompositionLocalProvider(LocalTokens provides t, LocalMotion provides rememberMotion()) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }
@@ -182,9 +182,9 @@ fun MicroLabel(text: String, modifier: Modifier = Modifier, color: Color = token
 
 /** A section eyebrow over a hairline, as used down the Today screen. */
 @Composable
-fun SectionHeader(title: String, trailing: String? = null, content: @Composable ColumnScope.() -> Unit = {}) {
+fun SectionHeader(title: String, trailing: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit = {}) {
     val t = tokens
-    Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
+    Column(modifier.fillMaxWidth().padding(top = 28.dp)) {
         androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             MicroLabel(title, Modifier.weight(1f))
             if (trailing != null) Text(trailing, style = Typeface.mono(11), color = t.muted)

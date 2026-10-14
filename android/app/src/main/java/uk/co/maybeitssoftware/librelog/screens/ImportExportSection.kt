@@ -5,7 +5,24 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlin.math.roundToInt
+import uk.co.maybeitssoftware.librelog.ui.Haptics
+import uk.co.maybeitssoftware.librelog.ui.motion
+import uk.co.maybeitssoftware.librelog.ui.pressable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -57,6 +73,8 @@ fun ImportExportSection(app: AppModel) {
     var preview by remember { mutableStateOf<PendingImport?>(null) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<Message?>(null) }
+    val m = motion
+    val haptics = LocalHapticFeedback.current
 
     val saveTo = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val export = pendingExport ?: return@rememberLauncherForActivityResult
@@ -67,7 +85,7 @@ fun ImportExportSection(app: AppModel) {
             } else {
                 runCatching { withContext(Dispatchers.IO) { copyOut(context, export.file, uri) } }
                     .fold(
-                        { Message(plural(export.entries, "Exported %d entry", "Exported %d entries"), false) },
+                        { Message(if (export.entries == 1) "Exported %d entry" else "Exported %d entries", false, export.entries) },
                         { Message(it.message ?: "Couldn't save the export.", true) },
                     )
             }
@@ -102,8 +120,17 @@ fun ImportExportSection(app: AppModel) {
         ActionRow("Import…", "Day One, Daylio, Markdown, or a Librelog backup") {
             pickFile.launch(arrayOf("*/*"))
         }
-        if (busy) Text("Working…", style = Typeface.small, color = t.muted)
-        message?.let { StatusBanner(it.text, if (it.error) t.danger else t.success) }
+        AnimatedVisibility(busy, enter = fadeIn(m.standard()) + expandVertically(m.glide()), exit = fadeOut(m.quick()) + shrinkVertically(m.glide())) {
+            Text("Working…", style = Typeface.small, color = t.muted)
+        }
+        AnimatedContent(
+            message,
+            transitionSpec = {
+                if (m.reduced) EnterTransition.None togetherWith ExitTransition.None
+                else (fadeIn(m.standard()) + expandVertically(m.glide())) togetherWith (fadeOut(m.quick()) + shrinkVertically(m.glide()))
+            },
+            label = "message",
+        ) { msg -> if (msg != null) MessageBanner(msg) }
     }
 
     if (choosingFormat) {
@@ -171,11 +198,16 @@ fun ImportExportSection(app: AppModel) {
                         result
                             .onSuccess { r ->
                                 val skipped = if (r.skipped > 0u) ", skipped ${r.skipped}" else ""
-                                message = Message(plural(r.imported.toInt(), "Imported %d entry", "Imported %d entries") + skipped, false)
+                                val n = r.imported.toInt()
+                                message = Message((if (n == 1) "Imported %d entry" else "Imported %d entries") + skipped, false, n)
+                                if (n > 0) Haptics.confirm(haptics)
                                 app.changed()
                                 app.sync.schedulePush()
                             }
-                            .onFailure { message = Message(it.message ?: "Import failed.", true) }
+                            .onFailure {
+                                Haptics.reject(haptics)
+                                message = Message(it.message ?: "Import failed.", true)
+                            }
                     }
                 },
             )
@@ -186,7 +218,25 @@ fun ImportExportSection(app: AppModel) {
 
 private data class PendingExport(val file: File, val entries: Int)
 private data class PendingImport(val file: File, val preview: ImportPreview)
-private data class Message(val text: String, val error: Boolean)
+/** A result line. With [count], [text] is a template whose %d counts up to it. */
+private data class Message(val text: String, val error: Boolean, val count: Int? = null)
+
+@Composable
+private fun MessageBanner(msg: Message) {
+    val t = tokens
+    val m = motion
+    val count = msg.count
+    if (count == null) {
+        StatusBanner(msg.text, if (msg.error) t.danger else t.success)
+        return
+    }
+    // Ticks up from zero: quick for a handful, never longer than a second.
+    val shown = remember(msg) { Animatable(if (m.reduced) count.toFloat() else 0f) }
+    LaunchedEffect(msg) {
+        shown.animateTo(count.toFloat(), tween((250 + count * 3).coerceAtMost(1000), easing = FastOutSlowInEasing))
+    }
+    StatusBanner(msg.text.format(shown.value.roundToInt()), if (msg.error) t.danger else t.success)
+}
 
 private enum class ExportChoice(val format: ExportFormat, val title: String, val detail: String) {
     Backup(ExportFormat.JSON, "Complete backup (JSON)", "Everything, to restore into Librelog"),
@@ -202,7 +252,7 @@ private fun ActionRow(title: String, detail: String, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
-            .clickable(role = Role.Button, onClick = onClick)
+            .pressable(onClick = onClick)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

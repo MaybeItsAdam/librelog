@@ -8,6 +8,7 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.widget.EditText
 import androidx.compose.runtime.Composable
@@ -64,7 +65,10 @@ class EditorEditText(context: Context, private val controller: EditorController)
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP && layout != null) {
             val offset = getOffsetForPosition(event.x, event.y)
-            if (controller.toggleCheck(offset)) return true
+            if (controller.toggleCheck(offset)) {
+                performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                return true
+            }
         }
         return super.onTouchEvent(event)
     }

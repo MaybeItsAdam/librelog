@@ -1,5 +1,9 @@
 package uk.co.maybeitssoftware.librelog.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,11 +26,18 @@ import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -48,7 +59,7 @@ fun EntryRow(entry: EntrySummary, onClick: () -> Unit, showDate: Boolean = true,
     Column(
         Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
+            .pressable(onClick = onClick)
             .padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -127,32 +138,63 @@ fun Stars(rating: Double, size: Int = 12) {
     }
 }
 
-/** Tappable stars; tapping the current rating clears it. 44dp tall targets. */
+/**
+ * Tappable stars; tapping the current rating clears it. 44dp tall targets.
+ * Stars that light up pop in turn, left to right.
+ */
 @Composable
 fun RatingPicker(rating: Double?, onSet: (Double?) -> Unit) {
-    val t = tokens
+    val haptics = LocalHapticFeedback.current
+    val r = rating ?: 0.0
+    // The rating before the last tap, so newly lit stars stagger from there.
+    var from by remember { mutableStateOf(r) }
     Row {
         for (i in 1..5) {
             val value = i.toDouble()
-            val r = rating ?: 0.0
-            Box(
-                Modifier
-                    .size(width = 30.dp, height = 44.dp)
-                    .clickable(role = Role.Button) { onSet(if (rating == value) null else value) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    when {
-                        r >= value -> Icons.Filled.Star
-                        r >= value - 0.5 -> Icons.Filled.StarHalf
-                        else -> Icons.Outlined.StarOutline
-                    },
-                    "$i stars",
-                    Modifier.size(18.dp),
-                    tint = if (r >= value - 0.5) t.warning else t.dim,
-                )
+            RatingStar(i, r = r, order = (i - 1 - from.toInt()).coerceAtLeast(0)) {
+                Haptics.tick(haptics)
+                from = r
+                onSet(if (rating == value) null else value)
             }
         }
+    }
+}
+
+@Composable
+private fun RatingStar(i: Int, r: Double, order: Int, onClick: () -> Unit) {
+    val t = tokens
+    val m = motion
+    val lit = r >= i - 0.5
+    val tint by animateColorAsState(if (lit) t.warning else t.dim, m.standard(), label = "star")
+    val scale = remember { Animatable(1f) }
+    var wasLit by remember { mutableStateOf(lit) }
+    LaunchedEffect(lit) {
+        if (lit && !wasLit && !m.reduced) {
+            delay(order * 45L)
+            scale.animateTo(Motion.POP, tween(90, easing = FastOutSlowInEasing))
+            scale.animateTo(1f, m.settle())
+        }
+        wasLit = lit
+    }
+    Box(
+        Modifier
+            .size(width = 30.dp, height = 44.dp)
+            .pressable(pressedScale = 0.85f, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            when {
+                r >= i -> Icons.Filled.Star
+                lit -> Icons.Filled.StarHalf
+                else -> Icons.Outlined.StarOutline
+            },
+            "$i stars",
+            Modifier.size(18.dp).graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
+            tint = tint,
+        )
     }
 }
 
@@ -162,10 +204,11 @@ fun IconAction(icon: ImageVector, label: String, onClick: () -> Unit, tint: Colo
     Box(
         Modifier
             .size(44.dp)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+            .pressable(enabled = enabled, pressedScale = 0.9f, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, label, Modifier.size(22.dp), tint = if (enabled) tint else tokens.dim)
+        val color by animateColorAsState(if (enabled) tint else tokens.dim, motion.standard(), label = "icon")
+        Icon(icon, label, Modifier.size(22.dp), tint = color)
     }
 }
 
@@ -190,11 +233,12 @@ fun StatusBanner(text: String, color: Color, modifier: Modifier = Modifier, onCl
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val t = tokens
+    val fill by animateColorAsState(if (enabled) t.primary else t.dim, motion.standard(), label = "fill")
     Box(
         modifier
             .fillMaxWidth()
-            .background(if (enabled) t.primary else t.dim, RoundedCornerShape(Radius.control))
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .pressable(enabled = enabled, onClick = onClick)
+            .background(fill, RoundedCornerShape(Radius.control))
             .padding(vertical = 13.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -208,8 +252,8 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
     Box(
         modifier
             .fillMaxWidth()
+            .pressable(onClick = onClick)
             .border(1.dp, t.input, RoundedCornerShape(Radius.control))
-            .clickable(role = Role.Button, onClick = onClick)
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -224,8 +268,8 @@ fun NewEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         modifier
             .padding(20.dp)
             .size(56.dp)
-            .background(tokens.primary, RoundedCornerShape(Radius.card))
-            .clickable(role = Role.Button, onClick = onClick),
+            .pressable(pressedScale = Motion.PRESSED_PRIMARY, onClick = onClick)
+            .background(tokens.primary, RoundedCornerShape(Radius.card)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(Icons.Filled.Add, "New entry", Modifier.size(26.dp), tint = Color.White)

@@ -1,9 +1,21 @@
 package uk.co.maybeitssoftware.librelog.screens
 
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.focus.onFocusChanged
+import uk.co.maybeitssoftware.librelog.ui.motion
+import uk.co.maybeitssoftware.librelog.ui.pressable
+import uk.co.maybeitssoftware.librelog.ui.rowMotion
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -61,6 +72,10 @@ fun SearchScreen(app: AppModel, openEntry: (String) -> Unit) {
     val t = tokens
     var query by rememberSaveable { mutableStateOf("") }
     var hits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
+    val m = motion
+    // The search box's border lights up while it has focus.
+    var focused by remember { mutableStateOf(false) }
+    val border by animateColorAsState(if (focused) t.primary else t.input, m.standard(), label = "focus")
 
     LaunchedEffect(query, app.revision) {
         delay(120)
@@ -80,7 +95,7 @@ fun SearchScreen(app: AppModel, openEntry: (String) -> Unit) {
                     .fillMaxWidth()
                     .heightIn(min = 44.dp)
                     .background(t.raised, shape)
-                    .border(1.dp, t.input, shape)
+                    .border(1.dp, border, shape)
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -93,7 +108,7 @@ fun SearchScreen(app: AppModel, openEntry: (String) -> Unit) {
                     textStyle = Typeface.ui.copy(color = t.ink, fontSize = 16.sp),
                     cursorBrush = SolidColor(t.primary),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Search),
-                    modifier = Modifier.weight(1f).padding(start = 8.dp, top = 12.dp, bottom = 12.dp),
+                    modifier = Modifier.weight(1f).padding(start = 8.dp, top = 12.dp, bottom = 12.dp).onFocusChanged { focused = it.isFocused },
                     decorationBox = { inner ->
                         if (query.isEmpty()) Text("Words, tag:, rating:, before:…", style = Typeface.ui.copy(fontSize = 16.sp), color = t.dim)
                         inner()
@@ -102,14 +117,14 @@ fun SearchScreen(app: AppModel, openEntry: (String) -> Unit) {
             }
         }
         if (query.isBlank()) {
-            item {
-                SectionHeader("Try") {
+            item(key = "try") {
+                SectionHeader("Try", modifier = rowMotion(m)) {
                     examples.forEach { (q, meaning) ->
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 44.dp)
-                                .clickable(role = Role.Button) { query = q }
+                                .pressable(pressedScale = 0.98f, tick = true) { query = q }
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -121,16 +136,31 @@ fun SearchScreen(app: AppModel, openEntry: (String) -> Unit) {
                 }
             }
         } else {
-            item {
-                MicroLabel(
-                    if (hits.size == 1) "1 result" else "${hits.size} results",
-                    Modifier.padding(top = 20.dp, bottom = 6.dp),
-                )
-                Hairline()
+            item(key = "count") {
+                Column(rowMotion(m)) {
+                    // The count rolls as results come and go.
+                    AnimatedContent(
+                        hits.size,
+                        transitionSpec = {
+                            if (m.reduced) EnterTransition.None togetherWith ExitTransition.None
+                            else {
+                                val up = targetState > initialState
+                                (slideInVertically(m.glide()) { if (up) it else -it } + fadeIn(m.quick()))
+                                    .togetherWith(slideOutVertically(m.glide()) { if (up) -it else it } + fadeOut(m.quick()))
+                            }
+                        },
+                        label = "count",
+                    ) { n ->
+                        MicroLabel(if (n == 1) "1 result" else "$n results", Modifier.padding(top = 20.dp, bottom = 6.dp))
+                    }
+                    Hairline()
+                }
             }
             items(hits, key = { it.entry.id }) { hit ->
-                EntryRow(hit.entry, onClick = { openEntry(hit.entry.id) }, snippet = hit.snippet)
-                Hairline()
+                Column(rowMotion(m)) {
+                    EntryRow(hit.entry, onClick = { openEntry(hit.entry.id) }, snippet = hit.snippet)
+                    Hairline()
+                }
             }
         }
     }
