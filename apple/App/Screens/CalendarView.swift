@@ -32,7 +32,7 @@ struct CalendarView: View {
                     }
                     ForEach(dayEntries, id: \.id) { e in
                         VStack(spacing: 0) {
-                            NavigationLink(value: Route.entry(e.id)) { EntryRow(entry: e, showDate: false) }
+                            NavigationLink(value: Route.entry(e.id)) { EntryRow(entry: e, showDate: false, onDay: selected) }
                                 .buttonStyle(.pressable)
                             Divider().overlay(Color.hairline)
                         }
@@ -86,9 +86,9 @@ struct CalendarView: View {
     private var grid: some View {
         ZStack(alignment: .top) {
             LazyVGrid(columns: columns, spacing: 0) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
+                ForEach(Array(cells.enumerated()), id: \.offset) { i, day in
                     if let day {
-                        dayCell(day)
+                        dayCell(day, column: i % 7)
                     } else {
                         Color.clear.frame(height: 48)
                     }
@@ -117,7 +117,7 @@ struct CalendarView: View {
                            removal: .move(edge: outgoing).combined(with: .opacity))
     }
 
-    private func dayCell(_ day: String) -> some View {
+    private func dayCell(_ day: String, column: Int) -> some View {
         let mark = marks[day]
         let isToday = day == Day.today
         let isSelected = day == selected
@@ -144,10 +144,31 @@ struct CalendarView: View {
                     RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline)
                 }
             }
+            .background { band(mark, day: day, column: column) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable(scale: 0.92))
         .accessibilityLabel("\(Day.title(day)), \(mark?.entryCount ?? 0) entries")
+    }
+
+    /// Days covered by a multi-day entry share one band. Its ends are round,
+    /// and it stays square where it carries on into the next or previous
+    /// day, except at the edge of a week row, where it rounds off.
+    @ViewBuilder
+    private func band(_ mark: DayMark?, day: String, column: Int) -> some View {
+        if let mark, mark.spanBefore || mark.spanAfter {
+            let lastOfMonth = day == cells.last.flatMap { $0 }
+            let joinsLeft = mark.spanBefore && column > 0 && !day.hasSuffix("-01")
+            let joinsRight = mark.spanAfter && column < 6 && !lastOfMonth
+            let r = Radius.control
+            UnevenRoundedRectangle(topLeadingRadius: joinsLeft ? 0 : r, bottomLeadingRadius: joinsLeft ? 0 : r,
+                                   bottomTrailingRadius: joinsRight ? 0 : r, topTrailingRadius: joinsRight ? 0 : r)
+                .fill(Color.primary.opacity(0.12))
+                .padding(.leading, joinsLeft ? 0 : 3)
+                .padding(.trailing, joinsRight ? 0 : 3)
+                .padding(.vertical, 6)
+                .transition(.opacity)
+        }
     }
 
     /// No rating: ink dot. Rated: raspberry → amber → emerald.

@@ -17,6 +17,7 @@ struct EntryEditorView: View {
     @State private var newTag = ""
     @State private var showConflicts = false
     @State private var confirmDelete = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollView {
@@ -66,7 +67,9 @@ struct EntryEditorView: View {
     private func header(_ entry: Entry) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text(Day.title(entry.date)).microLabel()
+                Text(entry.endDate == nil ? Day.title(entry.date) : Day.range(entry.date, entry.endDate))
+                    .microLabel()
+                    .contentTransition(.opacity)
                 if let time = entry.time {
                     Text(time).font(Typeface.mono(11)).foregroundStyle(Color.muted)
                 }
@@ -79,6 +82,8 @@ struct EntryEditorView: View {
             }
             .padding(.top, 12)
 
+            spanRow(entry)
+
             TextField("Title", text: $title, axis: .vertical)
                 .font(Typeface.title)
                 .foregroundStyle(Color.ink)
@@ -89,6 +94,49 @@ struct EntryEditorView: View {
             tagRow(entry)
             Divider().overlay(Color.hairline)
         }
+    }
+
+    /// "Several days": a trip or a festival, written up as one entry. Turning
+    /// it on starts with the next day as the last; the picker allows a year.
+    private func spanRow(_ entry: Entry) -> some View {
+        let start = Day.date(entry.date) ?? Date()
+        let cal = Calendar.current
+        let earliest = cal.date(byAdding: .day, value: 1, to: start) ?? start
+        let latest = cal.date(byAdding: .day, value: 365, to: start) ?? start
+        let several = Binding<Bool>(
+            get: { entry.endDate != nil },
+            set: { on in setEnd(on ? Day.string(earliest) : nil) }
+        )
+        let last = Binding<Date>(
+            get: { entry.endDate.flatMap(Day.date) ?? earliest },
+            set: { setEnd(Day.string($0)) }
+        )
+        return HStack(spacing: 12) {
+            Toggle(isOn: several) {
+                Text("Several days").font(.system(size: 13)).foregroundStyle(Color.muted)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .tint(Color.primary)
+            .fixedSize()
+            if entry.endDate != nil {
+                DatePicker("Last day", selection: last, in: earliest...latest, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .font(.system(size: 13))
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 44)
+        .sensoryFeedback(.selection, trigger: entry.endDate != nil)
+    }
+
+    private func setEnd(_ end: String?) {
+        guard let entry, entry.endDate != end else { return }
+        let id = entry.id
+        withMotion(Motion.snappy, reduce: reduceMotion) { self.entry?.endDate = end }
+        Task { await app.write { try $0.setEndDate(id: id, endDate: end) } }
     }
 
     private func tagRow(_ entry: Entry) -> some View {

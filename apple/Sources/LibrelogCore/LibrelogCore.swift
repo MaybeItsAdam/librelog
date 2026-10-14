@@ -821,7 +821,8 @@ public protocol StoreProtocol: AnyObject, Sendable {
     func createJournal(name: String, color: String?) throws  -> Journal
     
     /**
-     * All entries on one day, earliest first.
+     * All entries on one day, including any covering several days that
+     * take it in, earliest first.
      */
     func day(date: String, journalId: String?) throws  -> [EntrySummary]
     
@@ -879,7 +880,8 @@ public protocol StoreProtocol: AnyObject, Sendable {
     func keyMatches(key: Data, keyCheck: String) throws  -> Bool
     
     /**
-     * Calendar marks for one month, `YYYY-MM`.
+     * Calendar marks for one month, `YYYY-MM`. Entries covering several
+     * days mark each of them.
      */
     func month(yearMonth: String, journalId: String?) throws  -> [DayMark]
     
@@ -946,7 +948,16 @@ public protocol StoreProtocol: AnyObject, Sendable {
     
     func search(query: String, limit: UInt32) throws  -> [SearchHit]
     
+    /**
+     * Moves an entry. One covering several days keeps its length.
+     */
     func setDateTime(id: String, date: String, time: String?) throws 
+    
+    /**
+     * Makes an entry cover every day up to `end_date`, or just its own day
+     * when none. An end on or before the start day clears it.
+     */
+    func setEndDate(id: String, endDate: String?) throws 
     
     func setFavorite(id: String, favorite: Bool) throws 
     
@@ -1116,7 +1127,8 @@ open func createJournal(name: String, color: String?)throws  -> Journal  {
 }
     
     /**
-     * All entries on one day, earliest first.
+     * All entries on one day, including any covering several days that
+     * take it in, earliest first.
      */
 open func day(date: String, journalId: String?)throws  -> [EntrySummary]  {
     return try  FfiConverterSequenceTypeEntrySummary.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
@@ -1275,7 +1287,8 @@ open func keyMatches(key: Data, keyCheck: String)throws  -> Bool  {
 }
     
     /**
-     * Calendar marks for one month, `YYYY-MM`.
+     * Calendar marks for one month, `YYYY-MM`. Entries covering several
+     * days mark each of them.
      */
 open func month(yearMonth: String, journalId: String?)throws  -> [DayMark]  {
     return try  FfiConverterSequenceTypeDayMark.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
@@ -1474,6 +1487,9 @@ open func search(query: String, limit: UInt32)throws  -> [SearchHit]  {
 })
 }
     
+    /**
+     * Moves an entry. One covering several days keeps its length.
+     */
 open func setDateTime(id: String, date: String, time: String?)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
         uniffiCallStatus in
     uniffi_librelog_core_fn_method_store_set_date_time(
@@ -1481,6 +1497,20 @@ open func setDateTime(id: String, date: String, time: String?)throws   {try rust
         FfiConverterString.lower(id),
         FfiConverterString.lower(date),
         FfiConverterOptionString.lower(time),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Makes an entry cover every day up to `end_date`, or just its own day
+     * when none. An end on or before the start day clears it.
+     */
+open func setEndDate(id: String, endDate: String?)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_end_date(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionString.lower(endDate),uniffiCallStatus
     )
 }
 }
@@ -1747,15 +1777,33 @@ public func FfiConverterTypeBlock_lower(_ value: Block) -> RustBuffer {
  */
 public struct DayMark: Equatable, Hashable {
     public var date: String
+    /**
+     * Entries on this day, counting multi-day entries on every day they cover.
+     */
     public var entryCount: UInt32
     public var rating: Double?
+    /**
+     * A multi-day entry covers this day and the day before / after, so the
+     * calendar can draw it as one band.
+     */
+    public var spanBefore: Bool
+    public var spanAfter: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(date: String, entryCount: UInt32, rating: Double?) {
+    public init(date: String, 
+        /**
+         * Entries on this day, counting multi-day entries on every day they cover.
+         */entryCount: UInt32, rating: Double?, 
+        /**
+         * A multi-day entry covers this day and the day before / after, so the
+         * calendar can draw it as one band.
+         */spanBefore: Bool, spanAfter: Bool) {
         self.date = date
         self.entryCount = entryCount
         self.rating = rating
+        self.spanBefore = spanBefore
+        self.spanAfter = spanAfter
     }
 
     
@@ -1776,7 +1824,9 @@ public struct FfiConverterTypeDayMark: FfiConverterRustBuffer {
             try DayMark(
                 date: FfiConverterString.read(from: &buf), 
                 entryCount: FfiConverterUInt32.read(from: &buf), 
-                rating: FfiConverterOptionDouble.read(from: &buf)
+                rating: FfiConverterOptionDouble.read(from: &buf), 
+                spanBefore: FfiConverterBool.read(from: &buf), 
+                spanAfter: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -1784,6 +1834,8 @@ public struct FfiConverterTypeDayMark: FfiConverterRustBuffer {
         FfiConverterString.write(value.date, into: &buf)
         FfiConverterUInt32.write(value.entryCount, into: &buf)
         FfiConverterOptionDouble.write(value.rating, into: &buf)
+        FfiConverterBool.write(value.spanBefore, into: &buf)
+        FfiConverterBool.write(value.spanAfter, into: &buf)
     }
 }
 
@@ -1814,6 +1866,10 @@ public struct Entry: Equatable, Hashable {
      * Local time, `HH:MM`, or none for an untimed entry.
      */
     public var time: String?
+    /**
+     * The last day, for an entry covering several days; always after `date`.
+     */
+    public var endDate: String?
     public var title: String?
     public var body: [Block]
     public var wordCount: UInt32
@@ -1831,11 +1887,15 @@ public struct Entry: Equatable, Hashable {
          */date: String, 
         /**
          * Local time, `HH:MM`, or none for an untimed entry.
-         */time: String?, title: String?, body: [Block], wordCount: UInt32, rating: Double?, isFavorite: Bool, tags: [Tag], hasConflict: Bool, updatedAt: String) {
+         */time: String?, 
+        /**
+         * The last day, for an entry covering several days; always after `date`.
+         */endDate: String?, title: String?, body: [Block], wordCount: UInt32, rating: Double?, isFavorite: Bool, tags: [Tag], hasConflict: Bool, updatedAt: String) {
         self.id = id
         self.journalId = journalId
         self.date = date
         self.time = time
+        self.endDate = endDate
         self.title = title
         self.body = body
         self.wordCount = wordCount
@@ -1866,6 +1926,7 @@ public struct FfiConverterTypeEntry: FfiConverterRustBuffer {
                 journalId: FfiConverterString.read(from: &buf), 
                 date: FfiConverterString.read(from: &buf), 
                 time: FfiConverterOptionString.read(from: &buf), 
+                endDate: FfiConverterOptionString.read(from: &buf), 
                 title: FfiConverterOptionString.read(from: &buf), 
                 body: FfiConverterSequenceTypeBlock.read(from: &buf), 
                 wordCount: FfiConverterUInt32.read(from: &buf), 
@@ -1882,6 +1943,7 @@ public struct FfiConverterTypeEntry: FfiConverterRustBuffer {
         FfiConverterString.write(value.journalId, into: &buf)
         FfiConverterString.write(value.date, into: &buf)
         FfiConverterOptionString.write(value.time, into: &buf)
+        FfiConverterOptionString.write(value.endDate, into: &buf)
         FfiConverterOptionString.write(value.title, into: &buf)
         FfiConverterSequenceTypeBlock.write(value.body, into: &buf)
         FfiConverterUInt32.write(value.wordCount, into: &buf)
@@ -1917,6 +1979,7 @@ public struct EntrySummary: Equatable, Hashable {
     public var journalId: String
     public var date: String
     public var time: String?
+    public var endDate: String?
     public var title: String?
     public var excerpt: String
     public var wordCount: UInt32
@@ -1926,11 +1989,12 @@ public struct EntrySummary: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, journalId: String, date: String, time: String?, title: String?, excerpt: String, wordCount: UInt32, rating: Double?, isFavorite: Bool, tagNames: [String]) {
+    public init(id: String, journalId: String, date: String, time: String?, endDate: String?, title: String?, excerpt: String, wordCount: UInt32, rating: Double?, isFavorite: Bool, tagNames: [String]) {
         self.id = id
         self.journalId = journalId
         self.date = date
         self.time = time
+        self.endDate = endDate
         self.title = title
         self.excerpt = excerpt
         self.wordCount = wordCount
@@ -1959,6 +2023,7 @@ public struct FfiConverterTypeEntrySummary: FfiConverterRustBuffer {
                 journalId: FfiConverterString.read(from: &buf), 
                 date: FfiConverterString.read(from: &buf), 
                 time: FfiConverterOptionString.read(from: &buf), 
+                endDate: FfiConverterOptionString.read(from: &buf), 
                 title: FfiConverterOptionString.read(from: &buf), 
                 excerpt: FfiConverterString.read(from: &buf), 
                 wordCount: FfiConverterUInt32.read(from: &buf), 
@@ -1973,6 +2038,7 @@ public struct FfiConverterTypeEntrySummary: FfiConverterRustBuffer {
         FfiConverterString.write(value.journalId, into: &buf)
         FfiConverterString.write(value.date, into: &buf)
         FfiConverterOptionString.write(value.time, into: &buf)
+        FfiConverterOptionString.write(value.endDate, into: &buf)
         FfiConverterOptionString.write(value.title, into: &buf)
         FfiConverterString.write(value.excerpt, into: &buf)
         FfiConverterUInt32.write(value.wordCount, into: &buf)
@@ -4096,7 +4162,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_create_journal() != 32710) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_librelog_core_checksum_method_store_day() != 8290) {
+    if (uniffi_librelog_core_checksum_method_store_day() != 58976) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_default_journal_id() != 7520) {
@@ -4135,7 +4201,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_key_matches() != 150) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_librelog_core_checksum_method_store_month() != 46494) {
+    if (uniffi_librelog_core_checksum_method_store_month() != 19343) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_move_entry() != 13924) {
@@ -4186,7 +4252,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_search() != 41579) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_librelog_core_checksum_method_store_set_date_time() != 65088) {
+    if (uniffi_librelog_core_checksum_method_store_set_date_time() != 12094) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_end_date() != 49275) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_set_favorite() != 37665) {
