@@ -21,6 +21,7 @@ public sealed partial class SyncPage : Page
     public SyncPage()
     {
         InitializeComponent();
+        Loaded += (_, _) => Motion.PressAll(this);
         Loaded += (_, _) => Sync.PropertyChanged += OnSyncChanged;
         Unloaded += (_, _) =>
         {
@@ -213,6 +214,20 @@ public sealed partial class SyncPage : Page
     {
         TransferText.Text = message;
         TransferText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[error ? "RaspberryBrush" : "InkBrush"];
+        if (error) Motion.Tint(TransferBox, Raspberry, hold: true);
+        else Motion.Untint(TransferBox);
+    }
+
+    private static readonly Windows.UI.Color Emerald = Windows.UI.Color.FromArgb(0xFF, 0x4C, 0xC3, 0x8E);
+    private static readonly Windows.UI.Color Raspberry = Windows.UI.Color.FromArgb(0xFF, 0xD6, 0x22, 0x46);
+
+    /// A finished import or export: the count rises to its total under a
+    /// brief emerald tint.
+    private void ShowDone(uint total, Func<uint, string> message)
+    {
+        ShowTransfer(message(0));
+        Motion.Tint(TransferBox, Emerald);
+        Motion.CountUp((int)total, n => TransferText.Text = message((uint)n));
     }
 
     private async void OnExport(object sender, RoutedEventArgs e)
@@ -252,7 +267,7 @@ public sealed partial class SyncPage : Page
         try
         {
             var summary = await AppServices.Run(s => s.Export(format, file.Path));
-            ShowTransfer($"Exported {Entries(summary.Entries)} to {file.Name}.");
+            ShowDone(summary.Entries, n => $"Exported {Entries(n)} to {file.Name}.");
         }
         catch (CoreException ex)
         {
@@ -304,9 +319,9 @@ public sealed partial class SyncPage : Page
         {
             // Write refreshes every screen and schedules a sync push.
             var result = await AppServices.Write(s => s.ImportFile(path));
-            ShowTransfer(result.Skipped == 0
-                ? $"Imported {Entries(result.Imported)}."
-                : $"Imported {Entries(result.Imported)}; skipped {result.Skipped} already in your journal.");
+            ShowDone(result.Imported, n => result.Skipped == 0
+                ? $"Imported {Entries(n)}."
+                : $"Imported {Entries(n)}; skipped {result.Skipped} already in your journal.");
         }
         catch (CoreException ex)
         {

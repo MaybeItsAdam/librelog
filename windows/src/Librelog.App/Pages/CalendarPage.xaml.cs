@@ -12,10 +12,15 @@ public sealed partial class CalendarPage : Page
 {
     private DateOnly month = FirstOf(DateOnly.FromDateTime(DateTime.Now));
     private string selected = AppServices.Today;
+    private int slide;          // -1 or 1 after a month change, for the next draw
+    private bool popSelected;   // a day was just picked
 
     public CalendarPage()
     {
         InitializeComponent();
+        DayList.ItemContainerTransitions = Motion.ListTransitions();
+        DayList.ContainerContentChanging += Motion.PressRows;
+        Loaded += (_, _) => Motion.PressAll(this);
         NavigationCacheMode = NavigationCacheMode.Required;
         BuildHeader();
         Loaded += (_, _) => AppServices.DataChanged += Reload;
@@ -57,8 +62,17 @@ public sealed partial class CalendarPage : Page
         var (marks, entries) = await AppServices.Run(s => (s.Month(ym), s.Day(day)));
         if (shown != month) return;
         MonthText.Text = Format.Month(shown);
+        var picked = popSelected;
         DrawGrid(shown, marks.ToDictionary(m => m.Date));
+        if (slide != 0)
+        {
+            // The new month comes from the side you moved towards.
+            Motion.SlideIn(DayGrid, slide * Motion.SlideDistance);
+            Motion.SlideIn(MonthText, slide * Motion.SlideDistance / 2);
+            slide = 0;
+        }
         SelectedText.Text = Format.Caps(Format.LongDate(day));
+        if (picked) Motion.FadeIn(DayList);
         DayList.ItemsSource = entries;
         NothingText.Visibility = Format.Shown(entries.Count == 0);
     }
@@ -111,6 +125,13 @@ public sealed partial class CalendarPage : Page
             ToolTipService.SetToolTip(button, mark is null ? Format.LongDate(ymd)
                 : $"{Format.LongDate(ymd)} · {mark.EntryCount} {(mark.EntryCount == 1 ? "entry" : "entries")}");
             button.Click += OnDayClick;
+            Motion.Press(button);
+            if (isSelected && popSelected)
+            {
+                // The ring grows into place once the button has a size to centre on.
+                button.Loaded += (b, _) => Motion.Pop((UIElement)b, Motion.SelectScale);
+                popSelected = false;
+            }
             Grid.SetRow(button, cell / 7);
             Grid.SetColumn(button, cell % 7);
             DayGrid.Children.Add(button);
@@ -132,13 +153,17 @@ public sealed partial class CalendarPage : Page
 
     private void OnDayClick(object sender, RoutedEventArgs e)
     {
-        selected = (string)((Button)sender).Tag;
+        var day = (string)((Button)sender).Tag;
+        if (day == selected) return;
+        selected = day;
+        popSelected = true;
         Reload();
     }
 
     private void Shift(int months)
     {
         month = month.AddMonths(months);
+        slide = Math.Sign(months);
         Reload();
     }
 

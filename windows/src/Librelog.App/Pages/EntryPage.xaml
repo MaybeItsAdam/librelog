@@ -92,7 +92,13 @@
                          BorderThickness="0" Background="Transparent" Padding="0" TextChanged="OnTitleChanged" />
 
                 <StackPanel Orientation="Horizontal" Spacing="16">
-                    <RatingControl x:Name="Rating" MaxRating="5" IsClearEnabled="True" ValueChanged="OnRatingChanged" />
+                    <RatingControl x:Name="Rating" MaxRating="5" IsClearEnabled="True" ValueChanged="OnRatingChanged">
+                        <!-- Stars take the calendar's rating colours, tweened as they change. -->
+                        <RatingControl.Resources>
+                            <SolidColorBrush x:Key="RatingControlSelectedForeground" Color="#FFBF00" />
+                            <SolidColorBrush x:Key="RatingControlPointerOverSelectedForeground" Color="#FFBF00" />
+                        </RatingControl.Resources>
+                    </RatingControl>
                     <ItemsControl x:Name="TagList" VerticalAlignment="Center">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>

@@ -3,6 +3,7 @@ using Librelog.App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.System;
 
@@ -28,15 +29,29 @@ public sealed partial class MainWindow : Window
         Go("journal");
     }
 
+    /// The pane's order, top to bottom; a switch slides the way you moved.
+    private static readonly string[] Order = ["journal", "calendar", "search", "sync"];
+
     public void Go(string tag)
     {
         if (!Pages.TryGetValue(tag, out var page)) return;
-        if (ContentFrame.CurrentSourcePageType != page) ContentFrame.Navigate(page);
+        if (ContentFrame.CurrentSourcePageType == page) return;
+        var from = Array.IndexOf(Order, Pages.FirstOrDefault(kv => kv.Value == ContentFrame.CurrentSourcePageType).Key);
+        var to = Array.IndexOf(Order, tag);
+        ContentFrame.Navigate(page, null, Transition(new SlideNavigationTransitionInfo
+        {
+            Effect = from < 0 || to >= from ? SlideNavigationTransitionEffect.FromRight : SlideNavigationTransitionEffect.FromLeft,
+        }));
     }
 
-    public void OpenEntry(string id) => ContentFrame.Navigate(typeof(EntryPage), id);
+    /// Opening an entry drills into it; Back reverses whichever transition was used.
+    public void OpenEntry(string id) => ContentFrame.Navigate(typeof(EntryPage), id, Transition(new DrillInNavigationTransitionInfo()));
 
-    public void OpenHistory(string id) => ContentFrame.Navigate(typeof(HistoryPage), id);
+    public void OpenHistory(string id) =>
+        ContentFrame.Navigate(typeof(HistoryPage), id, Transition(new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight }));
+
+    private static NavigationTransitionInfo Transition(NavigationTransitionInfo info) =>
+        Motion.Enabled ? info : new SuppressNavigationTransitionInfo();
 
     public void ShowSync() => Go("sync");
 
