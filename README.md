@@ -51,6 +51,24 @@ user must exist; sign in once first):
 select librelog.admin_set_sync_until('someone@example.com', now() + interval '1 year');
 ```
 
+## Bringing in an Obsidian vault
+
+Settings → Import & export reads Librelog backups, Day One, Daylio and
+Markdown directly. For an Obsidian vault, gather it into one zip first:
+
+```sh
+scripts/obsidian-to-librelog.py --vault ~/Documents/Life   # writes ~/Downloads/Librelog import <date>.zip
+scripts/obsidian-to-librelog.py --dry-run                  # just list the guessed dates
+```
+
+Daily notes are dated by file name, event notes by their `date:` front matter,
+and notes kept as `## 15/12` sections are split into one entry per day. Notes
+with no date anywhere are tagged `Undated`. Running it again later and
+importing the new zip only adds what's new.
+
+To try an import on a scratch database: `cargo run --example import --
+/tmp/test.sqlite <file>` in `core/`.
+
 ## Not built yet
 
 Payments (Stripe, store subscriptions), branded sign-in emails (needs SMTP),
