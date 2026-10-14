@@ -4,14 +4,21 @@ import SwiftUI
 struct EntryRow: View {
     let entry: EntrySummary
     var showDate = true
+    /// The day being shown, in a single day's list: an entry covering
+    /// several days then says which of them this is.
+    var onDay: String?
     /// Search snippet with matches wrapped in U+E000…U+E001 (see SearchHit).
     var snippet: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                if showDate {
-                    Text(Day.short(entry.date)).microLabel()
+                if let onDay, let end = entry.endDate, end > entry.date {
+                    Text("Day \(Day.between(entry.date, onDay) + 1) of \(Day.between(entry.date, end) + 1)")
+                        .microLabel()
+                } else if showDate || entry.endDate != nil {
+                    // A multi-day entry is listed once, so it always says how long it ran.
+                    Text(Day.range(entry.date, entry.endDate)).microLabel()
                 }
                 if let time = entry.time {
                     Text(time).font(Typeface.mono(11)).foregroundStyle(Color.muted)

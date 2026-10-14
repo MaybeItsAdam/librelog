@@ -133,6 +133,32 @@ enum Day {
             : d.formatted(.dateTime.day().month(.abbreviated).year())
     }
 
+    /// "26 – 27 Aug", "29 Sep – 2 Oct 2025", "29 Dec 2025 – 2 Jan 2026"; just
+    /// `short` when there's no end. The year shows when it isn't this one.
+    static func range(_ start: String, _ end: String?) -> String {
+        guard let end, end > start, let a = date(start), let b = date(end) else { return short(start) }
+        let cal = Calendar.current
+        let thisYear = cal.isDate(b, equalTo: Date(), toGranularity: .year)
+        let last = thisYear
+            ? b.formatted(.dateTime.day().month(.abbreviated))
+            : b.formatted(.dateTime.day().month(.abbreviated).year())
+        let first: String
+        if !cal.isDate(a, equalTo: b, toGranularity: .year) {
+            first = a.formatted(.dateTime.day().month(.abbreviated).year())
+        } else if cal.isDate(a, equalTo: b, toGranularity: .month) {
+            first = a.formatted(.dateTime.day())
+        } else {
+            first = a.formatted(.dateTime.day().month(.abbreviated))
+        }
+        return "\(first) – \(last)"
+    }
+
+    /// Days from `a` to `b` (positive when `b` is later).
+    static func between(_ a: String, _ b: String) -> Int {
+        guard let x = date(a), let y = date(b) else { return 0 }
+        return Calendar.current.dateComponents([.day], from: x, to: y).day ?? 0
+    }
+
     static func yearsAgo(_ s: String, from today: String = Day.today) -> Int {
         guard let a = date(s), let b = date(today) else { return 0 }
         return Calendar.current.dateComponents([.year], from: a, to: b).year ?? 0
