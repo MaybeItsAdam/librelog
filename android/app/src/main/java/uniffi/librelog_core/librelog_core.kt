@@ -761,6 +761,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_set_date_time(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_end_date(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_set_favorite(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_set_journal_key(
@@ -896,6 +898,8 @@ internal object UniffiLib {
     external fun uniffi_librelog_core_fn_method_store_search(`ptr`: Long,`query`: RustBuffer.ByValue,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_set_date_time(`ptr`: Long,`id`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`time`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_end_date(`ptr`: Long,`id`: RustBuffer.ByValue,`endDate`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_set_favorite(`ptr`: Long,`id`: RustBuffer.ByValue,`favorite`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1086,7 +1090,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_create_journal() and 0xFFFF) != 32710) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_librelog_core_checksum_method_store_day() and 0xFFFF) != 8290) {
+    if ((lib.uniffi_librelog_core_checksum_method_store_day() and 0xFFFF) != 58976) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_default_journal_id() and 0xFFFF) != 7520) {
@@ -1125,7 +1129,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_key_matches() and 0xFFFF) != 150) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_librelog_core_checksum_method_store_month() and 0xFFFF) != 46494) {
+    if ((lib.uniffi_librelog_core_checksum_method_store_month() and 0xFFFF) != 19343) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_move_entry() and 0xFFFF) != 13924) {
@@ -1176,7 +1180,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_search() and 0xFFFF) != 41579) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_librelog_core_checksum_method_store_set_date_time() and 0xFFFF) != 65088) {
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_date_time() and 0xFFFF) != 12094) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_end_date() and 0xFFFF) != 49275) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_set_favorite() and 0xFFFF) != 37665) {
@@ -2027,7 +2034,8 @@ public interface StoreInterface {
     fun `createJournal`(`name`: kotlin.String, `color`: kotlin.String?): Journal
     
     /**
-     * All entries on one day, earliest first.
+     * All entries on one day, including any covering several days that
+     * take it in, earliest first.
      */
     fun `day`(`date`: kotlin.String, `journalId`: kotlin.String?): List<EntrySummary>
     
@@ -2085,7 +2093,8 @@ public interface StoreInterface {
     fun `keyMatches`(`key`: kotlin.ByteArray, `keyCheck`: kotlin.String): kotlin.Boolean
     
     /**
-     * Calendar marks for one month, `YYYY-MM`.
+     * Calendar marks for one month, `YYYY-MM`. Entries covering several
+     * days mark each of them.
      */
     fun `month`(`yearMonth`: kotlin.String, `journalId`: kotlin.String?): List<DayMark>
     
@@ -2152,7 +2161,16 @@ public interface StoreInterface {
     
     fun `search`(`query`: kotlin.String, `limit`: kotlin.UInt): List<SearchHit>
     
+    /**
+     * Moves an entry. One covering several days keeps its length.
+     */
     fun `setDateTime`(`id`: kotlin.String, `date`: kotlin.String, `time`: kotlin.String?)
+    
+    /**
+     * Makes an entry cover every day up to `end_date`, or just its own day
+     * when none. An end on or before the start day clears it.
+     */
+    fun `setEndDate`(`id`: kotlin.String, `endDate`: kotlin.String?)
     
     fun `setFavorite`(`id`: kotlin.String, `favorite`: kotlin.Boolean)
     
@@ -2381,7 +2399,8 @@ open class Store: Disposable, AutoCloseable, StoreInterface
 
     
     /**
-     * All entries on one day, earliest first.
+     * All entries on one day, including any covering several days that
+     * take it in, earliest first.
      */
     @Throws(CoreException::class)override fun `day`(`date`: kotlin.String, `journalId`: kotlin.String?): List<EntrySummary> {
             return FfiConverterSequenceTypeEntrySummary.lift(
@@ -2602,7 +2621,8 @@ open class Store: Disposable, AutoCloseable, StoreInterface
 
     
     /**
-     * Calendar marks for one month, `YYYY-MM`.
+     * Calendar marks for one month, `YYYY-MM`. Entries covering several
+     * days mark each of them.
      */
     @Throws(CoreException::class)override fun `month`(`yearMonth`: kotlin.String, `journalId`: kotlin.String?): List<DayMark> {
             return FfiConverterSequenceTypeDayMark.lift(
@@ -2886,6 +2906,9 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     
 
     
+    /**
+     * Moves an entry. One covering several days keeps its length.
+     */
     @Throws(CoreException::class)override fun `setDateTime`(`id`: kotlin.String, `date`: kotlin.String, `time`: kotlin.String?)
         = 
     callWithHandle {
@@ -2896,6 +2919,25 @@ open class Store: Disposable, AutoCloseable, StoreInterface
         FfiConverterString.lower(`id`),
         FfiConverterString.lower(`date`),
         FfiConverterOptionalString.lower(`time`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Makes an entry cover every day up to `end_date`, or just its own day
+     * when none. An end on or before the start day clears it.
+     */
+    @Throws(CoreException::class)override fun `setEndDate`(`id`: kotlin.String, `endDate`: kotlin.String?)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_end_date(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalString.lower(`endDate`),_status)
 }
     }
     
@@ -3213,9 +3255,20 @@ public object FfiConverterTypeBlock: FfiConverterRustBuffer<Block> {
 data class DayMark (
     var `date`: kotlin.String
     , 
+    /**
+     * Entries on this day, counting multi-day entries on every day they cover.
+     */
     var `entryCount`: kotlin.UInt
     , 
     var `rating`: kotlin.Double?
+    , 
+    /**
+     * A multi-day entry covers this day and the day before / after, so the
+     * calendar can draw it as one band.
+     */
+    var `spanBefore`: kotlin.Boolean
+    , 
+    var `spanAfter`: kotlin.Boolean
     
 ){
     
@@ -3235,19 +3288,25 @@ public object FfiConverterTypeDayMark: FfiConverterRustBuffer<DayMark> {
             FfiConverterString.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterOptionalDouble.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
     override fun allocationSize(value: DayMark) = (
             FfiConverterString.allocationSize(value.`date`) +
             FfiConverterUInt.allocationSize(value.`entryCount`) +
-            FfiConverterOptionalDouble.allocationSize(value.`rating`)
+            FfiConverterOptionalDouble.allocationSize(value.`rating`) +
+            FfiConverterBoolean.allocationSize(value.`spanBefore`) +
+            FfiConverterBoolean.allocationSize(value.`spanAfter`)
     )
 
     override fun write(value: DayMark, buf: ByteBuffer) {
             FfiConverterString.write(value.`date`, buf)
             FfiConverterUInt.write(value.`entryCount`, buf)
             FfiConverterOptionalDouble.write(value.`rating`, buf)
+            FfiConverterBoolean.write(value.`spanBefore`, buf)
+            FfiConverterBoolean.write(value.`spanAfter`, buf)
     }
 }
 
@@ -3267,6 +3326,11 @@ data class Entry (
      * Local time, `HH:MM`, or none for an untimed entry.
      */
     var `time`: kotlin.String?
+    , 
+    /**
+     * The last day, for an entry covering several days; always after `date`.
+     */
+    var `endDate`: kotlin.String?
     , 
     var `title`: kotlin.String?
     , 
@@ -3304,6 +3368,7 @@ public object FfiConverterTypeEntry: FfiConverterRustBuffer<Entry> {
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterSequenceTypeBlock.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterOptionalDouble.read(buf),
@@ -3319,6 +3384,7 @@ public object FfiConverterTypeEntry: FfiConverterRustBuffer<Entry> {
             FfiConverterString.allocationSize(value.`journalId`) +
             FfiConverterString.allocationSize(value.`date`) +
             FfiConverterOptionalString.allocationSize(value.`time`) +
+            FfiConverterOptionalString.allocationSize(value.`endDate`) +
             FfiConverterOptionalString.allocationSize(value.`title`) +
             FfiConverterSequenceTypeBlock.allocationSize(value.`body`) +
             FfiConverterUInt.allocationSize(value.`wordCount`) +
@@ -3334,6 +3400,7 @@ public object FfiConverterTypeEntry: FfiConverterRustBuffer<Entry> {
             FfiConverterString.write(value.`journalId`, buf)
             FfiConverterString.write(value.`date`, buf)
             FfiConverterOptionalString.write(value.`time`, buf)
+            FfiConverterOptionalString.write(value.`endDate`, buf)
             FfiConverterOptionalString.write(value.`title`, buf)
             FfiConverterSequenceTypeBlock.write(value.`body`, buf)
             FfiConverterUInt.write(value.`wordCount`, buf)
@@ -3358,6 +3425,8 @@ data class EntrySummary (
     var `date`: kotlin.String
     , 
     var `time`: kotlin.String?
+    , 
+    var `endDate`: kotlin.String?
     , 
     var `title`: kotlin.String?
     , 
@@ -3391,6 +3460,7 @@ public object FfiConverterTypeEntrySummary: FfiConverterRustBuffer<EntrySummary>
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterOptionalDouble.read(buf),
@@ -3404,6 +3474,7 @@ public object FfiConverterTypeEntrySummary: FfiConverterRustBuffer<EntrySummary>
             FfiConverterString.allocationSize(value.`journalId`) +
             FfiConverterString.allocationSize(value.`date`) +
             FfiConverterOptionalString.allocationSize(value.`time`) +
+            FfiConverterOptionalString.allocationSize(value.`endDate`) +
             FfiConverterOptionalString.allocationSize(value.`title`) +
             FfiConverterString.allocationSize(value.`excerpt`) +
             FfiConverterUInt.allocationSize(value.`wordCount`) +
@@ -3417,6 +3488,7 @@ public object FfiConverterTypeEntrySummary: FfiConverterRustBuffer<EntrySummary>
             FfiConverterString.write(value.`journalId`, buf)
             FfiConverterString.write(value.`date`, buf)
             FfiConverterOptionalString.write(value.`time`, buf)
+            FfiConverterOptionalString.write(value.`endDate`, buf)
             FfiConverterOptionalString.write(value.`title`, buf)
             FfiConverterString.write(value.`excerpt`, buf)
             FfiConverterUInt.write(value.`wordCount`, buf)

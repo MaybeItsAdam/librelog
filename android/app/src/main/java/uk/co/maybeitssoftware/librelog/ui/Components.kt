@@ -51,10 +51,11 @@ import uniffi.librelog_core.EntrySummary
  * One entry in Today, Timeline, Search and On This Day.
  *
  * [snippet] is a search snippet with matches wrapped in U+E000…U+E001 (see
- * the core's SearchHit).
+ * the core's SearchHit). A multi-day entry always shows its range; listed
+ * under one of the days it covers ([onDay]), it also says which day that is.
  */
 @Composable
-fun EntryRow(entry: EntrySummary, onClick: () -> Unit, showDate: Boolean = true, snippet: String? = null) {
+fun EntryRow(entry: EntrySummary, onClick: () -> Unit, showDate: Boolean = true, snippet: String? = null, onDay: String? = null) {
     val t = tokens
     Column(
         Modifier
@@ -64,7 +65,15 @@ fun EntryRow(entry: EntrySummary, onClick: () -> Unit, showDate: Boolean = true,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val meta = listOfNotNull(if (showDate) Day.short(entry.date) else null, entry.time).joinToString(" · ")
+            val date = when {
+                entry.endDate != null -> Day.range(entry.date, entry.endDate)
+                showDate -> Day.short(entry.date)
+                else -> null
+            }
+            onDay?.let { Day.spanDay(entry.date, entry.endDate, it) }?.let { (n, of) ->
+                MicroLabel("Day $n of $of", Modifier.padding(end = 8.dp))
+            }
+            val meta = listOfNotNull(date, entry.time).joinToString(" · ")
             if (meta.isNotEmpty()) Text(meta, style = Typeface.mono(11), color = t.muted)
             Spacer(Modifier.weight(1f))
             if (entry.isFavorite) Icon(Icons.Filled.Star, "Favourite", Modifier.size(12.dp), tint = t.warning)

@@ -158,11 +158,35 @@ object Day {
     }
 
     /** "3 Oct" this year, "3 Oct 2025" otherwise. */
-    fun short(s: String): String {
-        val d = date(s) ?: return s
-        val pattern = if (d.year == LocalDate.now().year) "d MMM" else "d MMM yyyy"
-        return DateTimeFormatter.ofPattern(pattern, Locale.getDefault()).format(d)
+    fun short(s: String): String = date(s)?.let { shortIn(it, LocalDate.now().year) } ?: s
+
+    /**
+     * A multi-day entry's dates: "26 – 27 Aug", "29 Sep – 2 Oct", "26 – 27 Aug
+     * 2025", "30 Dec 2025 – 2 Jan 2026". The year is left off when both days
+     * fall in [thisYear]. A missing or invalid end is just the start day.
+     */
+    fun range(start: String, end: String?, thisYear: Int = LocalDate.now().year): String {
+        val a = date(start) ?: return start
+        val b = end?.let(::date)?.takeIf { it > a } ?: return shortIn(a, thisYear)
+        val year = if (a.year == thisYear && b.year == thisYear) "" else " yyyy"
+        return when {
+            a.year != b.year -> "${fmt("d MMM yyyy", a)} – ${fmt("d MMM yyyy", b)}"
+            a.month == b.month -> "${a.dayOfMonth} – ${fmt("d MMM$year", b)}"
+            else -> "${fmt("d MMM", a)} – ${fmt("d MMM$year", b)}"
+        }
     }
+
+    /** Which day of a multi-day entry [day] is: (2, 4) for "Day 2 of 4". */
+    fun spanDay(start: String, end: String?, day: String): Pair<Int, Int>? {
+        val a = date(start) ?: return null
+        val b = end?.let(::date)?.takeIf { it > a } ?: return null
+        val d = date(day)?.takeIf { it in a..b } ?: return null
+        return (ChronoUnit.DAYS.between(a, d) + 1).toInt() to (ChronoUnit.DAYS.between(a, b) + 1).toInt()
+    }
+
+    private fun shortIn(d: LocalDate, thisYear: Int): String = fmt(if (d.year == thisYear) "d MMM" else "d MMM yyyy", d)
+
+    private fun fmt(pattern: String, d: LocalDate): String = DateTimeFormatter.ofPattern(pattern, Locale.getDefault()).format(d)
 
     fun monthTitle(yearMonth: String): String {
         val d = date("$yearMonth-01") ?: return yearMonth

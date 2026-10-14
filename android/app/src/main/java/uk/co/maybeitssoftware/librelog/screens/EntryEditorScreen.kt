@@ -2,7 +2,28 @@ package uk.co.maybeitssoftware.librelog.screens
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalHapticFeedback
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import uk.co.maybeitssoftware.librelog.ui.Haptics
+import uk.co.maybeitssoftware.librelog.ui.motion
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -119,7 +140,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                 if (titleChanged) store.setTitle(e.id, newTitle.ifEmpty { null })
                 store.saveBody(e.id, blocks)
             }
-            if (titleChanged) entry = e.copy(title = newTitle.ifEmpty { null })
+            if (titleChanged) entry = entry?.copy(title = newTitle.ifEmpty { null })
             app.changed()
             app.sync.schedulePush()
         } catch (ex: Exception) {
@@ -209,13 +230,17 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
             val e = entry
             if (e != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    MicroLabel(Day.title(e.date))
+                    MicroLabel(if (e.endDate != null) Day.range(e.date, e.endDate) else Day.title(e.date))
                     e.time?.let { Text(it, style = Typeface.mono(11), color = t.muted, modifier = Modifier.padding(start = 8.dp)) }
                     Spacer(Modifier.weight(1f))
                     RatingPicker(e.rating) { value ->
                         entry = e.copy(rating = value)
                         scope.launch { app.write { it.setRating(e.id, value) } }
                     }
+                }
+                SpanControl(e.date, e.endDate) { end ->
+                    entry = entry?.copy(endDate = end)
+                    scope.launch { app.write { it.setEndDate(e.id, end) } }
                 }
                 BasicTextField(
                     value = title,
@@ -315,6 +340,89 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
             shape = RoundedCornerShape(Radius.card),
             containerColor = t.raised,
         )
+    }
+}
+
+/**
+ * "Several days" for a trip or a festival (SPEC.md §4): when on, the entry
+ * runs until the chosen last day, at least a day and at most a year on.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SpanControl(start: String, end: String?, onChange: (String?) -> Unit) {
+    val t = tokens
+    val m = motion
+    val haptics = LocalHapticFeedback.current
+    var picking by remember { mutableStateOf(false) }
+    val first = Day.date(start) ?: return
+    Row(
+        Modifier.padding(top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val on = end != null
+        val border by animateColorAsState(if (on) t.primary.copy(alpha = 0.4f) else t.hairline, m.quick(), label = "span")
+        Row(
+            Modifier
+                .border(1.dp, border, RoundedCornerShape(Radius.control))
+                .background(if (on) t.primary.copy(alpha = 0.08f) else Color.Transparent, RoundedCornerShape(Radius.control))
+                .toggleable(value = on, role = Role.Switch) { now ->
+                    Haptics.toggle(haptics, now)
+                    onChange(if (now) Day.string(first.plusDays(1)) else null)
+                }
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.DateRange, null, Modifier.size(14.dp), tint = if (on) t.primary else t.muted)
+            Text("Several days", style = Typeface.small, color = if (on) t.primary else t.muted, modifier = Modifier.padding(start = 4.dp))
+        }
+        AnimatedVisibility(
+            visible = on,
+            enter = expandHorizontally(m.glide()) + fadeIn(m.standard()),
+            exit = shrinkHorizontally(m.glide()) + fadeOut(m.quick()),
+        ) {
+            Text(
+                "Until ${end?.let(Day::short) ?: ""}",
+                style = Typeface.small,
+                color = t.ink,
+                modifier = Modifier
+                    .border(1.dp, t.input, RoundedCornerShape(Radius.control))
+                    .clickable(role = Role.Button) { picking = true }
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            )
+        }
+    }
+
+    if (picking) {
+        // The picker speaks UTC midnight; a LocalDate is a calendar day either way.
+        val toMillis = { d: LocalDate -> d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
+        val min = toMillis(first.plusDays(1))
+        val max = toMillis(first.plusDays(365))
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = end?.let(Day::date)?.let(toMillis) ?: min,
+            yearRange = first.year..first.plusDays(365).year,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis in min..max
+                override fun isSelectableYear(year: Int) = year in first.year..first.plusDays(365).year
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    picking = false
+                    state.selectedDateMillis?.let {
+                        Haptics.tick(haptics)
+                        onChange(Day.string(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()))
+                    }
+                }) { Text("Done") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+            shape = RoundedCornerShape(Radius.card),
+            colors = DatePickerDefaults.colors(containerColor = t.raised),
+        ) {
+            DatePicker(state, title = { MicroLabel("Last day", Modifier.padding(start = 24.dp, top = 16.dp)) }, showModeToggle = false)
+        }
     }
 }
 

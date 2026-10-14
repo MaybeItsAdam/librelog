@@ -7,6 +7,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -18,6 +19,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -175,12 +177,24 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
             Column {
                 cells(shown, firstDay).chunked(7).forEach { week ->
                     Row(Modifier.fillMaxWidth()) {
-                        week.forEach { date ->
-                            Box(Modifier.weight(1f).aspectRatio(1f).padding(2.dp)) {
+                        week.forEachIndexed { col, date ->
+                            Box(Modifier.weight(1f).aspectRatio(1f)) {
                                 if (date != null) {
-                                    DayCell(date, marks[date], selected == date, date == Day.today, date > Day.today, t, m) {
-                                        if (selected != date) Haptics.tick(haptics)
-                                        selected = date
+                                    val mark = marks[date]
+                                    // Joins the neighbouring cell's band unless
+                                    // the week row (or the month) ends there.
+                                    SpanBand(
+                                        visible = mark != null && (mark.spanBefore || mark.spanAfter),
+                                        joinStart = mark?.spanBefore == true && col > 0 && week[col - 1] != null,
+                                        joinEnd = mark?.spanAfter == true && col < 6 && week[col + 1] != null,
+                                        t = t,
+                                        m = m,
+                                    )
+                                    Box(Modifier.padding(2.dp)) {
+                                        DayCell(date, mark, selected == date, date == Day.today, date > Day.today, t, m) {
+                                            if (selected != date) Haptics.tick(haptics)
+                                            selected = date
+                                        }
                                     }
                                 }
                             }
@@ -206,7 +220,7 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
                         }
                         list.forEachIndexed { i, e ->
                             Reveal(i, active = true) {
-                                EntryRow(e, onClick = { openEntry(e.id) }, showDate = false)
+                                EntryRow(e, onClick = { openEntry(e.id) }, showDate = false, onDay = shownDay)
                                 Hairline()
                             }
                         }
@@ -274,6 +288,32 @@ private fun DayCell(date: String, mark: DayMark?, selected: Boolean, today: Bool
             Box(Modifier.size(4.dp).background(tint ?: t.muted, CircleShape))
         }
     }
+}
+
+/**
+ * The band behind days a multi-day entry covers: azure at low alpha, square
+ * where it runs on into the next cell, rounded where it starts or stops.
+ */
+@Composable
+private fun BoxScope.SpanBand(visible: Boolean, joinStart: Boolean, joinEnd: Boolean, t: Tokens, m: Motion) {
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, m.standard(), label = "band")
+    if (alpha == 0f) return
+    val r = Radius.control
+    Box(
+        Modifier
+            .matchParentSize()
+            .padding(start = if (joinStart) 0.dp else 2.dp, end = if (joinEnd) 0.dp else 2.dp, top = 2.dp, bottom = 2.dp)
+            .graphicsLayer { this.alpha = alpha }
+            .background(
+                t.primary.copy(alpha = 0.12f),
+                RoundedCornerShape(
+                    topStart = if (joinStart) 0.dp else r,
+                    bottomStart = if (joinStart) 0.dp else r,
+                    topEnd = if (joinEnd) 0.dp else r,
+                    bottomEnd = if (joinEnd) 0.dp else r,
+                ),
+            ),
+    )
 }
 
 private fun ratingColor(rating: Double?, t: Tokens): Color = when {
