@@ -152,7 +152,7 @@ public sealed partial class JournalPage : Page
             if (items[i] is JournalAction { Kind: JournalActionKind.OnThisDay }) at = i;
         if (at < 0) return;
         memoriesOpen = !memoriesOpen;
-        if (Chevron(List.ContainerFromIndex(at) as ListViewItem) is { } chevron)
+        if (Chevron(List.ContainerFromIndex(at) as ContentControl) is { } chevron)
             Motion.Rotate(chevron, memoriesOpen ? 180 : 0);
         if (memoriesOpen)
         {
@@ -190,7 +190,7 @@ public sealed partial class JournalPage : Page
             Motion.Rotate(chevron, ReferenceEquals(args.Item, toggle) && memoriesOpen ? 180 : 0, animate: false);
     }
 
-    private static UIElement? Chevron(ListViewItem? container) =>
+    private static UIElement? Chevron(ContentControl? container) =>
         container?.ContentTemplateRoot is FrameworkElement row ? row.FindName("Chevron") as UIElement : null;
 
     private void OnNew(object sender, RoutedEventArgs e) => _ = NewEntry(AppServices.Today);
