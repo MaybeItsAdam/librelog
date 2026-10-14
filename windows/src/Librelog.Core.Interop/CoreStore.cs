@@ -42,6 +42,9 @@ public sealed class CoreStore : IDisposable
     public void SetRating(string id, double? rating) => Call("set_rating", ("id", id), ("rating", rating));
     public void SetFavorite(string id, bool favorite) => Call("set_favorite", ("id", id), ("favorite", favorite));
     public void SetDateTime(string id, string date, string? time) => Call("set_date_time", ("id", id), ("date", date), ("time", time));
+    /// The last day of a multi-day entry; null (or a day not after the
+    /// start) makes it a single day again.
+    public void SetEndDate(string id, string? endDate) => Call("set_end_date", ("id", id), ("end_date", endDate));
     public void MoveEntry(string id, string journalId) => Call("move_entry", ("id", id), ("journal_id", journalId));
     public void DeleteEntry(string id) => Call("delete_entry", ("id", id));
     public void RestoreEntry(string id) => Call("restore_entry", ("id", id));

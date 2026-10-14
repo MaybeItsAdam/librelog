@@ -41,6 +41,7 @@
     <SolidColorBrush x:Key="EmeraldBrush" Color="#4CC38E" />
     <SolidColorBrush x:Key="RaspberryBrush" Color="#D62246" />
     <SolidColorBrush x:Key="AmberBrush" Color="#FFBF00" />
+    <SolidColorBrush x:Key="AzureTintBrush" Color="#007FFF" Opacity="0.10" />
     <SolidColorBrush x:Key="AmberTintBrush" Color="#FFBF00" Opacity="0.12" />
     <SolidColorBrush x:Key="RaspberryTintBrush" Color="#D62246" Opacity="0.10" />
     <Color x:Key="SystemAccentColor">#007FFF</Color>

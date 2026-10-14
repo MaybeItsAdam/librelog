@@ -43,8 +43,8 @@
                 <TextBlock x:Name="NothingText" Text="Nothing written this day." Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" />
                 <ListView x:Name="DayList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnEntryClick">
                     <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="core:EntrySummary">
-                            <pages:EntryRow Entry="{x:Bind}" ShowDate="False" />
+                        <DataTemplate x:DataType="pages:DayEntry">
+                            <pages:EntryRow Entry="{x:Bind Entry}" Day="{x:Bind Day}" ShowDate="False" />
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>

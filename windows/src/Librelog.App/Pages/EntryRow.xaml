@@ -11,7 +11,7 @@
         </Grid.ColumnDefinitions>
 
         <StackPanel Spacing="2">
-            <TextBlock x:Name="DateText" Style="{StaticResource MicroLabel}" />
+            <TextBlock x:Name="DateText" Style="{StaticResource MicroLabel}" TextWrapping="Wrap" />
             <TextBlock x:Name="TimeText" Style="{StaticResource MonoText}" />
         </StackPanel>
 
