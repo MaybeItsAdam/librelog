@@ -122,7 +122,7 @@ All ids are UUIDv7. Every syncable row carries `created_at`, `updated_at`,
 Journal          id, name, color, icon, sort, is_default, is_locked
 
 Entry            id, journal_id, date (local YYYY-MM-DD), time (HH:mm, nullable),
-                 tz (IANA), title, body (block document, §6.2), body_text (plain,
+                 end_date (last day of a multi-day entry, nullable), tz (IANA), title, body (block document, §6.2), body_text (plain,
                  for FTS), word_count, rating (0–5, half-steps optional),
                  place_id, template_id, is_favorite, weather_snapshot (JSON)
 
@@ -153,6 +153,13 @@ Setting          key, value, scope (device|synced)
 **Multiple entries per day** is first-class: a "day" is all entries sharing
 `date` + `journal_id`, ordered by `time`, shown as one scroll with timestamp
 dividers.
+
+**Multi-day entries** (a trip, a festival) set `end_date`, at most a year
+after `date`. They are listed once, on their first day, with the range
+("26–27 Aug"); the day view for any day they cover includes them, and the
+Calendar marks each covered day, joining them into one band. Moving the
+entry keeps its length. Exports carry `end_date` (Markdown front matter
+`end_date:`), and the Markdown importer reads `end_date:` or `end:`.
 
 ---
 

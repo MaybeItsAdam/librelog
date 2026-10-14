@@ -19,6 +19,8 @@ pub struct Entry {
     pub date: String,
     /// Local time, `HH:MM`, or none for an untimed entry.
     pub time: Option<String>,
+    /// The last day, for an entry covering several days; always after `date`.
+    pub end_date: Option<String>,
     pub title: Option<String>,
     pub body: Vec<Block>,
     pub word_count: u32,
@@ -36,6 +38,7 @@ pub struct EntrySummary {
     pub journal_id: String,
     pub date: String,
     pub time: Option<String>,
+    pub end_date: Option<String>,
     pub title: Option<String>,
     pub excerpt: String,
     pub word_count: u32,
@@ -48,8 +51,13 @@ pub struct EntrySummary {
 #[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct DayMark {
     pub date: String,
+    /// Entries on this day, counting multi-day entries on every day they cover.
     pub entry_count: u32,
     pub rating: Option<f64>,
+    /// A multi-day entry covers this day and the day before / after, so the
+    /// calendar can draw it as one band.
+    pub span_before: bool,
+    pub span_after: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]

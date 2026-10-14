@@ -15,7 +15,7 @@ pub const SYNCED: &[(&str, &[&str])] = &[
         "entries",
         &[
             "journal_id", "date", "time", "tz", "title", "body", "rating", "place_id",
-            "template_id", "is_favorite", "weather", "created_at", "deleted_at", "import_ref",
+            "template_id", "is_favorite", "weather", "created_at", "deleted_at", "import_ref", "end_date",
         ],
     ),
     (
@@ -251,6 +251,12 @@ const MIGRATIONS: &[&str] = &[
     r#"
     alter table entries add column import_ref text;
     create unique index entries_import_ref on entries (import_ref) where import_ref is not null;
+    "#,
+    // 3: the last day of an entry that covers several (a trip, a festival).
+    // `date` stays the first day, so lists and sync ordering are unchanged.
+    r#"
+    alter table entries add column end_date text;
+    create index entries_end_date on entries (end_date) where end_date is not null;
     "#,
 ];
 

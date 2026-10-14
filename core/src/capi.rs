@@ -153,6 +153,10 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
             let (id, date, time) = args!(id: String, date: String, time: Option<String>);
             ok(json!(s.set_date_time(id, date, time)?))
         }
+        "set_end_date" => {
+            let (id, end_date) = args!(id: String, end_date: Option<String>);
+            ok(json!(s.set_end_date(id, end_date)?))
+        }
         "move_entry" => {
             let (id, journal_id) = args!(id: String, journal_id: String);
             ok(json!(s.move_entry(id, journal_id)?))

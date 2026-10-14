@@ -106,6 +106,8 @@ struct ExportedEntry {
     time: Option<String>,
     #[serde(default)]
     tz: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    end_date: Option<String>,
     #[serde(default)]
     title: Option<String>,
     body: Vec<Block>,
@@ -163,7 +165,7 @@ fn load_for_export(conn: &Connection, journal_id: Option<&str>) -> Result<(Vec<E
 
     let mut entries = Vec::new();
     let mut stmt = conn.prepare(
-        "select id, journal_id, date, time, tz, title, body, rating, is_favorite, created_at, updated_at, import_ref
+        "select id, journal_id, date, time, tz, title, body, rating, is_favorite, created_at, updated_at, import_ref, end_date
          from entries where deleted_at is null and (?1 is null or journal_id = ?1)
          order by date, coalesce(time, ''), created_at",
     )?;
@@ -181,6 +183,7 @@ fn load_for_export(conn: &Connection, journal_id: Option<&str>) -> Result<(Vec<E
             created_at: r.get(9)?,
             updated_at: r.get(10)?,
             import_ref: r.get(11)?,
+            end_date: r.get(12)?,
             tags: Vec::new(),
             id,
         })
@@ -259,6 +262,9 @@ fn yaml_str(s: &str) -> String {
 
 fn markdown_file(e: &ExportedEntry, journal: Option<&str>, title_of: &dyn Fn(&str) -> Option<String>) -> String {
     let mut fm = vec![format!("id: {}", e.id), format!("date: {}", e.date)];
+    if let Some(end) = &e.end_date {
+        fm.push(format!("end_date: {end}"));
+    }
     if let Some(t) = &e.time {
         fm.push(format!("time: \"{t}\""));
     }
@@ -344,6 +350,9 @@ fn html_page(entries: &[ExportedEntry], title_of: &dyn Fn(&str) -> Option<String
             body.push_str(&format!("<h2 class=\"day\">{}</h2>\n", esc(&long_date(day))));
         }
         let mut meta = Vec::new();
+        if let Some(end) = &e.end_date {
+            meta.push(format!("until {}", esc(&long_date(end))));
+        }
         if let Some(t) = &e.time {
             meta.push(esc(t));
         }
@@ -384,6 +393,9 @@ fn text_export(entries: &[ExportedEntry]) -> String {
             out.push_str(&format!("{}\n{}\n\n", long_date(day), "=".repeat(long_date(day).chars().count())));
         }
         let mut head = Vec::new();
+        if let Some(end) = &e.end_date {
+            head.push(format!("until {}", long_date(end)));
+        }
         if let Some(t) = &e.time {
             head.push(t.clone());
         }
@@ -416,6 +428,7 @@ struct Incoming {
     journal_id: Option<String>,
     date: String,
     time: Option<String>,
+    end_date: Option<String>,
     tz: Option<String>,
     title: Option<String>,
     blocks: Vec<Block>,
@@ -578,6 +591,7 @@ fn read_librelog(v: Value) -> Result<Read_> {
             journal_id: Some(e.journal_id),
             date: e.date,
             time: e.time,
+            end_date: e.end_date,
             tz: e.tz,
             title: e.title,
             blocks: e.body,
@@ -618,6 +632,7 @@ fn read_day_one(journals: &[Value]) -> Result<Read_> {
                 journal_id: None,
                 date: zoned.date().to_string(),
                 time: Some(zoned.strftime("%H:%M").to_string()),
+                end_date: None,
                 tz: zone.map(str::to_string),
                 title: None,
                 blocks: parsed.blocks,
@@ -694,6 +709,7 @@ fn read_daylio(bytes: &[u8]) -> Result<Read_> {
             journal_id: None,
             date,
             time,
+            end_date: None,
             tz: None,
             title,
             blocks: markdown::from_markdown(&note).blocks,
@@ -846,6 +862,7 @@ fn read_markdown(docs: &[&Doc]) -> Result<Read_> {
             },
             id,
             journal_id: None,
+            end_date: fm.get("end_date").or_else(|| fm.get("end")).and_then(|v| find_date(v)).filter(|e| *e > date),
             date,
             time,
             tz: None,
@@ -946,6 +963,7 @@ pub fn import(tx: &Transaction, clock: &mut Clock, device: &str, path: &str, int
                 "journal_id": journal,
                 "date": e.date,
                 "time": e.time,
+                "end_date": e.end_date,
                 "tz": e.tz,
                 "title": e.title,
                 "body": doc::to_json(&e.blocks),

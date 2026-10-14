@@ -98,6 +98,26 @@ def title_date(title, fallback_year):
     return dt.date(int(m.group(3)), MONTHS[m.group(2).lower()], day)
 
 
+def title_range(title):
+    """'Aug 26-27 2026' / '26-29 August 2026' → (first day, last day)."""
+    for pat, order in ((r"\b([A-Za-z]+)\s+(\d{1,2})\s*[-–]\s*(\d{1,2}),?\s+((?:19|20)\d{2})\b", "mdd"),
+                       (r"\b(\d{1,2})\s*[-–]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+),?\s+((?:19|20)\d{2})\b", "ddm")):
+        m = re.search(pat, title)
+        if not m:
+            continue
+        mon, a, b = (m.group(1), m.group(2), m.group(3)) if order == "mdd" else (m.group(3), m.group(1), m.group(2))
+        if mon.lower() not in MONTHS:
+            continue
+        try:
+            y, mo = int(m.group(4)), MONTHS[mon.lower()]
+            first, last = dt.date(y, mo, int(a)), dt.date(y, mo, int(b))
+        except ValueError:
+            continue
+        if last > first:
+            return first, last
+    return None
+
+
 def created(path):
     st = path.stat()
     return dt.datetime.fromtimestamp(getattr(st, "st_birthtime", st.st_mtime))
@@ -181,8 +201,10 @@ def yaml(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def entry_file(date, time, title, tags, body):
+def entry_file(date, time, title, tags, body, end=None):
     fm = [f"date: {date.isoformat()}"]
+    if end:
+        fm.append(f"end_date: {end.isoformat()}")
     if time:
         fm.append(f'time: "{time}"')
     if title:
@@ -221,7 +243,11 @@ def gather(vault, folders, skip, simplenote):
                                             title=heading or None, tags=[tag, title], body=text, how="heading"))
                 continue
 
-            time, how = None, "front matter"
+            time, how, end = None, "front matter", None
+            span = title_range(title)
+            m = ISO_DATE.search(fields.get("end_date", "") or fields.get("end", ""))
+            if m:
+                end = dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
             m = ISO_DATE.search(fields.get("date", ""))
             if not m:
                 m, how = ISO_DATE.search(path.stem), "file name"
@@ -239,8 +265,11 @@ def gather(vault, folders, skip, simplenote):
                 if not date:
                     date, how = c.date(), "created"
                     time = c.strftime("%H:%M")
+            if span:
+                # A range in the title beats a date written down afterwards.
+                (date, end), time, how = span, None, "title range"
             entries.append(dict(rel=rel, date=date, time=time, title=None if is_daily else title,
-                                tags=[tag], body=body, how=how))
+                                tags=[tag], body=body, how=how, end=end if end and end > date else None))
     # A Simplenote note counts as already in the vault if most of its lines
     # are somewhere in it, whatever it's called there now.
     vault_text = norm_title("\n".join(
@@ -301,7 +330,7 @@ def main():
             while name in names:
                 name, n = f"{stem} ({n}).md", n + 1
             names.add(name)
-            z.writestr(name, entry_file(e["date"], e["time"], e["title"], e["tags"], e["body"]))
+            z.writestr(name, entry_file(e["date"], e["time"], e["title"], e["tags"], e["body"], e.get("end")))
 
     by_how = {}
     for e in entries:
@@ -309,7 +338,7 @@ def main():
     print(f"{len(entries)} entries, {entries[0]['date']} – {entries[-1]['date']}")
     for how, es in sorted(by_how.items()):
         print(f"  {len(es):4}  dated by {how}")
-    guessed = [e for e in entries if e["how"] not in ("front matter", "file name", "heading", "Simplenote")]
+    guessed = [e for e in entries if e["how"] not in ("front matter", "file name", "heading", "Simplenote", "title range")]
     if guessed:
         print("\nDates guessed from the title or file creation time (fix in the app if wrong):")
         for e in guessed:

@@ -126,7 +126,8 @@ impl Store {
         let g = self.lock();
         let mut e = g.conn.query_row(
             "select id, journal_id, date, time, title, body, word_count, rating, is_favorite, updated_at,
-                    exists (select 1 from revisions r where r.entry_id = entries.id and r.is_conflict = 1)
+                    exists (select 1 from revisions r where r.entry_id = entries.id and r.is_conflict = 1),
+                    end_date
              from entries where id = ?1 and deleted_at is null",
             [&id],
             |r| {
@@ -135,6 +136,7 @@ impl Store {
                     journal_id: r.get(1)?,
                     date: r.get(2)?,
                     time: r.get(3)?,
+                    end_date: r.get(11)?,
                     title: r.get(4)?,
                     body: doc::parse(&r.get::<_, String>(5)?),
                     word_count: r.get(6)?,
@@ -182,12 +184,49 @@ impl Store {
         self.write("entries", &id, json!({ "is_favorite": favorite }))
     }
 
+    /// Moves an entry. One covering several days keeps its length.
     pub fn set_date_time(&self, id: String, date: String, time: Option<String>) -> Result<()> {
-        check_date(&date)?;
+        let start = parse_date(&date)?;
         if let Some(t) = &time {
             check_time(t)?;
         }
-        self.write("entries", &id, json!({ "date": date, "time": time }))
+        let (old, end): (String, Option<String>) = self
+            .lock()
+            .conn
+            .query_row("select date, end_date from entries where id = ?1", [&id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .optional()?
+            .ok_or_else(|| CoreError::NotFound(format!("entry {id}")))?;
+        match end {
+            Some(end) => {
+                let days = (parse_date(&end)? - parse_date(&old)?).whole_days();
+                let end = ymd(start + time::Duration::days(days));
+                self.write("entries", &id, json!({ "date": date, "time": time, "end_date": end }))
+            }
+            None => self.write("entries", &id, json!({ "date": date, "time": time })),
+        }
+    }
+
+    /// Makes an entry cover every day up to `end_date`, or just its own day
+    /// when none. An end on or before the start day clears it.
+    pub fn set_end_date(&self, id: String, end_date: Option<String>) -> Result<()> {
+        let start: String = self
+            .lock()
+            .conn
+            .query_row("select date from entries where id = ?1", [&id], |r| r.get(0))
+            .optional()?
+            .ok_or_else(|| CoreError::NotFound(format!("entry {id}")))?;
+        let end = match end_date {
+            Some(e) => {
+                let e = parse_date(&e)?;
+                let s = parse_date(&start)?;
+                if (e - s).whole_days() > MAX_SPAN_DAYS {
+                    return Err(CoreError::Invalid(format!("an entry can cover at most {} days", MAX_SPAN_DAYS + 1)));
+                }
+                (e > s).then(|| ymd(e))
+            }
+            None => None,
+        };
+        self.write("entries", &id, json!({ "end_date": end }))
     }
 
     pub fn move_entry(&self, id: String, journal_id: String) -> Result<()> {
@@ -205,16 +244,17 @@ impl Store {
 
     // --- Reading -------------------------------------------------------------
 
-    /// All entries on one day, earliest first.
+    /// All entries on one day, including any covering several days that
+    /// take it in, earliest first.
     pub fn day(&self, date: String, journal_id: Option<String>) -> Result<Vec<EntrySummary>> {
         let g = self.lock();
-        let mut sql = summary_select("e.date = ?1");
+        let mut sql = summary_select("e.date <= ?1 and coalesce(e.end_date, e.date) >= ?1");
         let mut args: Vec<Sql> = vec![Sql::Text(date)];
         if let Some(j) = journal_id {
             sql.push_str(" and e.journal_id = ?2");
             args.push(Sql::Text(j));
         }
-        sql.push_str(" order by coalesce(e.time, ''), e.created_at");
+        sql.push_str(" order by e.date, coalesce(e.time, ''), e.created_at");
         query_summaries(&g.conn, &sql, args)
     }
 
@@ -255,18 +295,52 @@ impl Store {
         query_summaries(&g.conn, &sql, args)
     }
 
-    /// Calendar marks for one month, `YYYY-MM`.
+    /// Calendar marks for one month, `YYYY-MM`. Entries covering several
+    /// days mark each of them.
     pub fn month(&self, year_month: String, journal_id: Option<String>) -> Result<Vec<DayMark>> {
+        let first = parse_date(&format!("{year_month}-01"))?;
+        let last = ymd(first.replace_day(first.month().length(first.year()))
+            .map_err(|e| CoreError::Invalid(e.to_string()))?);
+        let first_s = ymd(first);
         let g = self.lock();
         let mut stmt = g.conn.prepare_cached(
-            "select date, count(*), avg(rating) from entries
-             where deleted_at is null and date like ?1 || '-%' and (?2 is null or journal_id = ?2)
-             group by date order by date",
+            "select date, end_date, rating from entries
+             where deleted_at is null and date <= ?2 and coalesce(end_date, date) >= ?1
+               and (?3 is null or journal_id = ?3)",
         )?;
-        let rows = stmt.query_map(params![year_month, journal_id], |r| {
-            Ok(DayMark { date: r.get(0)?, entry_count: r.get(1)?, rating: r.get(2)? })
+        let rows = stmt.query_map(params![first_s, last, journal_id], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, Option<f64>>(2)?))
         })?;
-        Ok(rows.collect::<std::result::Result<_, _>>()?)
+        // date → (count, rating sum, rated count, span before, span after)
+        let mut days: std::collections::BTreeMap<String, (u32, f64, u32, bool, bool)> = Default::default();
+        for row in rows {
+            let (start, end, rating) = row?;
+            let s = parse_date(&start)?;
+            let e = end.as_deref().map(parse_date).transpose()?.unwrap_or(s).min(s + time::Duration::days(MAX_SPAN_DAYS));
+            let mut d = s.max(first);
+            let stop = e.min(parse_date(&last)?);
+            while d <= stop {
+                let m = days.entry(ymd(d)).or_default();
+                m.0 += 1;
+                if let Some(r) = rating {
+                    m.1 += r;
+                    m.2 += 1;
+                }
+                m.3 |= d > s;
+                m.4 |= d < e;
+                d = d.next_day().expect("in range");
+            }
+        }
+        Ok(days
+            .into_iter()
+            .map(|(date, (count, sum, rated, before, after))| DayMark {
+                date,
+                entry_count: count,
+                rating: (rated > 0).then(|| sum / rated as f64),
+                span_before: before,
+                span_after: after,
+            })
+            .collect())
     }
 
     /// Entries from the same day and month in earlier years, newest year first.
@@ -315,7 +389,7 @@ impl Store {
 
         let mut stmt = g.conn.prepare(&sql)?;
         let rows = stmt.query_map(rusqlite::params_from_iter(args), |r| {
-            Ok(SearchHit { entry: summary_from_row(r)?, snippet: r.get::<_, Option<String>>(10)?.unwrap_or_default() })
+            Ok(SearchHit { entry: summary_from_row(r)?, snippet: r.get::<_, Option<String>>(11)?.unwrap_or_default() })
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
@@ -768,8 +842,20 @@ fn non_empty(s: String, what: &str) -> Result<String> {
 }
 
 fn check_date(d: &str) -> Result<()> {
+    parse_date(d).map(|_| ())
+}
+
+/// The longest an entry can cover, past its first day: a year.
+const MAX_SPAN_DAYS: i64 = 365;
+
+fn parse_date(d: &str) -> Result<time::Date> {
     let fmt = time::macros::format_description!("[year]-[month]-[day]");
-    time::Date::parse(d, &fmt).map(|_| ()).map_err(|_| CoreError::Invalid(format!("date {d}: want YYYY-MM-DD")))
+    time::Date::parse(d, &fmt).map_err(|_| CoreError::Invalid(format!("date {d}: want YYYY-MM-DD")))
+}
+
+fn ymd(d: time::Date) -> String {
+    let fmt = time::macros::format_description!("[year]-[month]-[day]");
+    d.format(&fmt).expect("valid date")
 }
 
 fn check_time(t: &str) -> Result<()> {
@@ -824,7 +910,8 @@ fn get_sync_meta(conn: &Connection, key: &str) -> Result<Option<String>> {
 
 const SUMMARY_COLS: &str = "e.id, e.journal_id, e.date, e.time, e.title, e.body_text, e.word_count, e.rating, e.is_favorite,
     (select group_concat(t.name, char(31)) from entry_tags et join tags t on t.id = et.tag_id
-      where et.entry_id = e.id and et.deleted_at is null and t.deleted_at is null)";
+      where et.entry_id = e.id and et.deleted_at is null and t.deleted_at is null),
+    e.end_date";
 
 fn summary_select(condition: &str) -> String {
     format!("select {SUMMARY_COLS} from entries e where e.deleted_at is null and {condition}")
@@ -844,6 +931,7 @@ fn summary_from_row(r: &Row) -> rusqlite::Result<EntrySummary> {
         journal_id: r.get(1)?,
         date: r.get(2)?,
         time: r.get(3)?,
+        end_date: r.get(10)?,
         title: r.get(4)?,
         excerpt: doc::excerpt_text(&body_text, EXCERPT_CHARS),
         word_count: r.get(6)?,
@@ -991,10 +1079,47 @@ mod tests {
         write_entry(&s, "2025-10-04", "07:00", "not this day");
 
         let marks = s.month("2026-10".into(), None).unwrap();
-        assert_eq!(marks, vec![DayMark { date: "2026-10-03".into(), entry_count: 1, rating: Some(4.0) }]);
+        assert_eq!(
+            marks,
+            vec![DayMark { date: "2026-10-03".into(), entry_count: 1, rating: Some(4.0), span_before: false, span_after: false }]
+        );
 
         let otd: Vec<String> = s.on_this_day("2026-10-03".into()).unwrap().into_iter().map(|e| e.date).collect();
         assert_eq!(otd, ["2025-10-03", "2024-10-03"]);
+    }
+
+    #[test]
+    fn entries_covering_several_days() {
+        let s = store();
+        let trip = write_entry(&s, "2026-09-29", "09:00", "the trip");
+        s.set_end_date(trip.clone(), Some("2026-10-02".into())).unwrap();
+        s.set_rating(trip.clone(), Some(5.0)).unwrap();
+        write_entry(&s, "2026-10-01", "20:00", "that evening");
+
+        assert_eq!(s.entry(trip.clone()).unwrap().end_date.as_deref(), Some("2026-10-02"));
+        let day: Vec<String> = s.day("2026-10-01".into(), None).unwrap().into_iter().map(|e| e.excerpt).collect();
+        assert_eq!(day, ["the trip", "that evening"]);
+        assert!(s.day("2026-10-03".into(), None).unwrap().is_empty());
+
+        // October only sees the part of the trip inside it; it carries on
+        // from September.
+        let marks = s.month("2026-10".into(), None).unwrap();
+        let summary: Vec<_> = marks.iter().map(|m| (m.date.as_str(), m.entry_count, m.span_before, m.span_after)).collect();
+        assert_eq!(summary, [("2026-10-01", 2, true, true), ("2026-10-02", 1, true, false)]);
+        let sept = s.month("2026-09".into(), None).unwrap();
+        assert_eq!((sept[0].date.as_str(), sept[0].span_before, sept[0].span_after), ("2026-09-29", false, true));
+        assert_eq!(sept.len(), 2);
+
+        // Listed once in the journal, on its first day.
+        let all = s.timeline(TimelineFilter::default(), None, 50).unwrap();
+        assert_eq!(all.iter().filter(|e| e.id == trip).count(), 1);
+
+        // Moving it keeps its length; an end before the start clears it.
+        s.set_date_time(trip.clone(), "2026-11-10".into(), None).unwrap();
+        assert_eq!(s.entry(trip.clone()).unwrap().end_date.as_deref(), Some("2026-11-13"));
+        s.set_end_date(trip.clone(), Some("2026-11-01".into())).unwrap();
+        assert_eq!(s.entry(trip.clone()).unwrap().end_date, None);
+        assert!(s.set_end_date(trip, Some("2028-01-01".into())).is_err());
     }
 
     #[test]
@@ -1140,7 +1265,8 @@ mod tests {
         s.set_rating(id.clone(), Some(4.0)).unwrap();
         s.set_favorite(id.clone(), true).unwrap();
         s.tag_entry(id.clone(), s.tag_named("Walk".into()).unwrap().id, Some("5km".into())).unwrap();
-        write_entry(s, "2026-10-03", "08:15", "Slow start");
+        let slow = write_entry(s, "2026-10-03", "08:15", "Slow start");
+        s.set_end_date(slow, Some("2026-10-04".into())).unwrap();
         id
     }
 
@@ -1162,6 +1288,8 @@ mod tests {
         assert_eq!((eb.title, eb.rating, eb.is_favorite, eb.body), (ea.title, ea.rating, ea.is_favorite, ea.body));
         assert_eq!(eb.tags[0].value.as_deref(), Some("5km"));
 
+        assert_eq!(b.day("2026-10-04".into(), None).unwrap()[0].end_date.as_deref(), Some("2026-10-04"));
+
         assert_eq!(b.preview_import(path.clone()).unwrap().already_imported, 2);
         assert_eq!(b.import_file(path, None).unwrap().imported, 0);
         assert_eq!(b.day("2026-10-02".into(), None).unwrap().len(), 1);
@@ -1180,6 +1308,7 @@ mod tests {
         let e = b.entry(id).unwrap();
         assert_eq!((e.title.as_deref(), e.rating, e.is_favorite, e.time.as_deref()), (Some("Long walk"), Some(4.0), true, Some("21:40")));
         assert_eq!(e.tags[0].name, "Walk");
+        assert_eq!(b.day("2026-10-04".into(), None).unwrap().len(), 1);
         assert_eq!(b.import_file(zip, None).unwrap().imported, 0);
     }
 
