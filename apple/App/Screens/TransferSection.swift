@@ -13,6 +13,11 @@ struct TransferSection: View {
     @State private var busy = false
     @State private var note: String?
     @State private var failure: String?
+    /// The last import's outcome; `shown` rolls up to `outcome.imported`.
+    @State private var outcome: ImportResult?
+    @State private var shown: UInt32 = 0
+    @State private var flash = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Section {
@@ -20,6 +25,9 @@ struct TransferSection: View {
             Button { importing = true } label: { row("Import…", symbol: "square.and.arrow.down") }
             if busy {
                 ProgressView().frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let outcome {
+                importedRow(outcome)
             }
             if let note {
                 Text(note).font(.system(size: 13)).foregroundStyle(Color.muted)
@@ -35,6 +43,7 @@ struct TransferSection: View {
                 .foregroundStyle(Color.muted)
         }
         .disabled(busy)
+        .sensoryFeedback(.success, trigger: outcome?.imported) { _, new in new != nil }
         .confirmationDialog("Export as", isPresented: $choosingFormat, titleVisibility: .visible) {
             ForEach(ExportChoice.all) { choice in
                 Button(choice.title) { Task { await export(choice) } }
@@ -58,6 +67,33 @@ struct TransferSection: View {
         }
     }
 
+    /// "128 entries imported", the count rolling up from zero over a brief
+    /// emerald tint that fades back to the plain row.
+    private func importedRow(_ r: ImportResult) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(shown)")
+                    .font(Typeface.mono(17, relativeTo: .body))
+                    .foregroundStyle(Color.ink)
+                    .contentTransition(.numericText(value: Double(shown)))
+                Text(r.imported == 1 ? "entry imported" : "entries imported")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.ink)
+            }
+            if r.skipped > 0 {
+                Text("\(r.skipped) were already here.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.muted)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.success.opacity(flash ? 0.1 : 0), in: RoundedRectangle(cornerRadius: Radius.control))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.success.opacity(flash ? 0.4 : 0)))
+        .accessibilityElement(children: .combine)
+    }
+
     private func row(_ title: LocalizedStringKey, symbol: String) -> some View {
         Label(title, systemImage: symbol)
             .foregroundStyle(Color.ink)
@@ -70,12 +106,14 @@ struct TransferSection: View {
         busy = true
         note = nil
         failure = nil
+        outcome = nil
         defer { busy = false }
-        let ext = exportExtension(format: choice.format)
+        let format = choice.format
+        let ext = exportExtension(format: format)
         let name = "Librelog \(Day.today)"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).\(ext)")
         do {
-            let summary = try await app.run { try $0.export(format: choice.format, path: url.path, journalId: nil) }
+            let summary = try await app.run { try $0.export(format: format, path: url.path, journalId: nil) }
             exported = ExportedFile(url: url, name: name, type: choice.type)
             exporting = true
             note = summary.entries == 1 ? String(localized: "Exported 1 entry.") : String(localized: "Exported \(summary.entries) entries.")
@@ -92,6 +130,7 @@ struct TransferSection: View {
         busy = true
         note = nil
         failure = nil
+        outcome = nil
         defer { busy = false }
         let scoped = picked.startAccessingSecurityScopedResource()
         defer { if scoped { picked.stopAccessingSecurityScopedResource() } }
@@ -118,14 +157,22 @@ struct TransferSection: View {
         }
         do {
             let r = try await app.run { try $0.importFile(path: p.url.path, journalId: nil) }
-            var text = r.imported == 1 ? String(localized: "Imported 1 entry.") : String(localized: "Imported \(r.imported) entries.")
-            if r.skipped > 0 { text += " " + String(localized: "\(r.skipped) were already here.") }
-            note = text
+            shown = 0
+            flash = true
+            outcome = r
             app.changed()
             app.sync.schedulePush()
+            Task { await celebrate(r.imported) }
         } catch {
             failure = error.localizedDescription
         }
+    }
+
+    private func celebrate(_ count: UInt32) async {
+        try? await Task.sleep(for: .milliseconds(150))
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.7)) { shown = count }
+        try? await Task.sleep(for: .milliseconds(1400))
+        withAnimation(.easeOut(duration: 0.6)) { flash = false }
     }
 }
 

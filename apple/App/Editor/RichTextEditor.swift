@@ -109,8 +109,15 @@ private struct PlatformTextView: UIViewRepresentable {
             guard let pos = tv.closestPosition(to: point) else { return }
             let index = tv.offset(from: tv.beginningOfDocument, to: pos)
             // closestPosition lands after the glyph on its trailing half.
-            for i in [index, index - 1] where i >= 0 {
-                if controller.toggleCheck(atCharacter: i) { updateEmpty(tv); return }
+            for i in [index, index - 1] where controller.isCheckMarker(atCharacter: i) {
+                // The box cross-fades to its new state, with a tick of feedback.
+                UIView.transition(with: tv, duration: UIAccessibility.isReduceMotionEnabled ? 0 : 0.18,
+                                  options: [.transitionCrossDissolve, .allowUserInteraction]) {
+                    _ = self.controller.toggleCheck(atCharacter: i)
+                }
+                UISelectionFeedbackGenerator().selectionChanged()
+                updateEmpty(tv)
+                return
             }
         }
 
@@ -139,8 +146,10 @@ private final class EditorTextView: NSTextView, EditorHost {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         let index = characterIndexForInsertion(at: point)
-        for i in [index, index - 1] where i >= 0 {
-            if controller?.toggleCheck(atCharacter: i) == true { return }
+        for i in [index, index - 1] where controller?.isCheckMarker(atCharacter: i) == true {
+            _ = controller?.toggleCheck(atCharacter: i)
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            return
         }
         super.mouseDown(with: event)
     }

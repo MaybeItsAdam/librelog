@@ -22,6 +22,8 @@ final class AppModel {
     var selectedDate = Day.today
     var openEntryID: String?
     var lastError: String?
+    /// Counts entries made here, so the UI can acknowledge each one.
+    private(set) var created = 0
 
     init(store: Store) {
         self.store = store
@@ -75,6 +77,7 @@ final class AppModel {
             changed()
             sync.schedulePush()
             openEntryID = entry.id
+            created &+= 1
             return entry.id
         } catch {
             lastError = error.localizedDescription

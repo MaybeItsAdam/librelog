@@ -43,6 +43,8 @@ struct RootView: View {
             #endif
         }
         .tint(Color.primary)
+        .sensoryFeedback(.selection, trigger: tab)
+        .sensoryFeedback(.success, trigger: app.created)
         .onChange(of: app.openEntryID) { _, id in
             guard let id else { return }
             path.append(Route.entry(id))

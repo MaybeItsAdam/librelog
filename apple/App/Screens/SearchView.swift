@@ -5,6 +5,7 @@ struct SearchView: View {
     @Environment(AppModel.self) private var app
     @State private var query = ""
     @State private var hits: [SearchHit] = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         List {
@@ -18,8 +19,9 @@ struct SearchView: View {
                                 Text(meaning).font(.system(size: 12)).foregroundStyle(Color.muted)
                             }
                             .frame(minHeight: 36)
+                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.pressable)
                         .listRowBackground(Color.paper)
                     }
                 } header: {
@@ -32,6 +34,8 @@ struct SearchView: View {
                     NavigationLink(value: Route.entry(hit.entry.id)) {
                         EntryRow(entry: hit.entry, snippet: hit.snippet)
                     }
+                    .buttonStyle(.pressable)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                     .listRowBackground(Color.paper)
                     .listRowSeparatorTint(Color.hairline)
                 }
@@ -47,7 +51,9 @@ struct SearchView: View {
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
             let q = query
-            hits = (try? await app.run { try $0.search(query: q, limit: 100) }) ?? []
+            let found = (try? await app.run { try $0.search(query: q, limit: 100) }) ?? []
+            guard !Task.isCancelled else { return }
+            withMotion(Motion.snappy, reduce: reduceMotion) { hits = found }
         }
     }
 
