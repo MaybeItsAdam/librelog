@@ -16,3 +16,4 @@ fastlane/README.md
 apple/build/
 *.ipa
 *.dSYM.zip
+__pycache__/
