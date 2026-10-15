@@ -221,7 +221,7 @@ def entry_file(date, time, title, tags, body, end=None):
     return "---\n" + "\n".join(fm) + "\n---\n\n" + body + "\n"
 
 
-def gather(vault, folders, skip, simplenote):
+def gather(vault, folders, skip, simplenote, day_starts=5):
     entries, seen_titles = [], set()
     for folder in folders:
         for path in sorted((vault / folder).rglob("*.md")):
@@ -303,15 +303,25 @@ def gather(vault, folders, skip, simplenote):
                 if ls - vault_lines:
                     vault_lines |= ls
                     entries.append(e)
+    # A note timed by a clock (front matter, file creation, Simplenote)
+    # between midnight and the day's start was written the night before:
+    # it belongs to that day. It keeps the time it was written.
+    for e in entries:
+        if e["time"] and e["how"] != "heading" and int(e["time"][:2]) < day_starts:
+            e["date"] -= dt.timedelta(days=1)
+            if e.get("end") and e["end"] <= e["date"]:
+                e["end"] = None
+            e["how"] += f" (after midnight, filed under the day before)"
+
     # Notes copied into the vault together all share one creation day, which
     # says nothing about when they were written: tag them so they're easy to
     # find and re-date in the app.
     per_day = {}
     for e in entries:
-        if e["how"] == "created":
+        if e["how"].startswith("created"):
             per_day[e["date"]] = per_day.get(e["date"], 0) + 1
     for e in entries:
-        if e["how"] == "created" and per_day[e["date"]] >= 5:
+        if e["how"].startswith("created") and per_day[e["date"]] >= 5:
             e["tags"].append("Undated")
             e["time"] = None
             e["how"] = "created (bulk copy, tagged Undated)"
@@ -328,10 +338,12 @@ def main():
                     default=Path.home() / "Downloads" / f"Librelog import {dt.date.today().isoformat()}.zip")
     ap.add_argument("--simplenote", nargs="*", default=[],
                     help="Simplenote export zips (or notes.json) to date notes by and fill gaps from")
+    ap.add_argument("--day-starts", type=int, default=5, metavar="HOUR",
+                    help="notes timed before this hour belong to the day before (default 5)")
     ap.add_argument("--dry-run", action="store_true", help="list what would be written")
     a = ap.parse_args()
 
-    entries = gather(a.vault.expanduser(), a.folders, set(a.skip), simplenote_notes(a.simplenote))
+    entries = gather(a.vault.expanduser(), a.folders, set(a.skip), simplenote_notes(a.simplenote), a.day_starts)
     if not entries:
         sys.exit("Nothing found to import.")
     entries.sort(key=lambda e: (e["date"], e["time"] or "", str(e["rel"])))
@@ -358,7 +370,7 @@ def main():
     print(f"{len(entries)} entries, {entries[0]['date']} – {entries[-1]['date']}")
     for how, es in sorted(by_how.items()):
         print(f"  {len(es):4}  dated by {how}")
-    guessed = [e for e in entries if e["how"] not in ("front matter", "file name", "heading", "Simplenote", "title range")]
+    guessed = [e for e in entries if e["how"].split(" (")[0] not in ("front matter", "file name", "heading", "Simplenote", "title range")]
     if guessed:
         print("\nDates guessed from the title or file creation time (fix in the app if wrong):")
         for e in guessed:
