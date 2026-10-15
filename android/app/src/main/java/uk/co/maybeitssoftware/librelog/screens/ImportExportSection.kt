@@ -117,7 +117,7 @@ fun ImportExportSection(app: AppModel) {
     Section("Import & export") {
         ActionRow("Export…", "Save a copy of your journal") { choosingFormat = true }
         Hairline()
-        ActionRow("Import…", "Day One, Daylio, Markdown, or a Librelog backup") {
+        ActionRow("Import…", "Day One, Daylio, Diarium, Markdown, or a Librelog backup") {
             pickFile.launch(arrayOf("*/*"))
         }
         AnimatedVisibility(busy, enter = fadeIn(m.standard()) + expandVertically(m.glide()), exit = fadeOut(m.quick()) + shrinkVertically(m.glide())) {
@@ -268,6 +268,7 @@ private fun sourceName(s: ImportSource) = when (s) {
     ImportSource.DAY_ONE -> "Day One"
     ImportSource.DAYLIO -> "Daylio"
     ImportSource.MARKDOWN -> "Markdown"
+    ImportSource.DIARIUM -> "Diarium backup"
 }
 
 private fun plural(n: Int, one: String, many: String) = (if (n == 1) one else many).format(n)

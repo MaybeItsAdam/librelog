@@ -117,7 +117,7 @@ public static class ExportFormats
 
 public sealed record ExportSummary(uint Entries, string Path);
 
-/// What importing a file would do. Source is "Librelog", "DayOne", "Daylio"
+/// What importing a file would do. Source is "Librelog", "DayOne", "Daylio", "Diarium"
 /// or "Markdown" (kept a string so the JSON stays reflection-free).
 public sealed record ImportPreview(
     string Source, uint Entries, uint AlreadyImported, uint Tags,
@@ -129,6 +129,7 @@ public sealed record ImportPreview(
     {
         "DayOne" => "Day One",
         "Librelog" => "Librelog backup",
+        "Diarium" => "Diarium backup",
         _ => Source,
     };
 }

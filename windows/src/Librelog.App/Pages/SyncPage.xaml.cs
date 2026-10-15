@@ -187,7 +187,7 @@ public sealed partial class SyncPage : Page
         (ExportFormat.Text, "Plain text (.txt)", "Just the words."),
     ];
 
-    private static readonly string[] ImportTypes = [".json", ".zip", ".csv", ".md", ".markdown", ".txt"];
+    private static readonly string[] ImportTypes = [".json", ".zip", ".csv", ".md", ".markdown", ".txt", ".diary", "*"];
 
     private static string Entries(uint n) => n == 1 ? "1 entry" : $"{n} entries";
 

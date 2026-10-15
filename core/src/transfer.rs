@@ -54,6 +54,7 @@ pub enum ImportSource {
     DayOne,
     Daylio,
     Markdown,
+    Diarium,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, uniffi::Record)]
@@ -536,6 +537,10 @@ fn text(bytes: &[u8]) -> String {
 
 /// Works out what the input is and reads it.
 fn read_any(path: &str) -> Result<Read_> {
+    // A Diarium backup is its SQLite database, whatever the file is called.
+    if is_sqlite(path) {
+        return read_diarium(path);
+    }
     let docs = read_input(path)?;
     if docs.is_empty() {
         return Err(CoreError::Invalid("nothing to import in that file".into()));
@@ -568,7 +573,7 @@ fn read_any(path: &str) -> Result<Read_> {
         return read_markdown(&md);
     }
     Err(CoreError::Invalid(
-        "not a format Librelog can import (Librelog JSON, Day One, Daylio CSV or Markdown)".into(),
+        "not a format Librelog can import (Librelog JSON, Day One, Daylio CSV, Diarium backup or Markdown)".into(),
     ))
 }
 
@@ -728,6 +733,138 @@ fn read_daylio(bytes: &[u8]) -> Result<Read_> {
     Ok(Read_ { source: ImportSource::Daylio, entries, journals: vec![], skipped_images: 0, warnings })
 }
 
+fn is_sqlite(path: &str) -> bool {
+    let mut head = [0u8; 16];
+    File::open(path).and_then(|mut f| f.read_exact(&mut head)).is_ok() && &head == b"SQLite format 3\0"
+}
+
+/// .NET ticks (100 ns since 0001-01-01, local wall time) → date and HH:MM.
+fn ticks_local(ticks: i64) -> Option<(String, String)> {
+    let base = jiff::civil::date(1, 1, 1).at(0, 0, 0, 0);
+    let secs = ticks / 10_000_000;
+    let t = base.checked_add(jiff::Span::new().seconds(secs)).ok()?;
+    Some((t.date().to_string(), format!("{:02}:{:02}", t.hour(), t.minute())))
+}
+
+/// Diarium's rich text is a run of `<p>`s with a little inline markup;
+/// turn it into Markdown so the usual parser makes the blocks.
+fn diarium_markdown(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    let mut list: Vec<(bool, u32)> = Vec::new(); // (numbered, next number)
+    while let Some(i) = rest.find('<') {
+        out.push_str(&rest[..i]);
+        let Some(j) = rest[i..].find('>') else {
+            out.push_str(&rest[i..]);
+            rest = "";
+            break;
+        };
+        let raw = rest[i + 1..i + j].trim().to_lowercase();
+        let name: String = raw.trim_start_matches('/').chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
+        let closing = raw.starts_with('/');
+        match (name.as_str(), closing) {
+            ("p" | "div", true) | ("br", _) => out.push('\n'),
+            ("h1" | "h2" | "h3", false) => out.push_str("## "),
+            ("h1" | "h2" | "h3", true) => out.push('\n'),
+            ("b" | "strong", _) => out.push_str("**"),
+            ("i" | "em", _) => out.push('*'),
+            ("s" | "strike" | "del", _) => out.push_str("~~"),
+            ("ul", false) => list.push((false, 1)),
+            ("ol", false) => list.push((true, 1)),
+            ("ul" | "ol", true) => {
+                list.pop();
+            }
+            ("li", false) => {
+                if !out.is_empty() && !out.ends_with('\n') {
+                    out.push('\n');
+                }
+                match list.last_mut() {
+                    Some((true, n)) => {
+                        out.push_str(&format!("{n}. "));
+                        *n += 1;
+                    }
+                    _ => out.push_str("- "),
+                }
+            }
+            ("li", true) => out.push('\n'),
+            ("blockquote", false) => out.push_str("> "),
+            _ => {}
+        }
+        rest = &rest[i + j + 1..];
+    }
+    out.push_str(rest);
+    html_unescape(&out)
+}
+
+fn read_diarium(path: &str) -> Result<Read_> {
+    let not_diarium = || CoreError::Invalid("this database isn't a Diarium backup".into());
+    let db = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(io)?;
+    let has = |t: &str| -> bool {
+        db.query_row("select 1 from sqlite_master where type = 'table' and name = ?1", [t], |_| Ok(()))
+            .optional()
+            .ok()
+            .flatten()
+            .is_some()
+    };
+    if !has("Entries") {
+        return Err(not_diarium());
+    }
+    let mut tags: HashMap<i64, Vec<(String, Option<String>)>> = HashMap::new();
+    if has("Tags") && has("EntryTags") {
+        let mut stmt = db
+            .prepare("select et.DiaryEntryId, t.Value, et.TrackingValue from EntryTags et join Tags t on t.DiaryTagId = et.DiaryTagId")
+            .map_err(|_| not_diarium())?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, Option<String>>(2)?)))?;
+        for row in rows {
+            let (id, name, value) = row?;
+            let value = value.filter(|v| !v.trim().is_empty());
+            tags.entry(id).or_default().push((name.trim().to_string(), value));
+        }
+    }
+    let photos: u32 = if has("Media") {
+        db.query_row("select count(*) from Media", [], |r| r.get(0))?
+    } else {
+        0
+    };
+    let mut stmt = db
+        .prepare("select DiaryEntryId, Heading, Text, Rating from Entries order by DiaryEntryId")
+        .map_err(|_| not_diarium())?;
+    let rows = stmt.query_map([], |r| {
+        Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, i64>(3)?))
+    })?;
+    let mut entries = Vec::new();
+    let mut undated = 0;
+    for row in rows {
+        let (id, heading, html, rating) = row?;
+        let Some((date, time)) = ticks_local(id) else {
+            undated += 1;
+            continue;
+        };
+        let doc = markdown::from_markdown(&diarium_markdown(&html));
+        let heading = heading.trim();
+        entries.push(Incoming {
+            reference: format!("diarium:{id}"),
+            id: None,
+            journal_id: None,
+            date,
+            time: Some(time),
+            end_date: None,
+            tz: None,
+            title: (!heading.is_empty()).then(|| heading.to_string()),
+            blocks: doc.blocks,
+            rating: (1..=5).contains(&rating).then_some(rating as f64),
+            favorite: false,
+            tags: tags.remove(&id).unwrap_or_default(),
+            created_at: None,
+        });
+    }
+    let mut warnings = Vec::new();
+    if undated > 0 {
+        warnings.push(format!("{undated} entries had no readable date and were left out."));
+    }
+    Ok(Read_ { source: ImportSource::Diarium, entries, journals: vec![], skipped_images: photos, warnings })
+}
+
 /// "8:05 PM" / "20:05" → "20:05".
 fn clock_24h(s: &str) -> Option<String> {
     let s = s.trim();
@@ -773,7 +910,11 @@ fn strip_html(s: &str) -> String {
         }
     }
     out.push_str(rest);
-    out.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+    html_unescape(&out)
+}
+
+fn html_unescape(s: &str) -> String {
+    s.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
 }
 
 // --- Markdown ------------------------------------------------------------------

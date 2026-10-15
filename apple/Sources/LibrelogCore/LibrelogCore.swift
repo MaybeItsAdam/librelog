@@ -3512,6 +3512,7 @@ public enum ImportSource: Equatable, Hashable {
     case dayOne
     case daylio
     case markdown
+    case diarium
 
 
 
@@ -3541,6 +3542,8 @@ public struct FfiConverterTypeImportSource: FfiConverterRustBuffer {
         
         case 4: return .markdown
         
+        case 5: return .diarium
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -3563,6 +3566,10 @@ public struct FfiConverterTypeImportSource: FfiConverterRustBuffer {
         
         case .markdown:
             writeInt(&buf, Int32(4))
+        
+        
+        case .diarium:
+            writeInt(&buf, Int32(5))
         
         }
     }

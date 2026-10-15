@@ -38,7 +38,7 @@ struct TransferSection: View {
         } header: {
             Text("Import & export").microLabel()
         } footer: {
-            Text("Exports include every entry's text, tags and ratings. Imports read Librelog backups, Day One, Daylio and Markdown; photos aren't imported.")
+            Text("Exports include every entry's text, tags and ratings. Imports read Librelog backups, Day One, Daylio, Diarium backups and Markdown; photos aren't imported.")
                 .font(.system(size: 12))
                 .foregroundStyle(Color.muted)
         }
@@ -194,7 +194,9 @@ private struct ExportChoice: Identifiable {
 
 private enum ImportTypes {
     static let all: [UTType] = {
-        var types: [UTType] = [.json, .zip, .commaSeparatedText, .plainText, .folder]
+        // .data lets a Diarium backup through even when its name has lost
+        // the .diary extension; the core decides from the file's contents.
+        var types: [UTType] = [.json, .zip, .commaSeparatedText, .plainText, .folder, .data]
         if let md = UTType("net.daringfireball.markdown") { types.append(md) }
         return types
     }()
@@ -299,6 +301,7 @@ private struct ImportPreviewSheet: View {
         case .dayOne: "Day One"
         case .daylio: "Daylio"
         case .markdown: "Markdown"
+        case .diarium: "Diarium backup"
         }
     }
 }

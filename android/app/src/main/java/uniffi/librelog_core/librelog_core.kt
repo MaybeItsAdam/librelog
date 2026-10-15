@@ -4655,7 +4655,8 @@ enum class ImportSource {
     LIBRELOG,
     DAY_ONE,
     DAYLIO,
-    MARKDOWN;
+    MARKDOWN,
+    DIARIUM;
 
     
 

@@ -117,7 +117,7 @@
                 <StackPanel Spacing="10">
                     <TextBlock Text="IMPORT &amp; EXPORT" Style="{StaticResource MicroLabel}" />
                     <TextBlock Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}"
-                               Text="Save your journal as a backup, Markdown, a web page or text. Bring in entries from Day One, Daylio, Markdown notes or a Librelog backup." />
+                               Text="Save your journal as a backup, Markdown, a web page or text. Bring in entries from Day One, Daylio, a Diarium backup, Markdown notes or a Librelog backup." />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Style="{StaticResource PrimaryButton}" Content="Export…" Click="OnExport" />
                         <Button Style="{StaticResource PlainButton}" Content="Import…" Click="OnImport" />

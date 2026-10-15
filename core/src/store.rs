@@ -1355,6 +1355,46 @@ mod tests {
     }
 
     #[test]
+    fn diarium_backup_database() {
+        use crate::transfer::ImportSource;
+        let s = store();
+        // No extension, as a downloaded backup can end up: found by its header.
+        let path = tmp("Diarium.diary (1)");
+        let _ = std::fs::remove_file(&path);
+        {
+            let db = Connection::open(&path).unwrap();
+            db.execute_batch(
+                "create table Entries (DiaryEntryId bigint primary key, Heading varchar, Text varchar, Rating integer, Latitude float, Longitude float);
+                 create table Tags (DiaryTagId integer primary key, Value varchar, Type integer, Color varchar, Icon varchar);
+                 create table EntryTags (DiaryEntryId bigint, DiaryTagId integer, TrackingValue varchar);
+                 create table Media (DiaryMediaId varchar primary key, Type integer, Data blob, Name varchar, FileEnding varchar, \"Index\" integer, DiaryEntryId bigint);
+                 -- 2023-01-01 17:39:09 and 2024-02-29 08:05:00 as .NET ticks
+                 insert into Entries values (638081915490000000, 'Cabling', '<p>Finished <b>King Solomon''s</b> mines</p><p></p><ul><li>one</li><li>two</li></ul>', 0, 0, 0);
+                 insert into Entries values (638447907000000000, '', '<p>Leap &amp; day</p>', 4, 0, 0);
+                 insert into Tags values (3, 'DND', 0, null, null);
+                 insert into EntryTags values (638447907000000000, 3, '');
+                 insert into Media values ('m1', 0, x'00', 'a', '.jpg', 0, 638081915490000000);",
+            )
+            .unwrap();
+        }
+        let p = s.preview_import(path.clone()).unwrap();
+        assert_eq!((p.source, p.entries, p.skipped_images), (ImportSource::Diarium, 2, 1));
+        assert_eq!((p.first_date.as_deref(), p.last_date.as_deref()), (Some("2023-01-01"), Some("2024-02-29")));
+        assert_eq!(s.import_file(path.clone(), None).unwrap().imported, 2);
+        let first = &s.day("2023-01-01".into(), None).unwrap()[0];
+        assert_eq!((first.time.as_deref(), first.title.as_deref(), first.rating), (Some("17:39"), Some("Cabling"), None));
+        let body = s.entry(first.id.clone()).unwrap().body;
+        assert_eq!(body.len(), 3, "empty <p> spacers are dropped, list items kept: {body:?}");
+        assert_eq!(body[0].text, "Finished King Solomon's mines");
+        assert_eq!(body[1].kind, doc::BlockKind::Bullet);
+        let leap = &s.day("2024-02-29".into(), None).unwrap()[0];
+        assert_eq!((leap.time.as_deref(), leap.rating, leap.title.as_deref()), (Some("08:05"), Some(4.0), None));
+        assert_eq!(leap.tag_names, ["DND"]);
+        assert_eq!(s.entry(leap.id.clone()).unwrap().body[0].text, "Leap & day");
+        assert_eq!(s.import_file(path, None).unwrap().skipped, 2);
+    }
+
+    #[test]
     fn daylio_csv_moods_activities_and_duplicate_times() {
         use crate::transfer::ImportSource;
         let s = store();
