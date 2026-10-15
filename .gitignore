@@ -9,3 +9,10 @@ xcuserdata/
 
 # Claude Code agent worktrees
 .claude/
+
+# Fastlane output
+fastlane/report.xml
+fastlane/README.md
+apple/build/
+*.ipa
+*.dSYM.zip

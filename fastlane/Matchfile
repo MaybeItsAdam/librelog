@@ -1,0 +1,5 @@
+# Centralized iOS signing, shared with the other maybeitssoftware apps.
+storage_mode("git")
+git_url("git@github.com:MaybeItsSoftware/match-certs.git")
+type("appstore")
+app_identifier(["uk.co.maybeitssoftware.librelog"])

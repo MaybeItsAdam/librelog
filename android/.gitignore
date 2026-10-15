@@ -9,3 +9,7 @@ captures/
 
 # Built by scripts/build-android.sh
 app/src/main/jniLibs/
+
+# Release signing (shared upload key; never committed)
+key.properties
+*.jks

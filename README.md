@@ -75,3 +75,15 @@ To try an import on a scratch database: `cargo run --example import --
 Payments (Stripe, store subscriptions), branded sign-in emails (needs SMTP),
 Google sign-in on Android (needs an OAuth client id), and a signed Windows
 package for distribution (CI packages are test-signed).
+
+## Releasing to internal testing
+
+Fastlane lanes in `fastlane/Fastfile`; credentials come from the environment
+(the shared maybeitssoftware set: `ASC_KEY_ID`, `ASC_ISSUER_ID`,
+`ASC_KEY_CONTENT`, `MATCH_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`) and
+`android/key.properties` (the shared upload key, git-ignored).
+
+```sh
+bundle exec fastlane android internal version_code:2 version_name:0.1.1  # Play internal track
+bundle exec fastlane ios internal                                        # TestFlight (next build number)
+```

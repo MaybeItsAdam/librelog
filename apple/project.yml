@@ -44,6 +44,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Librelog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
           - CFBundleURLName: uk.co.maybeitssoftware.librelog.auth
             CFBundleURLSchemes: [librelog]
@@ -64,7 +66,9 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         LSApplicationCategoryType: public.app-category.lifestyle
-        ITSAppUsesNonExemptEncryption: false
+        # Sync encrypts entries end to end (XChaCha20-Poly1305): standard
+        # algorithms, declared once in App Store Connect.
+        ITSAppUsesNonExemptEncryption: true
         NSCameraUsageDescription: Librelog uses the camera only to scan another device's pairing code.
     settings:
       base:
