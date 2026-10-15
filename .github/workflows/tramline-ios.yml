@@ -1,0 +1,93 @@
+name: Tramline · iOS
+
+# Triggered by Tramline. Builds the Rust core, archives the app at the version
+# Tramline hands over (CFBundleShortVersionString = version_name,
+# CFBundleVersion = version_code) and uploads it to TestFlight via
+# `fastlane ios tramline`. Tramline then finds the build by its build number.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tramline-input:
+        description: "JSON from Tramline (version_name, version_code, commit_ref, build_notes)"
+        required: false
+        default: "{}"
+
+concurrency:
+  group: tramline-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Configure Tramline
+        id: tramline
+        uses: tramlinehq/deploy-action@v0.1.7
+        with:
+          input: ${{ github.event.inputs.tramline-input }}
+
+      - name: Require Tramline version
+        env:
+          VERSION_NAME: ${{ steps.tramline.outputs.version_name }}
+          VERSION_CODE: ${{ steps.tramline.outputs.version_code }}
+        run: |
+          if [ -z "$VERSION_NAME" ] || [ -z "$VERSION_CODE" ]; then
+            echo "::error::No version_name/version_code in tramline-input — this workflow is meant to be triggered by Tramline."; exit 1
+          fi
+
+      - name: Require signing secrets
+        env:
+          MATCH_GIT_URL: git@github.com:MaybeItsSoftware/match-certs.git
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+        run: |
+          for v in MATCH_PASSWORD APP_STORE_CONNECT_API_KEY_ID APP_STORE_CONNECT_API_KEY_ISSUER_ID APP_STORE_CONNECT_API_KEY_CONTENT; do
+            if [ -z "${!v}" ]; then echo "::error::Secret $v is not set"; exit 1; fi
+          done
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      # match-certs is cloned over SSH with a read-only deploy key on that repo.
+      - name: Load match-certs deploy key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_GIT_SSH_KEY }}
+
+      - name: Build and upload to TestFlight
+        env:
+          VERSION_NAME: ${{ steps.tramline.outputs.version_name }}
+          VERSION_CODE: ${{ steps.tramline.outputs.version_code }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          MATCH_GIT_URL: git@github.com:MaybeItsSoftware/match-certs.git
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane ios tramline version_name:"$VERSION_NAME" version_code:"$VERSION_CODE"

@@ -8,7 +8,8 @@ plugins {
 
 // Release signing uses the shared upload key (see the mobile release
 // runbook). android/key.properties holds storeFile, storePassword, keyAlias
-// and keyPassword; without it, release builds fall back to debug signing.
+// and keyPassword; without it, local release builds fall back to debug
+// signing (CI builds are left unsigned instead).
 val signing = rootProject.file("key.properties").takeIf { it.exists() }?.let { f ->
     Properties().apply { f.inputStream().use(::load) }
 }
@@ -44,7 +45,12 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
+            // In CI (CI=true) a missing key.properties leaves the bundle
+            // unsigned rather than debug-signed, so it can't reach Play by
+            // accident; local builds still fall back to the debug key.
+            signingConfig = signingConfigs.findByName("upload")
+                ?: if (providers.environmentVariable("CI").orNull == "true") null
+                else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
