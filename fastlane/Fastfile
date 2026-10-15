@@ -55,4 +55,34 @@ platform :ios do
     )
     upload_to_testflight(api_key: key, skip_waiting_for_build_processing: true) unless opts[:upload] == false
   end
+
+  # Called by .github/workflows/tramline-ios.yml. Tramline owns the version:
+  # it passes both numbers and finds the build in App Store Connect by its
+  # build number, so nothing here reads or bumps TestFlight's counter.
+  desc "Archive at Tramline's version_name/version_code and upload to TestFlight"
+  lane :tramline do |opts|
+    name = opts[:version_name].to_s
+    code = opts[:version_code].to_s
+    UI.user_error!("version_name: must look like 1.2.3 (got #{name.inspect})") unless name.match?(/\A\d+(\.\d+){0,2}\z/)
+    UI.user_error!("version_code: must be a positive integer (got #{code.inspect})") unless code.match?(/\A[1-9]\d*\z/)
+
+    key = asc_key
+    setup_ci if ENV["CI"]
+    # CI and local runs both clone the certs repo over SSH (CI via the
+    # MATCH_GIT_SSH_KEY deploy key); MATCH_GIT_URL overrides the Matchfile if set.
+    certs = { type: "appstore", app_identifier: APP_ID, api_key: key, readonly: true }
+    certs[:git_url] = ENV["MATCH_GIT_URL"] unless ENV["MATCH_GIT_URL"].to_s.empty?
+    match(**certs)
+    sh("cd #{ROOT} && scripts/build-apple.sh && cd apple && xcodegen -q")
+    build_app(
+      project: "#{ROOT}/apple/Librelog.xcodeproj", scheme: "Librelog",
+      destination: "generic/platform=iOS", export_method: "app-store",
+      output_directory: "#{ROOT}/apple/build", clean: true,
+      xcargs: "MARKETING_VERSION=#{name} CURRENT_PROJECT_VERSION=#{code} " \
+              "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=#{TEAM_ID} " \
+              "CODE_SIGN_IDENTITY='Apple Distribution' PROVISIONING_PROFILE_SPECIFIER='match AppStore #{APP_ID}'",
+      export_options: { provisioningProfiles: { APP_ID => "match AppStore #{APP_ID}" } },
+    )
+    upload_to_testflight(api_key: key, app_identifier: APP_ID, skip_waiting_for_build_processing: true)
+  end
 end
