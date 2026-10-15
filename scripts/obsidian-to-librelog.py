@@ -131,8 +131,8 @@ def norm_title(s):
 
 
 def simplenote_notes(paths):
-    """Active notes from Simplenote exports, newest export winning, as
-    {normalised title: (title, created, tags, body)}."""
+    """Active notes from Simplenote exports as {normalised title: [(title,
+    created, tags, body), ...]}, one version per export that differs."""
     notes = {}
     for p in paths:
         p = Path(p).expanduser()
@@ -147,9 +147,16 @@ def simplenote_notes(paths):
             title = first.lstrip("# ").strip()
             created = dt.datetime.fromisoformat(n["creationDate"].replace("Z", "+00:00")).astimezone()
             key = norm_title(title)
-            if key not in notes or created < notes[key][1]:
-                notes[key] = (title, created, [t.lower() for t in n.get("tags") or []], body.strip())
+            version = (title, created, [t.lower() for t in n.get("tags") or []], body.strip())
+            if all(v[3] != version[3] for v in notes.get(key, [])):
+                notes.setdefault(key, []).append(version)
     return notes
+
+
+def lines_of(e):
+    """An entry's wording as a set of normalised lines, for spotting copies."""
+    text = (e["title"] or "") + "\n" + e["body"]
+    return {norm_title(l) for l in text.splitlines() if norm_title(l)}
 
 
 def split_days(title, body):
@@ -168,7 +175,7 @@ def split_days(title, body):
             yr = int(y) + (2000 if len(y) == 2 else 0)
         elif year:
             yr = year
-            if prev and (mo, d) < (prev.month, prev.day):
+            if prev and prev.month >= 11 and mo <= 2:
                 yr = prev.year + 1  # Winter 25 running into January
             year = yr
         else:
@@ -215,7 +222,7 @@ def entry_file(date, time, title, tags, body, end=None):
 
 
 def gather(vault, folders, skip, simplenote):
-    entries, seen_reviews, seen_titles = [], set(), set()
+    entries, seen_titles = [], set()
     for folder in folders:
         for path in sorted((vault / folder).rglob("*.md")):
             rel = path.relative_to(vault)
@@ -228,17 +235,12 @@ def gather(vault, folders, skip, simplenote):
                 continue
             title = path.stem
             seen_titles.add(norm_title(title))
-            # The same review is sometimes in Journal and Log/Reviews; keep one.
-            if title in seen_reviews:
-                continue
             tag = tag_for(rel)
-            if tag == "Review" or "audit" in title.lower() or "in review" in title.lower():
-                seen_reviews.add(title)
 
             days = split_days(title, body)
             if days:
                 for date, heading, text in days:
-                    if text:
+                    if text or heading:
                         entries.append(dict(rel=rel, date=date, time=None,
                                             title=heading or None, tags=[tag, title], body=text, how="heading"))
                 continue
@@ -261,7 +263,8 @@ def gather(vault, folders, skip, simplenote):
                 date, how = title_date(title, c.year), "title"
                 sn = simplenote.get(norm_title(title))
                 if not date and sn:
-                    date, how, time = sn[1].date(), "Simplenote", sn[1].strftime("%H:%M")
+                    first = min(v[1] for v in sn)
+                    date, how, time = first.date(), "Simplenote", first.strftime("%H:%M")
                 if not date:
                     date, how = c.date(), "created"
                     time = c.strftime("%H:%M")
@@ -270,19 +273,36 @@ def gather(vault, folders, skip, simplenote):
                 (date, end), time, how = span, None, "title range"
             entries.append(dict(rel=rel, date=date, time=time, title=None if is_daily else title,
                                 tags=[tag], body=body, how=how, end=end if end and end > date else None))
-    # A Simplenote note counts as already in the vault if most of its lines
-    # are somewhere in it, whatever it's called there now.
-    vault_text = norm_title("\n".join(
-        p.read_text(encoding="utf-8", errors="replace") for p in vault.rglob("*.md")
-        if not any(q.startswith(".") for q in p.relative_to(vault).parts))) if simplenote else ""
-    for key, (title, when, tags, body) in simplenote.items():
-        if key in seen_titles or not SIMPLENOTE_DIARY_TAGS & set(tags) or not body:
+    # The same note kept in two folders (a review in Journal and in
+    # Log/Reviews): keep one copy unless the other has wording of its own.
+    by_name, kept = {}, []
+    for e in sorted(entries, key=lambda e: -len(e["body"])):
+        key = (e["rel"].name, e["date"], e["title"])
+        have = by_name.setdefault(key, set())
+        ls = lines_of(e)
+        if have and ls <= have:
             continue
-        lines = [norm_title(l) for l in body.splitlines() if len(l.split()) >= 6]
-        if lines and sum(l[:60] in vault_text for l in lines) * 2 >= len(lines):
-            continue
-        entries.append(dict(rel=Path("Simplenote") / title, date=when.date(), time=when.strftime("%H:%M"),
-                            title=title, tags=["Simplenote"], body=clean(body), how="Simplenote (not in vault)"))
+        have |= ls
+        kept.append(e)
+    entries = kept
+
+    # Simplenote versions of diary notes: keep any note, or any day of a
+    # dated-heading note, with a line that isn't anywhere in the vault.
+    vault_lines = set().union(*(lines_of(e) for e in entries)) if entries else set()
+    for key, versions in simplenote.items():
+        for title, when, tags, body in versions:
+            if not SIMPLENOTE_DIARY_TAGS & set(tags) or not body:
+                continue
+            days = split_days(title, body)
+            parts = ([dict(date=d, time=None, title=h or None, body=t) for d, h, t in days if t or h] if days else
+                     [dict(date=when.date(), time=when.strftime("%H:%M"), title=title, body=body)])
+            for part in parts:
+                e = dict(rel=Path("Simplenote") / title, tags=["Simplenote", title] if days else ["Simplenote"],
+                         how="Simplenote (not in vault)", **part)
+                ls = lines_of(e)
+                if ls - vault_lines:
+                    vault_lines |= ls
+                    entries.append(e)
     # Notes copied into the vault together all share one creation day, which
     # says nothing about when they were written: tag them so they're easy to
     # find and re-date in the app.
@@ -302,7 +322,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--vault", type=Path, default=Path.home() / "Documents" / "Life")
     ap.add_argument("--folders", nargs="+", default=["Log", "Journal"])
-    ap.add_argument("--skip", nargs="*", default=["Entities", "Places", "Templates"],
+    ap.add_argument("--skip", nargs="*", default=["Entities", "Templates"],
                     help="folder names to leave out (reference pages, not diary)")
     ap.add_argument("--out", type=Path,
                     default=Path.home() / "Downloads" / f"Librelog import {dt.date.today().isoformat()}.zip")
