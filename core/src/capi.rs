@@ -277,6 +277,35 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
             ok(json!(s.apply_snapshot(seq, payload)?))
         }
         "reset_sync" => ok(json!(s.reset_sync()?)),
+        "calendar_day" => {
+            let (journal_id, date, events) =
+                args!(journal_id: Option<String>, date: String, events: Vec<crate::CalendarEvent>);
+            ok(json!(s.calendar_day(journal_id, date, events)?))
+        }
+        "kept_calendar_events" => {
+            let (journal_id, date) = args!(journal_id: Option<String>, date: String);
+            ok(json!(s.kept_calendar_events(journal_id, date)?))
+        }
+        "keep_calendar_event" => {
+            let (journal_id, date, event) = args!(journal_id: Option<String>, date: String, event: crate::CalendarEvent);
+            ok(json!(s.keep_calendar_event(journal_id, date, event)?))
+        }
+        "remove_calendar_event" => {
+            let id = args!(id: String);
+            ok(json!(s.remove_calendar_event(id)?))
+        }
+        "set_calendar_event_note" => {
+            let (id, note) = args!(id: String, note: Option<String>);
+            ok(json!(s.set_calendar_event_note(id, note)?))
+        }
+        "tracked_calendar_events" => {
+            let key_prefix = args!(key_prefix: String);
+            ok(json!(s.tracked_calendar_events(key_prefix)?))
+        }
+        "refresh_calendar_events" => {
+            let lookups = args!(lookups: Vec<crate::CalendarLookup>);
+            ok(json!(s.refresh_calendar_events(lookups)?))
+        }
         other => Err(CoreError::Invalid(format!("unknown store method {other}"))),
     }
 }
@@ -436,6 +465,16 @@ mod tests {
         assert_eq!(call(h, "entry", json!({"id": "nope"}))["err"]["kind"], "not_found");
         assert_eq!(call(h, "no_such_method", json!({}))["err"]["kind"], "invalid");
         assert_eq!(call(h, "entry", json!({}))["err"]["kind"], "invalid");
+
+        let ev = json!({"key": "windows:1", "title": "Dentist", "start": "2026-10-03T10:00", "end": null,
+                        "location": null, "calendar": null, "cancelled": false});
+        let day = call(h, "calendar_day", json!({"date": "2026-10-03", "events": [ev]}));
+        assert_eq!(day["ok"]["suggestions"][0]["title"], "Dentist");
+        let kept = call(h, "keep_calendar_event", json!({"date": "2026-10-03", "event": ev}));
+        assert_eq!(kept["ok"]["state"], "scheduled");
+        let gone = json!({"lookups": [{"key": "windows:1", "event": null}]});
+        assert_eq!(call(h, "refresh_calendar_events", gone)["ok"], 1);
+        assert_eq!(call(h, "kept_calendar_events", json!({"date": "2026-10-03"}))["ok"][0]["state"], "cancelled");
         unsafe { dl_store_close(h) };
     }
 }
