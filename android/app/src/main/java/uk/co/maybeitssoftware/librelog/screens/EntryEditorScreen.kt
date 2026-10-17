@@ -91,6 +91,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
+import uk.co.maybeitssoftware.librelog.calendar.DayCalendarSection
 import uk.co.maybeitssoftware.librelog.editor.EditorController
 import uk.co.maybeitssoftware.librelog.editor.RichTextEditor
 import uk.co.maybeitssoftware.librelog.editor.editorStyle
@@ -305,6 +306,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                         }
                     }
                 }
+                DayCalendarSection(app, e.date, Modifier.padding(bottom = 6.dp))
                 Hairline()
                 if (e.hasConflict) {
                     StatusBanner("Edited on two devices — review", t.warning, Modifier.padding(top = 10.dp)) { onShowHistory(e.id) }

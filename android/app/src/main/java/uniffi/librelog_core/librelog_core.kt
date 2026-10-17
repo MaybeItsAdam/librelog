@@ -691,6 +691,20 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_pairingsession_receive(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_calendar_day(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_keep_calendar_event(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_kept_calendar_events(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_refresh_calendar_events(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_remove_calendar_event(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_calendar_event_note(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_tracked_calendar_events(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_apply_incoming(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_apply_snapshot(
@@ -829,6 +843,20 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_librelog_core_fn_constructor_store_open(`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_librelog_core_fn_method_store_calendar_day(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`events`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_keep_calendar_event(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`event`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_kept_calendar_events(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_refresh_calendar_events(`ptr`: Long,`lookups`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Int
+    external fun uniffi_librelog_core_fn_method_store_remove_calendar_event(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_calendar_event_note(`ptr`: Long,`id`: RustBuffer.ByValue,`note`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_tracked_calendar_events(`ptr`: Long,`keyPrefix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_apply_incoming(`ptr`: Long,`rows`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_apply_snapshot(`ptr`: Long,`seq`: Long,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1076,6 +1104,27 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_pairingsession_receive() and 0xFFFF) != 32456) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_calendar_day() and 0xFFFF) != 62542) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_keep_calendar_event() and 0xFFFF) != 13550) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_kept_calendar_events() and 0xFFFF) != 23402) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_refresh_calendar_events() and 0xFFFF) != 17426) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_remove_calendar_event() and 0xFFFF) != 39173) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_calendar_event_note() and 0xFFFF) != 449) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_tracked_calendar_events() and 0xFFFF) != 2002) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_apply_incoming() and 0xFFFF) != 46898) {
@@ -2015,6 +2064,51 @@ public object FfiConverterTypePairingSession: FfiConverter<PairingSession, Long>
 public interface StoreInterface {
     
     /**
+     * The day's kept events, and suggestions from `events` (the device's
+     * calendar for that day, already fetched by the app). Kept events seen
+     * in `events` are brought up to date on the way. Returns the kept ones
+     * first; suggestions leave out cancelled events and any already kept.
+     */
+    fun `calendarDay`(`journalId`: kotlin.String?, `date`: kotlin.String, `events`: List<CalendarEvent>): CalendarDay
+    
+    /**
+     * Keeps a calendar event on a journal day, and tracks it from then on.
+     * Keeping one that was kept and then removed brings it back, note and all.
+     */
+    fun `keepCalendarEvent`(`journalId`: kotlin.String?, `date`: kotlin.String, `event`: CalendarEvent): KeptEvent
+    
+    /**
+     * Events kept on one day, for showing without asking the calendar (a
+     * device without calendar access, or before permission is granted).
+     */
+    fun `keptCalendarEvents`(`journalId`: kotlin.String?, `date`: kotlin.String): List<KeptEvent>
+    
+    /**
+     * Brings kept events up to date with what the calendar has now. An
+     * event that wasn't found counts as cancelled only on the device that
+     * kept it, since another device may simply not have that calendar.
+     * Returns how many kept events changed.
+     */
+    fun `refreshCalendarEvents`(`lookups`: List<CalendarLookup>): kotlin.UInt
+    
+    /**
+     * Stops tracking a kept event and takes it off the day.
+     */
+    fun `removeCalendarEvent`(`id`: kotlin.String)
+    
+    /**
+     * The user's own note on a kept event; empty clears it.
+     */
+    fun `setCalendarEventNote`(`id`: kotlin.String, `note`: kotlin.String?)
+    
+    /**
+     * Every kept event whose key starts with `key_prefix` ("apple:",
+     * "android:"), for the app to look up and pass to
+     * `refresh_calendar_events`.
+     */
+    fun `trackedCalendarEvents`(`keyPrefix`: kotlin.String): List<KeptEvent>
+    
+    /**
      * Merges rows from `pull_ops`, in the order the server returned them.
      */
     fun `applyIncoming`(`rows`: List<IncomingOps>): PullResult
@@ -2321,6 +2415,146 @@ open class Store: Disposable, AutoCloseable, StoreInterface
             UniffiLib.uniffi_librelog_core_fn_clone_store(handle, status)
         }
     }
+
+    
+    /**
+     * The day's kept events, and suggestions from `events` (the device's
+     * calendar for that day, already fetched by the app). Kept events seen
+     * in `events` are brought up to date on the way. Returns the kept ones
+     * first; suggestions leave out cancelled events and any already kept.
+     */
+    @Throws(CoreException::class)override fun `calendarDay`(`journalId`: kotlin.String?, `date`: kotlin.String, `events`: List<CalendarEvent>): CalendarDay {
+            return FfiConverterTypeCalendarDay.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_calendar_day(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterSequenceTypeCalendarEvent.lower(`events`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Keeps a calendar event on a journal day, and tracks it from then on.
+     * Keeping one that was kept and then removed brings it back, note and all.
+     */
+    @Throws(CoreException::class)override fun `keepCalendarEvent`(`journalId`: kotlin.String?, `date`: kotlin.String, `event`: CalendarEvent): KeptEvent {
+            return FfiConverterTypeKeptEvent.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_keep_calendar_event(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterTypeCalendarEvent.lower(`event`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Events kept on one day, for showing without asking the calendar (a
+     * device without calendar access, or before permission is granted).
+     */
+    @Throws(CoreException::class)override fun `keptCalendarEvents`(`journalId`: kotlin.String?, `date`: kotlin.String): List<KeptEvent> {
+            return FfiConverterSequenceTypeKeptEvent.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_kept_calendar_events(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Brings kept events up to date with what the calendar has now. An
+     * event that wasn't found counts as cancelled only on the device that
+     * kept it, since another device may simply not have that calendar.
+     * Returns how many kept events changed.
+     */
+    @Throws(CoreException::class)override fun `refreshCalendarEvents`(`lookups`: List<CalendarLookup>): kotlin.UInt {
+            return FfiConverterUInt.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_refresh_calendar_events(
+        it,
+        
+        FfiConverterSequenceTypeCalendarLookup.lower(`lookups`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Stops tracking a kept event and takes it off the day.
+     */
+    @Throws(CoreException::class)override fun `removeCalendarEvent`(`id`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_remove_calendar_event(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * The user's own note on a kept event; empty clears it.
+     */
+    @Throws(CoreException::class)override fun `setCalendarEventNote`(`id`: kotlin.String, `note`: kotlin.String?)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_calendar_event_note(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalString.lower(`note`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Every kept event whose key starts with `key_prefix` ("apple:",
+     * "android:"), for the app to look up and pass to
+     * `refresh_calendar_events`.
+     */
+    @Throws(CoreException::class)override fun `trackedCalendarEvents`(`keyPrefix`: kotlin.String): List<KeptEvent> {
+            return FfiConverterSequenceTypeKeptEvent.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_tracked_calendar_events(
+        it,
+        
+        FfiConverterString.lower(`keyPrefix`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -3250,6 +3484,177 @@ public object FfiConverterTypeBlock: FfiConverterRustBuffer<Block> {
 
 
 /**
+ * What to show for one day: the events kept there, and the calendar's
+ * other events that day to offer as suggestions.
+ */
+data class CalendarDay (
+    var `kept`: List<KeptEvent>
+    , 
+    var `suggestions`: List<CalendarEvent>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCalendarDay: FfiConverterRustBuffer<CalendarDay> {
+    override fun read(buf: ByteBuffer): CalendarDay {
+        return CalendarDay(
+            FfiConverterSequenceTypeKeptEvent.read(buf),
+            FfiConverterSequenceTypeCalendarEvent.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CalendarDay) = (
+            FfiConverterSequenceTypeKeptEvent.allocationSize(value.`kept`) +
+            FfiConverterSequenceTypeCalendarEvent.allocationSize(value.`suggestions`)
+    )
+
+    override fun write(value: CalendarDay, buf: ByteBuffer) {
+            FfiConverterSequenceTypeKeptEvent.write(value.`kept`, buf)
+            FfiConverterSequenceTypeCalendarEvent.write(value.`suggestions`, buf)
+    }
+}
+
+
+
+/**
+ * One event as the device's calendar has it now. Times are local wall-clock
+ * time on the device: `YYYY-MM-DDTHH:MM` for a timed event, `YYYY-MM-DD`
+ * for an all-day one.
+ */
+data class CalendarEvent (
+    /**
+     * The calendar's stable identity for this event, prefixed by where it
+     * came from: `apple:<external id>[@<occurrence>]`,
+     * `android:<event id>[@<original instance millis>]`. It must not change
+     * when the event is edited or moved; a recurring event's occurrences
+     * each get their own, from the time the occurrence was *originally* at.
+     */
+    var `key`: kotlin.String
+    , 
+    var `title`: kotlin.String
+    , 
+    var `start`: kotlin.String
+    , 
+    /**
+     * Timed: when it ends. All-day: the last day it covers, or none for a
+     * single day.
+     */
+    var `end`: kotlin.String?
+    , 
+    var `location`: kotlin.String?
+    , 
+    /**
+     * The calendar's name ("Work", "Home"), shown as a caption.
+     */
+    var `calendar`: kotlin.String?
+    , 
+    /**
+     * The calendar marks it cancelled.
+     */
+    var `cancelled`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCalendarEvent: FfiConverterRustBuffer<CalendarEvent> {
+    override fun read(buf: ByteBuffer): CalendarEvent {
+        return CalendarEvent(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CalendarEvent) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterString.allocationSize(value.`start`) +
+            FfiConverterOptionalString.allocationSize(value.`end`) +
+            FfiConverterOptionalString.allocationSize(value.`location`) +
+            FfiConverterOptionalString.allocationSize(value.`calendar`) +
+            FfiConverterBoolean.allocationSize(value.`cancelled`)
+    )
+
+    override fun write(value: CalendarEvent, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterString.write(value.`start`, buf)
+            FfiConverterOptionalString.write(value.`end`, buf)
+            FfiConverterOptionalString.write(value.`location`, buf)
+            FfiConverterOptionalString.write(value.`calendar`, buf)
+            FfiConverterBoolean.write(value.`cancelled`, buf)
+    }
+}
+
+
+
+/**
+ * The result of looking one tracked event up in the device's calendar.
+ */
+data class CalendarLookup (
+    var `key`: kotlin.String
+    , 
+    /**
+     * What the calendar has now, or none if the event wasn't found.
+     */
+    var `event`: CalendarEvent?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCalendarLookup: FfiConverterRustBuffer<CalendarLookup> {
+    override fun read(buf: ByteBuffer): CalendarLookup {
+        return CalendarLookup(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalTypeCalendarEvent.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CalendarLookup) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterOptionalTypeCalendarEvent.allocationSize(value.`event`)
+    )
+
+    override fun write(value: CalendarLookup, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterOptionalTypeCalendarEvent.write(value.`event`, buf)
+    }
+}
+
+
+
+/**
  * One day cell in the Calendar.
  */
 data class DayMark (
@@ -3747,6 +4152,116 @@ public object FfiConverterTypeJournal: FfiConverterRustBuffer<Journal> {
             FfiConverterString.write(value.`name`, buf)
             FfiConverterOptionalString.write(value.`color`, buf)
             FfiConverterBoolean.write(value.`isDefault`, buf)
+    }
+}
+
+
+
+/**
+ * A calendar event the user kept on a day.
+ */
+data class KeptEvent (
+    var `id`: kotlin.String
+    , 
+    var `journalId`: kotlin.String
+    , 
+    /**
+     * The journal day it is kept on. A moved event stays on this day.
+     */
+    var `date`: kotlin.String
+    , 
+    var `key`: kotlin.String
+    , 
+    var `title`: kotlin.String
+    , 
+    var `location`: kotlin.String?
+    , 
+    var `calendar`: kotlin.String?
+    , 
+    var `start`: kotlin.String
+    , 
+    var `end`: kotlin.String?
+    , 
+    var `allDay`: kotlin.Boolean
+    , 
+    /**
+     * "09:30–10:00", "09:30", or empty for an all-day event.
+     */
+    var `timeLabel`: kotlin.String
+    , 
+    var `state`: KeptEventState
+    , 
+    /**
+     * Moved to a different day than `date` (`start` says which).
+     */
+    var `movedToAnotherDay`: kotlin.Boolean
+    , 
+    var `note`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeptEvent: FfiConverterRustBuffer<KeptEvent> {
+    override fun read(buf: ByteBuffer): KeptEvent {
+        return KeptEvent(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeKeptEventState.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: KeptEvent) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`journalId`) +
+            FfiConverterString.allocationSize(value.`date`) +
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterOptionalString.allocationSize(value.`location`) +
+            FfiConverterOptionalString.allocationSize(value.`calendar`) +
+            FfiConverterString.allocationSize(value.`start`) +
+            FfiConverterOptionalString.allocationSize(value.`end`) +
+            FfiConverterBoolean.allocationSize(value.`allDay`) +
+            FfiConverterString.allocationSize(value.`timeLabel`) +
+            FfiConverterTypeKeptEventState.allocationSize(value.`state`) +
+            FfiConverterBoolean.allocationSize(value.`movedToAnotherDay`) +
+            FfiConverterOptionalString.allocationSize(value.`note`)
+    )
+
+    override fun write(value: KeptEvent, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`journalId`, buf)
+            FfiConverterString.write(value.`date`, buf)
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterOptionalString.write(value.`location`, buf)
+            FfiConverterOptionalString.write(value.`calendar`, buf)
+            FfiConverterString.write(value.`start`, buf)
+            FfiConverterOptionalString.write(value.`end`, buf)
+            FfiConverterBoolean.write(value.`allDay`, buf)
+            FfiConverterString.write(value.`timeLabel`, buf)
+            FfiConverterTypeKeptEventState.write(value.`state`, buf)
+            FfiConverterBoolean.write(value.`movedToAnotherDay`, buf)
+            FfiConverterOptionalString.write(value.`note`, buf)
     }
 }
 
@@ -4686,6 +5201,50 @@ public object FfiConverterTypeImportSource: FfiConverterRustBuffer<ImportSource>
 
 
 
+
+enum class KeptEventState {
+    
+    /**
+     * As it was when kept.
+     */
+    SCHEDULED,
+    /**
+     * Its time changed since it was kept; `start` / `end` are the new time.
+     */
+    MOVED,
+    /**
+     * Cancelled in the calendar, or gone from it.
+     */
+    CANCELLED;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeptEventState: FfiConverterRustBuffer<KeptEventState> {
+    override fun read(buf: ByteBuffer) = try {
+        KeptEventState.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: KeptEventState) = 4UL
+
+    override fun write(value: KeptEventState, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 sealed class MarkKind {
     
     object Bold : MarkKind()
@@ -4924,6 +5483,38 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeCalendarEvent: FfiConverterRustBuffer<CalendarEvent?> {
+    override fun read(buf: ByteBuffer): CalendarEvent? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeCalendarEvent.read(buf)
+    }
+
+    override fun allocationSize(value: CalendarEvent?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeCalendarEvent.allocationSize(value)
+        }
+    }
+
+    override fun write(value: CalendarEvent?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeCalendarEvent.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeOutgoingBatch: FfiConverterRustBuffer<OutgoingBatch?> {
     override fun read(buf: ByteBuffer): OutgoingBatch? {
         if (buf.get().toInt() == 0) {
@@ -5076,6 +5667,62 @@ public object FfiConverterSequenceTypeBlock: FfiConverterRustBuffer<List<Block>>
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeCalendarEvent: FfiConverterRustBuffer<List<CalendarEvent>> {
+    override fun read(buf: ByteBuffer): List<CalendarEvent> {
+        val len = buf.getInt()
+        return List<CalendarEvent>(len) {
+            FfiConverterTypeCalendarEvent.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CalendarEvent>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCalendarEvent.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CalendarEvent>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCalendarEvent.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeCalendarLookup: FfiConverterRustBuffer<List<CalendarLookup>> {
+    override fun read(buf: ByteBuffer): List<CalendarLookup> {
+        val len = buf.getInt()
+        return List<CalendarLookup>(len) {
+            FfiConverterTypeCalendarLookup.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CalendarLookup>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCalendarLookup.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CalendarLookup>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCalendarLookup.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeDayMark: FfiConverterRustBuffer<List<DayMark>> {
     override fun read(buf: ByteBuffer): List<DayMark> {
         val len = buf.getInt()
@@ -5178,6 +5825,34 @@ public object FfiConverterSequenceTypeJournal: FfiConverterRustBuffer<List<Journ
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeJournal.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeKeptEvent: FfiConverterRustBuffer<List<KeptEvent>> {
+    override fun read(buf: ByteBuffer): List<KeptEvent> {
+        val len = buf.getInt()
+        return List<KeptEvent>(len) {
+            FfiConverterTypeKeptEvent.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<KeptEvent>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeKeptEvent.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<KeptEvent>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeKeptEvent.write(it, buf)
         }
     }
 }

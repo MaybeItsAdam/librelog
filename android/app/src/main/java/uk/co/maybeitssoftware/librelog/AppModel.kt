@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uk.co.maybeitssoftware.librelog.calendar.DeviceCalendar
 import uk.co.maybeitssoftware.librelog.sync.KeystoreSecretStore
 import uk.co.maybeitssoftware.librelog.sync.RealtimeChannel
 import uk.co.maybeitssoftware.librelog.sync.SupabaseClient
@@ -60,11 +61,16 @@ class LibrelogApplication : Application(), Configuration.Provider {
  * dispatcher via [run], so typing and scrolling never wait on SQLite.
  * Mirrors apple/App/AppModel.swift.
  */
-class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope) {
+class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope, val calendar: DeviceCalendar) {
     /** Bumped after any write or merged pull, so screens reload. */
     var revision by mutableIntStateOf(0)
         private set
     var lastError by mutableStateOf<String?>(null)
+
+    /** Whether the device calendar can be read; asked for on first use only. */
+    var calendarAccess by mutableStateOf(calendar.hasAccess)
+        private set
+    private var calendarRefreshedAt = 0L
 
     init {
         sync.onChange = { changed() }
@@ -85,6 +91,37 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
 
     fun changed() {
         revision++
+    }
+
+    /** After the permission dialog answers. */
+    fun calendarAccessChanged() {
+        calendarAccess = calendar.hasAccess
+        changed()
+    }
+
+    /**
+     * Brings every kept event this phone can see up to date with the
+     * calendar: renamed, moved or cancelled since (docs/calendar.md). Runs on
+     * coming to the foreground, at most every few minutes, and only once the
+     * user has granted access. Events kept more than 90 days back are left.
+     */
+    suspend fun refreshCalendar(force: Boolean = false) {
+        calendarAccess = calendar.hasAccess
+        if (!calendarAccess) return
+        val now = System.currentTimeMillis()
+        if (!force && now - calendarRefreshedAt < 5 * 60_000) return
+        calendarRefreshedAt = now
+        val since = Day.adding(-90, Day.today)
+        try {
+            val tracked = run { it.trackedCalendarEvents("android:") }.filter { it.date >= since }
+            val lookups = calendar.lookUp(tracked)
+            if (lookups.isNotEmpty() && run { it.refreshCalendarEvents(lookups) } > 0u) {
+                changed()
+                sync.schedulePush()
+            }
+        } catch (e: Exception) {
+            lastError = e.message
+        }
     }
 
     suspend fun newEntry(date: String = Day.today): String? {
@@ -120,7 +157,7 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
                     RealtimeChannel(Backend.URL, Backend.PUBLISHABLE_KEY, "user:$user", client, scope, onPing)
                 },
             )
-            val model = AppModel(store, sync, scope)
+            val model = AppModel(store, sync, scope, DeviceCalendar(app))
             // Background sync only while sync is on.
             scope.launch {
                 snapshotFlow { sync.phase }.collect { phase ->

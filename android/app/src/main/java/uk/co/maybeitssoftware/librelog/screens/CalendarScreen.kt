@@ -61,6 +61,7 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
+import uk.co.maybeitssoftware.librelog.calendar.DayCalendarSection
 import uk.co.maybeitssoftware.librelog.ui.EntryRow
 import uk.co.maybeitssoftware.librelog.ui.Hairline
 import uk.co.maybeitssoftware.librelog.ui.Haptics
@@ -226,6 +227,7 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
                         }
                     }
                 }
+                shownDay?.let { DayCalendarSection(app, it, Modifier.padding(top = 8.dp)) }
             }
         }
     }
