@@ -73,8 +73,9 @@ To try an import on a scratch database: `cargo run --example import --
 ## Not built yet
 
 Payments (Stripe, store subscriptions), branded sign-in emails (needs SMTP),
-Google sign-in on Android (needs an OAuth client id), and a signed Windows
-package for distribution (CI packages are test-signed).
+and a signed Windows package for distribution (CI packages are test-signed).
+Sign in with Google is built on every platform but needs its Google Cloud
+clients and Supabase provider set up first: [docs/google-sign-in.md](docs/google-sign-in.md).
 
 ## Releasing to internal testing
 

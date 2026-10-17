@@ -351,6 +351,21 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# Sign in with Google (docs/google-sign-in.md). Android exchanges a native ID
+# token for the Web client; the Apple and Windows apps use the web flow,
+# which needs the secret. Export both in your shell before `supabase start`.
+[auth.external.google]
+enabled = true
+# The Web application client id. More audiences can follow, comma-separated.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git.
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# Keep nonce checks on: Android sends a nonce with its ID token.
+skip_nonce_check = false
+email_optional = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]
