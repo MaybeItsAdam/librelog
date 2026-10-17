@@ -95,6 +95,9 @@ jobs:
         env:
           VERSION_NAME: ${{ steps.tramline.outputs.version_name }}
           VERSION_CODE: ${{ steps.tramline.outputs.version_code }}
+          # The Web OAuth client id for Sign in with Google; unset hides the
+          # button (docs/google-sign-in.md).
+          LIBRELOG_GOOGLE_WEB_CLIENT_ID: ${{ secrets.LIBRELOG_GOOGLE_WEB_CLIENT_ID }}
         run: ./gradlew bundleRelease -PversionCode="$VERSION_CODE" -PversionName="$VERSION_NAME"
 
       - name: Verify bundle is release-signed

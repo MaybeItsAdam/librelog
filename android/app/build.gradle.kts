@@ -14,6 +14,25 @@ val signing = rootProject.file("key.properties").takeIf { it.exists() }?.let { f
     Properties().apply { f.inputStream().use(::load) }
 }
 
+// `local.properties` beside settings.gradle.kts is gitignored, so a machine's
+// own values (the SDK path, a Google client id) can live there.
+val localProperties = rootProject.file("local.properties").takeIf { it.exists() }?.let { f ->
+    Properties().apply { f.inputStream().use(::load) }
+} ?: Properties()
+
+// The Google Cloud *Web* OAuth client id that Sign in with Google asks for an
+// ID token for (Supabase checks the token's audience against it). Empty hides
+// the Google button. The first of these that is set wins: the Gradle property
+// (`-PlibrelogGoogleWebClientId=…` or ~/.gradle/gradle.properties), the
+// LIBRELOG_GOOGLE_WEB_CLIENT_ID environment variable (CI), then
+// `librelogGoogleWebClientId=…` in local.properties. docs/google-sign-in.md
+// has the console steps that make one.
+fun String?.nonBlank() = this?.trim()?.takeIf { it.isNotEmpty() }
+val googleWebClientId = (findProperty("librelogGoogleWebClientId") as String?).nonBlank()
+    ?: System.getenv("LIBRELOG_GOOGLE_WEB_CLIENT_ID").nonBlank()
+    ?: localProperties.getProperty("librelogGoogleWebClientId").nonBlank()
+    ?: ""
+
 android {
     namespace = "uk.co.maybeitssoftware.librelog"
     // Current AndroidX, Compose and OkHttp releases require 37.2.
@@ -29,6 +48,7 @@ android {
         // Each upload to Play needs a higher code: pass -PversionCode=N.
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (findProperty("versionName") as String?) ?: "0.1.0"
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
@@ -62,7 +82,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     packaging {
         // JNA's desktop natives come in with the test jar; the app only needs
@@ -106,6 +129,9 @@ dependencies {
     implementation(libs.security.crypto)
     implementation(libs.zxing.core)
     implementation(libs.code.scanner)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

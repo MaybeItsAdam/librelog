@@ -154,6 +154,12 @@ class SyncEngine(
         adoptAccount()
     }
 
+    /** Sign in with Google: the ID token from [GoogleSignIn] and its raw nonce. */
+    suspend fun signInWithGoogle(idToken: String, nonce: String) {
+        client.signInWithIdToken("google", idToken, nonce)
+        adoptAccount()
+    }
+
     /** The `librelog://auth…` link from the sign-in email. */
     suspend fun handle(uri: String) {
         if (!uri.startsWith("librelog://auth")) return

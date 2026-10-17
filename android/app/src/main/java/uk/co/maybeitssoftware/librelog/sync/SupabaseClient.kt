@@ -84,6 +84,17 @@ class SupabaseClient(
         storeSession(post("$baseUrl/auth/v1/verify", body, auth = false))
     }
 
+    /**
+     * Native sign-in with a provider's OpenID token (Google's, from Credential
+     * Manager): Supabase checks the token's audience and that it carries the
+     * SHA-256 of [nonce], then answers with a session.
+     */
+    suspend fun signInWithIdToken(provider: String, idToken: String, nonce: String) {
+        val url = "$baseUrl/auth/v1/token".toHttpUrl().newBuilder().addQueryParameter("grant_type", "id_token").build()
+        val body = buildJsonObject { put("provider", provider); put("id_token", idToken); put("nonce", nonce) }
+        storeSession(post(url.toString(), body, auth = false))
+    }
+
     /** The `librelog://auth#access_token=…` link from the sign-in email. */
     fun handleRedirect(uri: String) {
         val tail = uri.substringAfter('#', missingDelimiterValue = "").ifEmpty { uri.substringAfter('?', "") }

@@ -57,6 +57,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
+import uk.co.maybeitssoftware.librelog.sync.GoogleSignIn
 import uk.co.maybeitssoftware.librelog.sync.SyncEngine
 import uk.co.maybeitssoftware.librelog.sync.SyncError
 import uk.co.maybeitssoftware.librelog.ui.Hairline
@@ -73,7 +74,8 @@ import uniffi.librelog_core.PairingSession
 /**
  * Sync setup and status (SPEC.md §12). Everything here is optional: the
  * journal works fully without an account. Mirrors
- * apple/App/Screens/SyncSettingsView.swift, minus Sign in with Apple.
+ * apple/App/Screens/SyncSettingsView.swift, with Google (when the build has a
+ * client id) where Apple has Sign in with Apple.
  */
 @Composable
 fun SyncSettingsScreen(app: AppModel) {
@@ -124,8 +126,29 @@ private fun SignIn(app: AppModel) {
     var sentTo by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
-    Section("Sync across your devices") {
+    // Google first when this build has a client id, as Apple's button is on
+    // iPhone and Mac; email follows under its own heading.
+    if (GoogleSignIn.isConfigured) {
+        Section("Sync across your devices") {
+            SecondaryButton(
+                "Continue with Google",
+                onClick = {
+                    if (busy) return@SecondaryButton
+                    scope.launch {
+                        busy = true
+                        message = runCatching {
+                            GoogleSignIn.request(context)?.let { app.sync.signInWithGoogle(it.idToken, it.rawNonce) }
+                        }.exceptionOrNull()?.message
+                        busy = false
+                    }
+                },
+            )
+        }
+    }
+
+    Section(if (GoogleSignIn.isConfigured) "Or with email" else "Sync across your devices") {
         val address = sentTo
         if (address != null) {
             Text(
