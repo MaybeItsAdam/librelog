@@ -15,6 +15,8 @@ public static class Backend
     public static readonly Uri Url = new("https://wzkhuilypzapqkrjxeku.supabase.co/");
     public const string PublishableKey = "sb_publishable_tNzC2ZUmrDOFk_QTBWYY7A_KDfU-8aY";
     public const string RedirectUri = "librelog://auth";
+    /// Where a provider's web sign-in (Google) comes back to, with `?code=…`.
+    public const string OAuthCallbackUri = "librelog://auth/callback";
 }
 
 public sealed record Session(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, string UserId, string? Email)
@@ -97,6 +99,22 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
     public async Task Verify(string email, string code, CancellationToken ct = default) =>
         StoreSession(await Post("auth/v1/verify",
             new JsonObject { ["type"] = "email", ["email"] = email, ["token"] = code }, auth: false, ct));
+
+    /// Where to send the browser to sign in with `provider` through Supabase's
+    /// web flow (PKCE). It comes back to `redirect` with `?code=…`, which
+    /// <see cref="ExchangeCode"/> turns into a session.
+    public Uri AuthorizeUri(string provider, string redirect, string challenge) =>
+        new(url, "auth/v1/authorize"
+            + $"?provider={Uri.EscapeDataString(provider)}"
+            + $"&redirect_to={Uri.EscapeDataString(redirect)}"
+            + $"&code_challenge={Uri.EscapeDataString(challenge)}"
+            + "&code_challenge_method=s256");
+
+    /// The second half of the PKCE web flow: the code from the redirect and
+    /// the verifier whose hash went into <see cref="AuthorizeUri"/>.
+    public async Task ExchangeCode(string code, string verifier, CancellationToken ct = default) =>
+        StoreSession(await Post("auth/v1/token?grant_type=pkce",
+            new JsonObject { ["auth_code"] = code, ["code_verifier"] = verifier }, auth: false, ct));
 
     /// The `librelog://auth#access_token=…` link from the sign-in email.
     public void HandleRedirect(Uri redirect)

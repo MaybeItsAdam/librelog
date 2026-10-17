@@ -190,13 +190,41 @@ public sealed class SyncEngine(
         await AdoptAccount();
     }
 
-    /// The `librelog://auth#…` link, delivered by protocol activation.
+    /// The PKCE verifier of the web sign-in in progress. It lives only in
+    /// this process: the second launch the redirect starts hands its
+    /// activation to this one (Program.cs).
+    private string? oauthVerifier;
+
+    /// Starts Sign in with Google: the address to open in the browser. Its
+    /// redirect comes back through <see cref="HandleRedirect"/>.
+    public Uri BeginGoogleSignIn()
+    {
+        var verifier = oauthVerifier = Pkce.Verifier();
+        return client.AuthorizeUri("google", Backend.OAuthCallbackUri, Pkce.Challenge(verifier));
+    }
+
+    /// The `librelog://auth#…` link from the sign-in email, or the
+    /// `librelog://auth/callback?code=…` one from a web sign-in, delivered by
+    /// protocol activation.
     public async Task HandleRedirect(Uri uri)
     {
         if (uri.Scheme != "librelog" || uri.Host != "auth") return;
         try
         {
-            client.HandleRedirect(uri);
+            var query = uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
+                .Select(pair => pair.Split('=', 2))
+                .Where(kv => kv.Length == 2)
+                .ToDictionary(kv => kv[0], kv => Uri.UnescapeDataString(kv[1].Replace('+', ' ')));
+            if (query.TryGetValue("code", out var code))
+            {
+                var verifier = oauthVerifier ?? throw new SyncException(SyncProblem.SignedOut, "no sign-in in progress");
+                oauthVerifier = null;
+                await client.ExchangeCode(code, verifier);
+            }
+            else
+            {
+                client.HandleRedirect(uri);
+            }
             await AdoptAccount();
         }
         catch (SyncException e)

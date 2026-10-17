@@ -94,6 +94,15 @@ public sealed partial class SyncPage : Page
         SendButton.IsEnabled = true;
     }
 
+    /// Google in the default browser, through Supabase's web flow; it comes
+    /// back as a `librelog://auth/callback?code=…` activation (App.HandleActivation).
+    private async void OnGoogle(object sender, RoutedEventArgs e)
+    {
+        if (await global::Windows.System.Launcher.LaunchUriAsync(Sync.BeginGoogleSignIn())) return;
+        ProblemText.Text = "Couldn't open the browser.";
+        ProblemText.Visibility = Visibility.Visible;
+    }
+
     private async void OnVerify(object sender, RoutedEventArgs e) => await Try(() => Sync.Verify(CodeBox.Text));
 
     private async void OnSignOut(object sender, RoutedEventArgs e)
