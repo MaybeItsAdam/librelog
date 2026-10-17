@@ -23,9 +23,9 @@ use crate::{db, search};
 pub(crate) const DEFAULT_JOURNAL: &str = "00000000-0000-7000-8000-000000000001";
 const EXCERPT_CHARS: usize = 160;
 
-struct Inner {
-    conn: Connection,
-    clock: Clock,
+pub(crate) struct Inner {
+    pub(crate) conn: Connection,
+    pub(crate) clock: Clock,
     key: Option<JournalKey>,
 }
 
@@ -788,17 +788,24 @@ impl Store {
 }
 
 impl Store {
-    fn lock(&self) -> MutexGuard<'_, Inner> {
+    pub(crate) fn lock(&self) -> MutexGuard<'_, Inner> {
         // A panic while holding the lock can't leave SQLite inconsistent (the
         // transaction rolls back), so carry on with the inner value.
         self.inner.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    fn write(&self, table: &str, id: &str, f: Value) -> Result<()> {
+    pub(crate) fn write(&self, table: &str, id: &str, f: Value) -> Result<()> {
+        self.write_all(vec![(table, id.to_string(), f)])
+    }
+
+    /// Several writes in one transaction: all of them or none.
+    pub(crate) fn write_all(&self, writes: Vec<(&str, String, Value)>) -> Result<()> {
         let mut g = self.lock();
         let Inner { conn, clock, .. } = &mut *g;
         let tx = conn.transaction()?;
-        changes::write(&tx, clock, &self.device_id, table, id, fields(f))?;
+        for (table, id, f) in writes {
+            changes::write(&tx, clock, &self.device_id, table, &id, fields(f))?;
+        }
         tx.commit()?;
         Ok(())
     }

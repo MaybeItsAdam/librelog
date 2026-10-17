@@ -4,6 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Read only, asked for when the user first taps "Show this day's
+         calendar"; see docs/calendar.md. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <!-- Backups would carry the encrypted session and journal key to Google's
          servers; the rules below exclude them, and the journal itself is

@@ -39,6 +39,13 @@ pub const SYNCED: &[(&str, &[&str])] = &[
     ),
     ("day_meta", &["journal_id", "date", "kept_items", "deleted_at"]),
     ("synced_settings", &["value", "deleted_at"]),
+    (
+        "calendar_events",
+        &[
+            "journal_id", "date", "event_key", "title", "location", "calendar", "start", "end_at", "kept_start",
+            "kept_end", "cancelled", "note", "origin_device_id", "created_at", "deleted_at",
+        ],
+    ),
 ];
 
 pub fn synced_fields(table: &str) -> Option<&'static [&'static str]> {
@@ -257,6 +264,31 @@ const MIGRATIONS: &[&str] = &[
     r#"
     alter table entries add column end_date text;
     create index entries_end_date on entries (end_date) where end_date is not null;
+    "#,
+    // 4: calendar events the user kept on a day (calendar.rs). Only events
+    // tapped to keep are stored; the rest stay in the device's calendar.
+    r#"
+    create table calendar_events (
+      id                text primary key,  -- name_id of "<journal_id>:<event_key>"
+      journal_id        text not null,
+      date              text not null,     -- the journal day it was kept on
+      event_key         text not null,     -- the calendar's own identity for it
+      title             text not null default '',
+      location          text,
+      calendar          text,              -- the calendar's name, for display
+      start             text not null,     -- YYYY-MM-DD (all day) or YYYY-MM-DDTHH:MM, local
+      end_at            text,              -- same forms; for all-day, the last day
+      kept_start        text not null,     -- start/end when kept: a difference means it moved
+      kept_end          text,
+      cancelled         integer not null default 0,
+      note              text,              -- the user's own words about it
+      origin_device_id  text,              -- the device that kept it
+      created_at        text not null,
+      updated_at        text not null,
+      deleted_at        text
+    );
+    create index calendar_events_day on calendar_events (journal_id, date) where deleted_at is null;
+    create index calendar_events_key on calendar_events (event_key) where deleted_at is null;
     "#,
 ];
 

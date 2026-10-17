@@ -802,6 +802,51 @@ public func FfiConverterTypePairingSession_lower(_ value: PairingSession) -> UIn
 public protocol StoreProtocol: AnyObject, Sendable {
     
     /**
+     * The day's kept events, and suggestions from `events` (the device's
+     * calendar for that day, already fetched by the app). Kept events seen
+     * in `events` are brought up to date on the way. Returns the kept ones
+     * first; suggestions leave out cancelled events and any already kept.
+     */
+    func calendarDay(journalId: String?, date: String, events: [CalendarEvent]) throws  -> CalendarDay
+    
+    /**
+     * Keeps a calendar event on a journal day, and tracks it from then on.
+     * Keeping one that was kept and then removed brings it back, note and all.
+     */
+    func keepCalendarEvent(journalId: String?, date: String, event: CalendarEvent) throws  -> KeptEvent
+    
+    /**
+     * Events kept on one day, for showing without asking the calendar (a
+     * device without calendar access, or before permission is granted).
+     */
+    func keptCalendarEvents(journalId: String?, date: String) throws  -> [KeptEvent]
+    
+    /**
+     * Brings kept events up to date with what the calendar has now. An
+     * event that wasn't found counts as cancelled only on the device that
+     * kept it, since another device may simply not have that calendar.
+     * Returns how many kept events changed.
+     */
+    func refreshCalendarEvents(lookups: [CalendarLookup]) throws  -> UInt32
+    
+    /**
+     * Stops tracking a kept event and takes it off the day.
+     */
+    func removeCalendarEvent(id: String) throws 
+    
+    /**
+     * The user's own note on a kept event; empty clears it.
+     */
+    func setCalendarEventNote(id: String, note: String?) throws 
+    
+    /**
+     * Every kept event whose key starts with `key_prefix` ("apple:",
+     * "android:"), for the app to look up and pass to
+     * `refresh_calendar_events`.
+     */
+    func trackedCalendarEvents(keyPrefix: String) throws  -> [KeptEvent]
+    
+    /**
      * Merges rows from `pull_ops`, in the order the server returned them.
      */
     func applyIncoming(rows: [IncomingOps]) throws  -> PullResult
@@ -1070,6 +1115,111 @@ public static func `open`(path: String)throws  -> Store  {
 }
     
 
+    
+    /**
+     * The day's kept events, and suggestions from `events` (the device's
+     * calendar for that day, already fetched by the app). Kept events seen
+     * in `events` are brought up to date on the way. Returns the kept ones
+     * first; suggestions leave out cancelled events and any already kept.
+     */
+open func calendarDay(journalId: String?, date: String, events: [CalendarEvent])throws  -> CalendarDay  {
+    return try  FfiConverterTypeCalendarDay_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_calendar_day(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterSequenceTypeCalendarEvent.lower(events),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Keeps a calendar event on a journal day, and tracks it from then on.
+     * Keeping one that was kept and then removed brings it back, note and all.
+     */
+open func keepCalendarEvent(journalId: String?, date: String, event: CalendarEvent)throws  -> KeptEvent  {
+    return try  FfiConverterTypeKeptEvent_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_keep_calendar_event(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterTypeCalendarEvent_lower(event),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Events kept on one day, for showing without asking the calendar (a
+     * device without calendar access, or before permission is granted).
+     */
+open func keptCalendarEvents(journalId: String?, date: String)throws  -> [KeptEvent]  {
+    return try  FfiConverterSequenceTypeKeptEvent.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_kept_calendar_events(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Brings kept events up to date with what the calendar has now. An
+     * event that wasn't found counts as cancelled only on the device that
+     * kept it, since another device may simply not have that calendar.
+     * Returns how many kept events changed.
+     */
+open func refreshCalendarEvents(lookups: [CalendarLookup])throws  -> UInt32  {
+    return try  FfiConverterUInt32.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_refresh_calendar_events(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceTypeCalendarLookup.lower(lookups),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Stops tracking a kept event and takes it off the day.
+     */
+open func removeCalendarEvent(id: String)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_remove_calendar_event(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * The user's own note on a kept event; empty clears it.
+     */
+open func setCalendarEventNote(id: String, note: String?)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_calendar_event_note(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionString.lower(note),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Every kept event whose key starts with `key_prefix` ("apple:",
+     * "android:"), for the app to look up and pass to
+     * `refresh_calendar_events`.
+     */
+open func trackedCalendarEvents(keyPrefix: String)throws  -> [KeptEvent]  {
+    return try  FfiConverterSequenceTypeKeptEvent.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_tracked_calendar_events(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(keyPrefix),uniffiCallStatus
+    )
+})
+}
     
     /**
      * Merges rows from `pull_ops`, in the order the server returned them.
@@ -1773,6 +1923,240 @@ public func FfiConverterTypeBlock_lower(_ value: Block) -> RustBuffer {
 
 
 /**
+ * What to show for one day: the events kept there, and the calendar's
+ * other events that day to offer as suggestions.
+ */
+public struct CalendarDay: Equatable, Hashable {
+    public var kept: [KeptEvent]
+    public var suggestions: [CalendarEvent]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(kept: [KeptEvent], suggestions: [CalendarEvent]) {
+        self.kept = kept
+        self.suggestions = suggestions
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CalendarDay: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCalendarDay: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CalendarDay {
+        return
+            try CalendarDay(
+                kept: FfiConverterSequenceTypeKeptEvent.read(from: &buf), 
+                suggestions: FfiConverterSequenceTypeCalendarEvent.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CalendarDay, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeKeptEvent.write(value.kept, into: &buf)
+        FfiConverterSequenceTypeCalendarEvent.write(value.suggestions, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCalendarDay_lift(_ buf: RustBuffer) throws -> CalendarDay {
+    return try FfiConverterTypeCalendarDay.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCalendarDay_lower(_ value: CalendarDay) -> RustBuffer {
+    return FfiConverterTypeCalendarDay.lower(value)
+}
+
+
+/**
+ * One event as the device's calendar has it now. Times are local wall-clock
+ * time on the device: `YYYY-MM-DDTHH:MM` for a timed event, `YYYY-MM-DD`
+ * for an all-day one.
+ */
+public struct CalendarEvent: Equatable, Hashable {
+    /**
+     * The calendar's stable identity for this event, prefixed by where it
+     * came from: `apple:<external id>[@<occurrence>]`,
+     * `android:<event id>[@<original instance millis>]`. It must not change
+     * when the event is edited or moved; a recurring event's occurrences
+     * each get their own, from the time the occurrence was *originally* at.
+     */
+    public var key: String
+    public var title: String
+    public var start: String
+    /**
+     * Timed: when it ends. All-day: the last day it covers, or none for a
+     * single day.
+     */
+    public var end: String?
+    public var location: String?
+    /**
+     * The calendar's name ("Work", "Home"), shown as a caption.
+     */
+    public var calendar: String?
+    /**
+     * The calendar marks it cancelled.
+     */
+    public var cancelled: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The calendar's stable identity for this event, prefixed by where it
+         * came from: `apple:<external id>[@<occurrence>]`,
+         * `android:<event id>[@<original instance millis>]`. It must not change
+         * when the event is edited or moved; a recurring event's occurrences
+         * each get their own, from the time the occurrence was *originally* at.
+         */key: String, title: String, start: String, 
+        /**
+         * Timed: when it ends. All-day: the last day it covers, or none for a
+         * single day.
+         */end: String?, location: String?, 
+        /**
+         * The calendar's name ("Work", "Home"), shown as a caption.
+         */calendar: String?, 
+        /**
+         * The calendar marks it cancelled.
+         */cancelled: Bool) {
+        self.key = key
+        self.title = title
+        self.start = start
+        self.end = end
+        self.location = location
+        self.calendar = calendar
+        self.cancelled = cancelled
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CalendarEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCalendarEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CalendarEvent {
+        return
+            try CalendarEvent(
+                key: FfiConverterString.read(from: &buf), 
+                title: FfiConverterString.read(from: &buf), 
+                start: FfiConverterString.read(from: &buf), 
+                end: FfiConverterOptionString.read(from: &buf), 
+                location: FfiConverterOptionString.read(from: &buf), 
+                calendar: FfiConverterOptionString.read(from: &buf), 
+                cancelled: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CalendarEvent, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.key, into: &buf)
+        FfiConverterString.write(value.title, into: &buf)
+        FfiConverterString.write(value.start, into: &buf)
+        FfiConverterOptionString.write(value.end, into: &buf)
+        FfiConverterOptionString.write(value.location, into: &buf)
+        FfiConverterOptionString.write(value.calendar, into: &buf)
+        FfiConverterBool.write(value.cancelled, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCalendarEvent_lift(_ buf: RustBuffer) throws -> CalendarEvent {
+    return try FfiConverterTypeCalendarEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCalendarEvent_lower(_ value: CalendarEvent) -> RustBuffer {
+    return FfiConverterTypeCalendarEvent.lower(value)
+}
+
+
+/**
+ * The result of looking one tracked event up in the device's calendar.
+ */
+public struct CalendarLookup: Equatable, Hashable {
+    public var key: String
+    /**
+     * What the calendar has now, or none if the event wasn't found.
+     */
+    public var event: CalendarEvent?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(key: String, 
+        /**
+         * What the calendar has now, or none if the event wasn't found.
+         */event: CalendarEvent?) {
+        self.key = key
+        self.event = event
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CalendarLookup: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCalendarLookup: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CalendarLookup {
+        return
+            try CalendarLookup(
+                key: FfiConverterString.read(from: &buf), 
+                event: FfiConverterOptionTypeCalendarEvent.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CalendarLookup, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.key, into: &buf)
+        FfiConverterOptionTypeCalendarEvent.write(value.event, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCalendarLookup_lift(_ buf: RustBuffer) throws -> CalendarLookup {
+    return try FfiConverterTypeCalendarLookup.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCalendarLookup_lower(_ value: CalendarLookup) -> RustBuffer {
+    return FfiConverterTypeCalendarLookup.lower(value)
+}
+
+
+/**
  * One day cell in the Calendar.
  */
 public struct DayMark: Equatable, Hashable {
@@ -2392,6 +2776,129 @@ public func FfiConverterTypeJournal_lift(_ buf: RustBuffer) throws -> Journal {
 #endif
 public func FfiConverterTypeJournal_lower(_ value: Journal) -> RustBuffer {
     return FfiConverterTypeJournal.lower(value)
+}
+
+
+/**
+ * A calendar event the user kept on a day.
+ */
+public struct KeptEvent: Equatable, Hashable {
+    public var id: String
+    public var journalId: String
+    /**
+     * The journal day it is kept on. A moved event stays on this day.
+     */
+    public var date: String
+    public var key: String
+    public var title: String
+    public var location: String?
+    public var calendar: String?
+    public var start: String
+    public var end: String?
+    public var allDay: Bool
+    /**
+     * "09:30–10:00", "09:30", or empty for an all-day event.
+     */
+    public var timeLabel: String
+    public var state: KeptEventState
+    /**
+     * Moved to a different day than `date` (`start` says which).
+     */
+    public var movedToAnotherDay: Bool
+    public var note: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, journalId: String, 
+        /**
+         * The journal day it is kept on. A moved event stays on this day.
+         */date: String, key: String, title: String, location: String?, calendar: String?, start: String, end: String?, allDay: Bool, 
+        /**
+         * "09:30–10:00", "09:30", or empty for an all-day event.
+         */timeLabel: String, state: KeptEventState, 
+        /**
+         * Moved to a different day than `date` (`start` says which).
+         */movedToAnotherDay: Bool, note: String?) {
+        self.id = id
+        self.journalId = journalId
+        self.date = date
+        self.key = key
+        self.title = title
+        self.location = location
+        self.calendar = calendar
+        self.start = start
+        self.end = end
+        self.allDay = allDay
+        self.timeLabel = timeLabel
+        self.state = state
+        self.movedToAnotherDay = movedToAnotherDay
+        self.note = note
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension KeptEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptEvent {
+        return
+            try KeptEvent(
+                id: FfiConverterString.read(from: &buf), 
+                journalId: FfiConverterString.read(from: &buf), 
+                date: FfiConverterString.read(from: &buf), 
+                key: FfiConverterString.read(from: &buf), 
+                title: FfiConverterString.read(from: &buf), 
+                location: FfiConverterOptionString.read(from: &buf), 
+                calendar: FfiConverterOptionString.read(from: &buf), 
+                start: FfiConverterString.read(from: &buf), 
+                end: FfiConverterOptionString.read(from: &buf), 
+                allDay: FfiConverterBool.read(from: &buf), 
+                timeLabel: FfiConverterString.read(from: &buf), 
+                state: FfiConverterTypeKeptEventState.read(from: &buf), 
+                movedToAnotherDay: FfiConverterBool.read(from: &buf), 
+                note: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KeptEvent, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.journalId, into: &buf)
+        FfiConverterString.write(value.date, into: &buf)
+        FfiConverterString.write(value.key, into: &buf)
+        FfiConverterString.write(value.title, into: &buf)
+        FfiConverterOptionString.write(value.location, into: &buf)
+        FfiConverterOptionString.write(value.calendar, into: &buf)
+        FfiConverterString.write(value.start, into: &buf)
+        FfiConverterOptionString.write(value.end, into: &buf)
+        FfiConverterBool.write(value.allDay, into: &buf)
+        FfiConverterString.write(value.timeLabel, into: &buf)
+        FfiConverterTypeKeptEventState.write(value.state, into: &buf)
+        FfiConverterBool.write(value.movedToAnotherDay, into: &buf)
+        FfiConverterOptionString.write(value.note, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptEvent_lift(_ buf: RustBuffer) throws -> KeptEvent {
+    return try FfiConverterTypeKeptEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptEvent_lower(_ value: KeptEvent) -> RustBuffer {
+    return FfiConverterTypeKeptEvent.lower(value)
 }
 
 
@@ -3593,6 +4100,88 @@ public func FfiConverterTypeImportSource_lower(_ value: ImportSource) -> RustBuf
 
 
 
+public enum KeptEventState: Equatable, Hashable {
+    
+    /**
+     * As it was when kept.
+     */
+    case scheduled
+    /**
+     * Its time changed since it was kept; `start` / `end` are the new time.
+     */
+    case moved
+    /**
+     * Cancelled in the calendar, or gone from it.
+     */
+    case cancelled
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension KeptEventState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptEventState: FfiConverterRustBuffer {
+    typealias SwiftType = KeptEventState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptEventState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .scheduled
+        
+        case 2: return .moved
+        
+        case 3: return .cancelled
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: KeptEventState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .scheduled:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .moved:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .cancelled:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptEventState_lift(_ buf: RustBuffer) throws -> KeptEventState {
+    return try FfiConverterTypeKeptEventState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptEventState_lower(_ value: KeptEventState) -> RustBuffer {
+    return FfiConverterTypeKeptEventState.lower(value)
+}
+
+
+
+
 public enum MarkKind: Equatable, Hashable {
     
     case bold
@@ -3759,6 +4348,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeCalendarEvent: FfiConverterRustBuffer {
+    typealias SwiftType = CalendarEvent?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeCalendarEvent.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeCalendarEvent.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeOutgoingBatch: FfiConverterRustBuffer {
     typealias SwiftType = OutgoingBatch?
 
@@ -3881,6 +4494,56 @@ fileprivate struct FfiConverterSequenceTypeBlock: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeCalendarEvent: FfiConverterRustBuffer {
+    typealias SwiftType = [CalendarEvent]
+
+    public static func write(_ value: [CalendarEvent], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeCalendarEvent.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [CalendarEvent] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [CalendarEvent]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeCalendarEvent.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeCalendarLookup: FfiConverterRustBuffer {
+    typealias SwiftType = [CalendarLookup]
+
+    public static func write(_ value: [CalendarLookup], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeCalendarLookup.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [CalendarLookup] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [CalendarLookup]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeCalendarLookup.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeDayMark: FfiConverterRustBuffer {
     typealias SwiftType = [DayMark]
 
@@ -3973,6 +4636,31 @@ fileprivate struct FfiConverterSequenceTypeJournal: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeJournal.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeKeptEvent: FfiConverterRustBuffer {
+    typealias SwiftType = [KeptEvent]
+
+    public static func write(_ value: [KeptEvent], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeKeptEvent.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [KeptEvent] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [KeptEvent]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeKeptEvent.read(from: &buf))
         }
         return seq
     }
@@ -4155,6 +4843,27 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_pairingsession_receive() != 32456) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_calendar_day() != 62542) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_keep_calendar_event() != 13550) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_kept_calendar_events() != 23402) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_refresh_calendar_events() != 17426) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_remove_calendar_event() != 39173) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_calendar_event_note() != 449) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_tracked_calendar_events() != 2002) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_apply_incoming() != 46898) {

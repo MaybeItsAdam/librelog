@@ -6,6 +6,7 @@ uniffi::setup_scaffolding!();
 
 #[cfg(feature = "capi")]
 pub mod capi;
+mod calendar;
 mod changes;
 mod crypto;
 mod db;
@@ -19,6 +20,7 @@ mod search;
 mod store;
 mod transfer;
 
+pub use calendar::*;
 pub use error::CoreError;
 pub use model::*;
 pub use pairing::*;

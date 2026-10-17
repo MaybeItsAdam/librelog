@@ -38,6 +38,8 @@ struct CalendarView: View {
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
+                    DayCalendarSection(date: selected)
+                        .padding(.top, 8)
                 }
             }
             .padding(.horizontal, 20)

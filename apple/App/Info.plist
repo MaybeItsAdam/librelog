@@ -37,6 +37,8 @@
 	<true/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.lifestyle</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>LibreLog shows a day's calendar events so you can add them to your journal, and keeps the ones you add up to date. Nothing else is read or stored.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Librelog uses the camera only to scan another device's pairing code.</string>
 	<key>UIAppFonts</key>

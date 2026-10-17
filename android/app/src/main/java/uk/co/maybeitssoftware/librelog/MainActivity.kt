@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
             if (started) model.sync.syncNow() else model.sync.start()
             started = true
         }
+        model.scope.launch { model.refreshCalendar() }
     }
 
     /** The sign-in email's link: librelog://auth#access_token=… */
