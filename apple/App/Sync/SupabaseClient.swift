@@ -78,6 +78,27 @@ actor SupabaseClient {
         try store(sessionJSON: data)
     }
 
+    /// Where to send the browser to sign in with `provider` through Supabase's
+    /// web flow (PKCE): it comes back to `redirect` with `?code=…`, which
+    /// `exchange(code:verifier:)` turns into a session.
+    func authorizeURL(provider: String, redirect: String, challenge: String) -> URL {
+        var c = URLComponents(url: url.appending(path: "auth/v1/authorize"), resolvingAgainstBaseURL: false)!
+        c.queryItems = [
+            URLQueryItem(name: "provider", value: provider),
+            URLQueryItem(name: "redirect_to", value: redirect),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "s256"),
+        ]
+        return c.url!
+    }
+
+    /// The second half of the PKCE web flow: the code from the redirect, and
+    /// the verifier whose hash went into `authorizeURL`.
+    func exchange(code: String, verifier: String) async throws {
+        let data = try await post(tokenURL("pkce"), body: ["auth_code": code, "code_verifier": verifier], auth: false)
+        try store(sessionJSON: data)
+    }
+
     /// The `librelog://auth#access_token=…` link from the sign-in email.
     func handleRedirect(_ redirect: URL) async throws {
         guard let fragment = redirect.fragment ?? URLComponents(url: redirect, resolvingAgainstBaseURL: false)?.query else {

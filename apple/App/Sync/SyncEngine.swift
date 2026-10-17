@@ -125,6 +125,22 @@ final class SyncEngine {
         await adoptAccount()
     }
 
+    /// Sign in with Google in the system's browser sheet, through Supabase's
+    /// web flow. Returns quietly if the sheet is closed.
+    func signInWithGoogle() async throws {
+        let verifier = PKCE.verifier()
+        let start = await client.authorizeURL(provider: "google", redirect: WebSignIn.callback,
+                                              challenge: PKCE.challenge(verifier))
+        guard let callback = try await WebSignIn.run(start) else { return }
+        let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if let error = items.first(where: { $0.name == "error_description" })?.value {
+            throw SyncError.server(400, error)
+        }
+        guard let code = items.first(where: { $0.name == "code" })?.value else { throw SyncError.signedOut }
+        try await client.exchange(code: code, verifier: verifier)
+        await adoptAccount()
+    }
+
     func handle(url: URL) async {
         guard url.scheme == "librelog", url.host == "auth" else { return }
         do {

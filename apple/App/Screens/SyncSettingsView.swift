@@ -56,6 +56,17 @@ struct SyncSettingsView: View {
             }
             .frame(height: 44)
             .signInWithAppleButtonStyle(.black)
+
+            Button { Task { await signInWithGoogle() } } label: {
+                Text("Continue with Google")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color.ink)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.inputBorder))
+            }
+            .buttonStyle(.plain)
+            .disabled(busy)
         } header: {
             Text("Sync across your devices").microLabel()
         }
@@ -158,6 +169,17 @@ struct SyncSettingsView: View {
         defer { busy = false }
         do {
             try await app.sync.verify(code: code)
+            message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func signInWithGoogle() async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await app.sync.signInWithGoogle()
             message = nil
         } catch {
             message = error.localizedDescription
