@@ -87,3 +87,33 @@ Fastlane lanes in `fastlane/Fastfile`; credentials come from the environment
 bundle exec fastlane android internal version_code:2 version_name:0.1.1  # Play internal track
 bundle exec fastlane ios internal                                        # TestFlight (next build number)
 ```
+
+## Open source and hosted sync
+
+LibreLog is free and open source: every app, the Rust core and the sync
+backend are in this repository under the AGPL, and every feature works
+offline without an account. The one thing that costs money is the **hosted**
+sync service, priced each year at what it costs to run (SPEC.md §15) — you
+pay for the servers, not for the software.
+
+You don't have to use it. The backend is a set of Supabase migrations in
+`supabase/`, and anyone can run their own copy and sync through it for free:
+[docs/self-hosting.md](docs/self-hosting.md) covers setting it up and
+building the apps to point at it. Journals are end-to-end encrypted either
+way, so the server only ever holds ciphertext.
+
+## Licence
+
+Copyright © 2026 Maybe It's Software.
+
+LibreLog is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. It is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the full text.
+
+If you run a modified version — including a modified sync backend — for other
+people, the AGPL asks you to offer them its source. Third-party components
+and their licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md);
+[CONTRIBUTING.md](CONTRIBUTING.md) explains how to contribute.

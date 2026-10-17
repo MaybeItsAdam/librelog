@@ -632,6 +632,17 @@ App Store / Play prices sit at the lowest store tier that covers the 15% cut.
 A public `/costs` page lists last year's actual invoices by category, the
 number of paying users, and how the next year's price was derived.
 
+### 15.7 Licence
+
+LibreLog — the apps, the Rust core and the sync backend's SQL — is free
+software under the GNU AGPL v3 or later (`LICENSE`), © 2026 Maybe It's
+Software. The Affero clause is deliberate: a fork, including one that runs a
+modified sync backend for other people, must offer its users the source.
+Hosted sync is a service sold at cost, not a licence: anyone may run their
+own backend from `supabase/` (`docs/self-hosting.md`) and sync for free.
+Third-party licences, and the proprietary Google and Microsoft libraries the
+Android and Windows apps link, are listed in `THIRD_PARTY_NOTICES.md`.
+
 ---
 
 ## 16. Import & export
