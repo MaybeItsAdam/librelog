@@ -92,6 +92,7 @@ struct EntryEditorView: View {
                 .onChange(of: title) { scheduleSave() }
 
             tagRow(entry)
+            DayCalendarSection(date: entry.date)
             Divider().overlay(Color.hairline)
         }
     }

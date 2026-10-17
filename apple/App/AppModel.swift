@@ -16,6 +16,10 @@ enum Backend {
 final class AppModel {
     let store: Store
     let sync: SyncEngine
+    let calendar = DeviceCalendar()
+    /// Whether the device calendar can be read; asked on first use only.
+    private(set) var calendarAccess: DeviceCalendar.Access
+    private var calendarRefreshedAt: Date?
 
     /// Bumped after any write or merged pull, so screens reload.
     private(set) var revision = 0
@@ -28,6 +32,7 @@ final class AppModel {
     init(store: Store) {
         self.store = store
         self.sync = SyncEngine(store: store)
+        self.calendarAccess = calendar.access
         sync.onChange = { [weak self] in self?.changed() }
     }
 
@@ -67,6 +72,38 @@ final class AppModel {
 
     func changed() {
         revision &+= 1
+    }
+
+    // MARK: Calendar (docs/calendar.md)
+
+    func requestCalendarAccess() async {
+        _ = await calendar.requestAccess()
+        calendarAccess = calendar.access
+        changed()
+    }
+
+    /// Brings every kept event this device can see up to date with the
+    /// calendar: renamed, moved or cancelled since. Runs on launch and on
+    /// coming to the foreground, at most every few minutes, and only once
+    /// the user has granted access. Events kept on days more than 90 days
+    /// back are left as they are.
+    func refreshCalendar(force: Bool = false) async {
+        calendarAccess = calendar.access
+        guard calendarAccess == .granted else { return }
+        if !force, let last = calendarRefreshedAt, Date().timeIntervalSince(last) < 300 { return }
+        calendarRefreshedAt = Date()
+        let since = Day.adding(-90, to: Day.today)
+        guard let tracked = try? await run({ try $0.trackedCalendarEvents(keyPrefix: "apple:") }) else { return }
+        let lookups = await calendar.lookUp(tracked.filter { $0.date >= since })
+        guard !lookups.isEmpty else { return }
+        do {
+            if try await run({ try $0.refreshCalendarEvents(lookups: lookups) }) > 0 {
+                changed()
+                sync.schedulePush()
+            }
+        } catch {
+            lastError = error.localizedDescription
+        }
     }
 
     func newEntry(on date: String? = nil) async -> String? {

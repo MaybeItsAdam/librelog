@@ -25,9 +25,13 @@ struct LibrelogApp: App {
             RootView()
                 .environment(app)
                 .task { await app.sync.start() }
+                .task { await app.refreshCalendar() }
                 .onOpenURL { url in Task { await app.sync.handle(url: url) } }
                 .onChange(of: phase) { _, now in
-                    if now == .active { Task { await app.sync.syncNow() } }
+                    if now == .active {
+                        Task { await app.sync.syncNow() }
+                        Task { await app.refreshCalendar() }
+                    }
                 }
         }
         #if os(macOS)
