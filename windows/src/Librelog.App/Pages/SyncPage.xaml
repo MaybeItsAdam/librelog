@@ -126,7 +126,10 @@
                         <Button Style="{StaticResource PlainButton}" Content="Import…" Click="OnImport" />
                         <Button Style="{StaticResource PlainButton}" Content="Import folder…" Click="OnImportFolder" />
                     </StackPanel>
-                    <TextBlock x:Name="TransferText" Style="{StaticResource BodyText}" />
+                    <!-- Tinted emerald for a moment when an import or export lands. -->
+                    <Border x:Name="TransferBox" CornerRadius="6" BorderThickness="1" Padding="10,6" Margin="-10,0">
+                        <TextBlock x:Name="TransferText" Style="{StaticResource BodyText}" />
+                    </Border>
                 </StackPanel>
             </Border>
         </StackPanel>

@@ -57,7 +57,17 @@
     <!-- No page header: the list opens on today's name. -->
     <Grid MaxWidth="760" Padding="40,4,40,0">
         <ListView x:Name="List" SelectionMode="None" IsItemClickEnabled="True"
-                  ItemClick="OnItemClick" Padding="0,0,0,48"
-                  ItemTemplateSelector="{StaticResource JournalTemplates}" />
+                  ItemClick="OnItemClick" Padding="0,0,0,48" ContainerContentChanging="OnContainerChanging"
+                  ItemTemplateSelector="{StaticResource JournalTemplates}">
+            <!-- Rows arrive one after another on first load, and the rest
+                 make room when one is added or removed. -->
+            <ListView.ItemContainerTransitions>
+                <TransitionCollection>
+                    <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="24" />
+                    <AddDeleteThemeTransition />
+                    <RepositionThemeTransition />
+                </TransitionCollection>
+            </ListView.ItemContainerTransitions>
+        </ListView>
     </Grid>
 </Page>

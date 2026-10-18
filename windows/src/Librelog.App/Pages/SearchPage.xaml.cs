@@ -15,6 +15,9 @@ public sealed partial class SearchPage : Page
     public SearchPage()
     {
         InitializeComponent();
+        Results.ItemContainerTransitions = Motion.ListTransitions(stagger: false); // new results on every keystroke
+        Results.ContainerContentChanging += Motion.PressRows;
+        Loaded += (_, _) => Motion.PressAll(this);
         NavigationCacheMode = NavigationCacheMode.Required;
         Examples.ItemsSource = new SearchExample[]
         {

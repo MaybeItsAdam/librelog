@@ -29,6 +29,7 @@ public sealed partial class EntryPage : Page
         InitializeComponent();
         Editor.Controller.Changed += OnBodyChanged;
         Editor.StateChanged += UpdateFormatBar;
+        Loaded += (_, _) => Motion.PressAll(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -53,6 +54,7 @@ public sealed partial class EntryPage : Page
         TitleBox.FontSize = 26 * AppearanceService.Scale;
         Photos.Date = en.Date;
         Rating.Value = en.Rating ?? -1;
+        ColorStars(en.Rating, animate: false);
         FavoriteButton.IsChecked = en.IsFavorite;
         TagList.ItemsSource = en.Tags;
         ConflictBanner.Visibility = Format.Shown(en.HasConflict);
@@ -122,6 +124,7 @@ public sealed partial class EntryPage : Page
         var words = await saving;
         WordCount.Text = Format.Words(words);
         SavedText.Text = "Saved";
+        Motion.FadeIn(SavedText);
     }
 
     private Task Update(Action<CoreStore, string> write)
@@ -143,12 +146,28 @@ public sealed partial class EntryPage : Page
     private void OnRatingChanged(RatingControl sender, object args)
     {
         double? rating = Rating.Value < 0 ? null : Rating.Value;
+        ColorStars(rating, animate: !loading);
+        if (!loading && rating is not null) Motion.Pop(Rating, Motion.RatingPopScale);
         _ = Update((s, id) => s.SetRating(id, rating));
+    }
+
+    /// Raspberry below 2, amber below 3.5, emerald above: as on the calendar.
+    private void ColorStars(double? rating, bool animate)
+    {
+        var color = rating switch
+        {
+            < 2 => Windows.UI.Color.FromArgb(0xFF, 0xD6, 0x22, 0x46),
+            < 3.5 => Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xBF, 0x00),
+            _ => Windows.UI.Color.FromArgb(0xFF, 0x4C, 0xC3, 0x8E),
+        };
+        foreach (var key in new[] { "RatingControlSelectedForeground", "RatingControlPointerOverSelectedForeground" })
+            if (Rating.Resources[key] is Microsoft.UI.Xaml.Media.SolidColorBrush brush) Motion.TweenColor(brush, color, animate);
     }
 
     private void OnFavorite(object sender, RoutedEventArgs e)
     {
         var fav = FavoriteButton.IsChecked == true;
+        if (fav) Motion.Pop(FavoriteButton);
         _ = Update((s, id) => s.SetFavorite(id, fav));
     }
 

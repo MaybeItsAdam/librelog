@@ -43,6 +43,7 @@ public sealed partial class JournalPage : Page
     private const string GlyphAdd = "";
 
     private readonly ObservableCollection<object> items = [];
+    private bool entering = true;     // the staggered entrance plays on first load only
     private string? lastDay;          // the day of the last item added
     private TimelineCursor? after;    // where the next page starts
     private bool done;
@@ -84,6 +85,8 @@ public sealed partial class JournalPage : Page
         var todays = await AppServices.Run(s => s.Day(today));
         if (mine != generation) return; // reloaded meanwhile
 
+        // Rebuilt in place after an edit or a sync: no second fly-in.
+        var settle = entering ? null : Motion.Quiet(List);
         items.Clear();
         after = null;
         items.Add(Heading(today));
@@ -92,6 +95,7 @@ public sealed partial class JournalPage : Page
         foreach (var e in todays) items.Add(e);
         lastDay = today;
         loading = false;
+        settle?.Invoke();
         await LoadMore();
     }
 
@@ -105,6 +109,9 @@ public sealed partial class JournalPage : Page
         if (mine != generation) return;
 
         var today = AppServices.Today;
+        // The first page joins the entrance; later ones just appear as you scroll.
+        var settle = entering ? null : Motion.Quiet(List);
+        entering = false;
         foreach (var e in page)
         {
             if (e.Date == today) continue; // already shown at the top
@@ -116,6 +123,7 @@ public sealed partial class JournalPage : Page
             items.Add(e);
         }
         if (page.Count > 0) after = new TimelineCursor(page[^1].Date, page[^1].Time, page[^1].Id);
+        settle?.Invoke();
         done = page.Count < PageSize;
         loading = false;
     }
@@ -132,6 +140,13 @@ public sealed partial class JournalPage : Page
     private void OnScrolled(object? sender, ScrollViewerViewChangedEventArgs e)
     {
         if (sender is ScrollViewer sv && sv.VerticalOffset > sv.ScrollableHeight - 800) _ = LoadMore();
+    }
+
+    /// Rows press in a touch.
+    private void OnContainerChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue) return;
+        if (args.Item is not JournalDay) Motion.Press(args.ItemContainer);
     }
 
     private void OnNew(object sender, RoutedEventArgs e) => _ = NewEntry(AppServices.Today);

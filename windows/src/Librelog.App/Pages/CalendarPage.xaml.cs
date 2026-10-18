@@ -23,10 +23,14 @@ public sealed partial class CalendarPage : Page
     private string selected = AppServices.Today;
     private int chooserYear;
     private int slideDirection; // set by a month change, used by the next draw
+    private bool popSelected;   // a day was just picked
 
     public CalendarPage()
     {
         InitializeComponent();
+        DayList.ItemContainerTransitions = Motion.ListTransitions();
+        DayList.ContainerContentChanging += Motion.PressRows;
+        Loaded += (_, _) => Motion.PressAll(this);
         NavigationCacheMode = NavigationCacheMode.Required;
         BuildHeader();
         BuildChooser();
@@ -74,8 +78,10 @@ public sealed partial class CalendarPage : Page
         var (marks, entries) = await AppServices.Run(s => (s.Month(ym), s.Day(day)));
         if (shown != month) return;
         MonthText.Text = Format.Month(shown);
+        var picked = popSelected;
         DrawGrid(shown, marks.ToDictionary(m => m.Date));
         SelectedText.Text = Format.Caps(Format.LongDate(day));
+        if (picked) Motion.FadeIn(DayList);
         DayList.ItemsSource = entries.Select(e => new DayEntry(e, day)).ToList();
         NothingText.Visibility = Format.Shown(entries.Count == 0);
         Photos.Date = day;
@@ -158,6 +164,13 @@ public sealed partial class CalendarPage : Page
             ToolTipService.SetToolTip(button, mark is null ? Format.LongDate(ymd)
                 : $"{Format.LongDate(ymd)} · {mark.EntryCount} {(mark.EntryCount == 1 ? "entry" : "entries")}");
             button.Click += OnDayClick;
+            Motion.Press(button);
+            if (isSelected && popSelected)
+            {
+                // The ring grows into place once the button has a size to centre on.
+                button.Loaded += (b, _) => Motion.Pop((UIElement)b, Motion.SelectScale);
+                popSelected = false;
+            }
             Grid.SetRow(button, row);
             Grid.SetColumn(button, column);
             DayGrid.Children.Add(button);
@@ -175,7 +188,10 @@ public sealed partial class CalendarPage : Page
 
     private void OnDayClick(object sender, RoutedEventArgs e)
     {
-        selected = (string)((Button)sender).Tag;
+        var day = (string)((Button)sender).Tag;
+        if (day == selected) return;
+        selected = day;
+        popSelected = true;
         Reload();
     }
 
