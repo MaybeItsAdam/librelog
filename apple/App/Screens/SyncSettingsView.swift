@@ -47,26 +47,16 @@ struct SyncSettingsView: View {
     @ViewBuilder
     private var signIn: some View {
         Section {
-            SignInWithAppleButton(.continue) { request in
+            AppleSignInButton { request in
                 nonce = Self.randomNonce()
                 request.requestedScopes = [.email]
                 request.nonce = Self.sha256(nonce)
             } onCompletion: { result in
                 Task { await finishApple(result) }
             }
-            .frame(height: 44)
-            .signInWithAppleButtonStyle(.black)
 
-            Button { Task { await signInWithGoogle() } } label: {
-                Text("Continue with Google")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(Color.ink)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
-                    .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.inputBorder))
-            }
-            .buttonStyle(.plain)
-            .disabled(busy)
+            GoogleSignInButton { Task { await signInWithGoogle() } }
+                .disabled(busy)
         } header: {
             Text("Sync across your devices").microLabel()
         }

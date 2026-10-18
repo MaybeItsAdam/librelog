@@ -59,6 +59,24 @@ extension Color {
     static let warning = Color(hex: Palette.amber)
 }
 
+/// Google's Sign-In button colours, fixed by its branding guidelines rather
+/// than the house palette: fill, 1pt inside stroke (none for neutral), text.
+enum GoogleBrand {
+    struct Colours {
+        let fill: Color
+        let stroke: Color?
+        let text: Color
+    }
+
+    static func colours(_ theme: GoogleSignInButton.Theme) -> Colours {
+        switch theme {
+        case .light: Colours(fill: Color(hex: 0xffffff), stroke: Color(hex: 0x747775), text: Color(hex: 0x1f1f1f))
+        case .dark: Colours(fill: Color(hex: 0x131314), stroke: Color(hex: 0x8e918f), text: Color(hex: 0xe3e3e3))
+        case .neutral: Colours(fill: Color(hex: 0xf2f2f2), stroke: nil, text: Color(hex: 0x1f1f1f))
+        }
+    }
+}
+
 extension PlatformColor {
     static func dynamic(light: Int, dark: Int) -> PlatformColor {
         #if canImport(UIKit)
