@@ -9,10 +9,7 @@ file is the contract the Rust core's sync client codes against.
 
 | Path | What |
 | --- | --- |
-| `migrations/20261003150000_sync_schema.sql` | Tables, RLS, every client function |
-| `migrations/20261003150100_maintenance_cron.sql` | Nightly `librelog.maintenance()` at 03:17 UTC |
-| `migrations/20261003150200_realtime_auth.sql` | Lets a device receive on its own Realtime channel |
-| `migrations/20261003170000_rename_to_librelog.sql` | Rebuilds the three above under the `librelog` schema (the app was Dailylog) and drops `dailylog` |
+| `migrations/20261003170000_sync_schema.sql` | Tables, RLS, every client function, the nightly `librelog.maintenance()` at 03:17 UTC, and the Realtime policy that lets a device receive on its own channel |
 | `templates/sign_in_code.html` | Sign-in code email, enabled once custom SMTP is set up |
 | `tests/` | `run.sh` tests the migrations on a throwaway local Postgres 17 |
 | `config.toml` | Pushed with `supabase config push` |

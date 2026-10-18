@@ -42,10 +42,7 @@ supabase db push                                 # applies supabase/migrations/ 
 For a self-hosted Supabase, use `supabase db push --db-url
 postgresql://postgres:<password>@<host>:5432/postgres` instead of `link`.
 
-The four migrations build the `librelog` schema. The first three create it
-under its old name, `dailylog`, and the fourth rebuilds it as `librelog`
-and drops the old schema; on a fresh database that is expected and leaves
-nothing behind. Together they create:
+The migration builds the `librelog` schema. It creates:
 
 - the tables, row-level security and every client function;
 - the Realtime policy that lets a signed-in device receive on its own
