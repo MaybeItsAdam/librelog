@@ -73,13 +73,14 @@ import uk.co.maybeitssoftware.librelog.ui.tokens
 import uniffi.librelog_core.PairingSession
 
 /**
- * Sync setup and status (SPEC.md §12). Everything here is optional: the
+ * Settings, a tab of its own: appearance, then sync setup and status
+ * (SPEC.md §12), then import and export. Everything here is optional: the
  * journal works fully without an account. Mirrors
  * apple/App/Screens/SyncSettingsView.swift, with Google (when the build has a
  * client id) where Apple has Sign in with Apple.
  */
 @Composable
-fun SyncSettingsScreen(app: AppModel) {
+fun SettingsScreen(app: AppModel) {
     val t = tokens
     val sync = app.sync
     Column(
@@ -91,10 +92,8 @@ fun SyncSettingsScreen(app: AppModel) {
             .padding(bottom = 40.dp)
             .widthIn(max = 720.dp),
     ) {
-        Column(Modifier.padding(top = 24.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            MicroLabel("Settings")
-            Text("Sync", style = Typeface.title, color = t.ink)
-        }
+        Text("Settings", style = Typeface.title, color = t.ink, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
+        AppearanceSection(app)
         when (sync.phase) {
             SyncEngine.Phase.Off -> SignIn(app)
             SyncEngine.Phase.NeedsKey -> KeySetup(app)

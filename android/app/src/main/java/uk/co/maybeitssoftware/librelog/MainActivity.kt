@@ -1,12 +1,16 @@
 package uk.co.maybeitssoftware.librelog
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.ui.LibrelogTheme
+import uk.co.maybeitssoftware.librelog.ui.isDark
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as LibrelogApplication).model
@@ -16,7 +20,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            LibrelogTheme { RootScreen(model) }
+            val appearance = model.appearance
+            val dark = appearance.isDark()
+            // The bars' icons follow the app's theme, which can differ from
+            // the system's (Settings → Appearance).
+            LaunchedEffect(dark) {
+                val style = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            LibrelogTheme(appearance) { RootScreen(model) }
         }
         handle(intent)
     }

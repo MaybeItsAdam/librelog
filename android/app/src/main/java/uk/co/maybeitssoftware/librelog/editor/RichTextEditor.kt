@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
 import uk.co.maybeitssoftware.librelog.R
+import uk.co.maybeitssoftware.librelog.ui.Appearance
 import uk.co.maybeitssoftware.librelog.ui.Tokens
 
 /**
@@ -42,8 +43,15 @@ class EditorEditText(context: Context, private val controller: EditorController)
         isSingleLine = false
         setHorizontallyScrolling(false)
         setLineSpacing(0f, 1.25f)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-        typeface = ResourcesCompat.getFont(context, R.font.arvo_regular)
+        // The reading face and size from Settings → Appearance, via the style.
+        val style = controller.style
+        if (style != null) {
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, style.bodyPx)
+            typeface = style.serif
+        } else {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            typeface = ResourcesCompat.getFont(context, R.font.arvo_regular)
+        }
         controller.host = this
         addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) =
@@ -87,18 +95,36 @@ fun RichTextEditor(controller: EditorController, modifier: Modifier = Modifier, 
     )
 }
 
-/** Fonts, sizes and colours for the editor, from the theme's role colours. */
-fun editorStyle(context: Context, t: Tokens): EditorStyle {
+/**
+ * Fonts, sizes and colours for the editor, from the theme's role colours and
+ * the reading face and size in Settings → Appearance (docs/appearance.md).
+ */
+fun editorStyle(context: Context, t: Tokens, appearance: Appearance = Appearance()): EditorStyle {
     val dm = context.resources.displayMetrics
-    fun sp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v, dm)
+    val scale = appearance.textSize.scale
+    fun sp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v * scale, dm)
     fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm).toInt()
     fun font(id: Int) = ResourcesCompat.getFont(context, id) ?: Typeface.SERIF
+    val mono = ResourcesCompat.getFont(context, R.font.geist_mono) ?: Typeface.MONOSPACE
+    // The four faces a paragraph can need: regular, bold, italic, bold italic.
+    val faces: List<Typeface> = when (appearance.font) {
+        Appearance.ReadingFont.Arvo -> listOf(
+            font(R.font.arvo_regular), font(R.font.arvo_bold), font(R.font.arvo_italic), font(R.font.arvo_bold_italic),
+        )
+        Appearance.ReadingFont.Sans -> styles(Typeface.SANS_SERIF)
+        Appearance.ReadingFont.Serif -> styles(Typeface.SERIF)
+        // Geist Mono is one variable font with no italic; italics are slanted.
+        Appearance.ReadingFont.Mono -> listOf(
+            Typeface.create(mono, 400, false), Typeface.create(mono, 700, false),
+            Typeface.create(mono, 400, true), Typeface.create(mono, 700, true),
+        )
+    }
     return EditorStyle(
-        serif = font(R.font.arvo_regular),
-        serifBold = font(R.font.arvo_bold),
-        serifItalic = font(R.font.arvo_italic),
-        serifBoldItalic = font(R.font.arvo_bold_italic),
-        mono = ResourcesCompat.getFont(context, R.font.geist_mono) ?: Typeface.MONOSPACE,
+        serif = faces[0],
+        serifBold = faces[1],
+        serifItalic = faces[2],
+        serifBoldItalic = faces[3],
+        mono = mono,
         bodyPx = sp(17f),
         scaledPx = ::sp,
         ink = t.ink.toArgb(),
@@ -111,3 +137,10 @@ fun editorStyle(context: Context, t: Tokens): EditorStyle {
         quoteGap = dp(14f),
     )
 }
+
+private fun styles(family: Typeface): List<Typeface> = listOf(
+    Typeface.create(family, Typeface.NORMAL),
+    Typeface.create(family, Typeface.BOLD),
+    Typeface.create(family, Typeface.ITALIC),
+    Typeface.create(family, Typeface.BOLD_ITALIC),
+)

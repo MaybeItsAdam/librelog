@@ -7,6 +7,14 @@
     <!-- Read only, asked for when the user first taps "Show this day's
          calendar"; see docs/calendar.md. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Read only, asked for when the user first opens Add photo, to show the
+         photos taken that day; Choose another photo needs none. Android 14
+         lets the user share just some (docs/photos.md). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Keeps a library photo's place in the copy the journal makes. -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
 
     <!-- Backups would carry the encrypted session and journal key to Google's
          servers; the rules below exclude them, and the journal itself is
@@ -39,6 +47,17 @@
                 <data android:scheme="librelog" android:host="auth" />
             </intent-filter>
         </activity>
+
+        <!-- Take photo: the camera app writes into our cache through this. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- WorkManager is started on demand from LibrelogApplication. -->
         <provider

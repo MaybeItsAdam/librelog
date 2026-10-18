@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,10 +39,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
+import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
 import uk.co.maybeitssoftware.librelog.ui.EntryRow
 import uk.co.maybeitssoftware.librelog.ui.Hairline
 import uk.co.maybeitssoftware.librelog.ui.Haptics
-import uk.co.maybeitssoftware.librelog.ui.IconAction
 import uk.co.maybeitssoftware.librelog.ui.MicroLabel
 import uk.co.maybeitssoftware.librelog.ui.Motion
 import uk.co.maybeitssoftware.librelog.ui.NewEntryButton
@@ -62,17 +61,16 @@ private const val PAGE = 50u
 
 /**
  * Every entry, newest first, grouped by day, with today always on top
- * (SPEC.md §6.1, §6.4). On This Day folds in under today when there is any.
+ * (SPEC.md §6.1, §6.4) and its photos under its entries. On This Day has
+ * its own button in the bottom bar.
  */
 @Composable
-fun JournalScreen(app: AppModel, openEntry: (String) -> Unit, openSettings: () -> Unit) {
+fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
     val t = tokens
     val m = motion
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     var entries by remember { mutableStateOf<List<EntrySummary>>(emptyList()) }
-    var memories by remember { mutableStateOf<List<EntrySummary>>(emptyList()) }
-    var memoriesOpen by rememberSaveable { mutableStateOf(false) }
     var done by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     val list = rememberLazyListState()
@@ -86,7 +84,6 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit, openSettings: () -
         val first = page(null)
         entries = first
         done = first.size < PAGE.toInt()
-        memories = runCatching { app.run { it.onThisDay(today) } }.getOrDefault(emptyList())
     }
     val nearEnd by remember {
         derivedStateOf { (list.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= list.layoutInfo.totalItemsCount - 10 }
@@ -119,7 +116,6 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit, openSettings: () -
         }
     }
 
-    val chevron by animateFloatAsState(if (memoriesOpen) 180f else 0f, m.glide(), label = "chevron")
 
     // Today first, then every other day in timeline order.
     val days = entries.groupBy { it.date }
@@ -132,52 +128,18 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit, openSettings: () -
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 100.dp),
         ) {
             val stagger = Stagger(active = !introDone && loaded)
+            // The day's name, large, then its full date: the screen opens on
+            // today, so there's no separate "Journal" heading above it.
             item(key = "title") {
-                Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 4.dp), verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        MicroLabel(Day.weekday(today))
-                        Text("Journal", style = Typeface.title, color = t.ink)
-                    }
-                    IconAction(Icons.Outlined.Settings, "Settings", openSettings, tint = t.muted)
+                Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(Day.relative(today), style = Typeface.title, color = t.ink)
+                    Text(Day.longDate(today), style = Typeface.small, color = t.muted)
                 }
             }
 
-            dayGroup(today, days[today].orEmpty(), openEntry, m, stagger, onNewEntry = { newEntry() })
-
-            if (memories.isNotEmpty()) {
-                val index = stagger.take()
-                item(key = "otd") {
-                    Reveal(index, stagger.active, rowMotion(m)) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 44.dp)
-                                .pressable(pressedScale = 0.99f, tick = true) { memoriesOpen = !memoriesOpen }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("On this day · ${memories.size}", style = Typeface.small, color = t.primary, modifier = Modifier.weight(1f))
-                            Icon(
-                                Icons.Filled.KeyboardArrowDown,
-                                if (memoriesOpen) "Hide" else "Show",
-                                Modifier.size(20.dp).graphicsLayer { rotationZ = chevron },
-                                tint = t.primary,
-                            )
-                        }
-                        Hairline()
-                    }
-                }
-                if (memoriesOpen) {
-                    memories.forEachIndexed { i, e ->
-                        item(key = "otd-${e.id}") {
-                            // Opened memories cascade in under the row.
-                            Reveal(i, active = true, rowMotion(m)) {
-                                EntryRow(e, onClick = { openEntry(e.id) })
-                                Hairline()
-                            }
-                        }
-                    }
-                }
+            dayGroup(today, days[today].orEmpty(), openEntry, m, stagger, onNewEntry = { newEntry() }, titled = false)
+            item(key = "photos$today") {
+                DayPhotosSection(app, today, rowMotion(m).padding(top = 4.dp))
             }
 
             otherDays.forEach { date -> dayGroup(date, days.getValue(date), openEntry, m, stagger) }
@@ -207,12 +169,14 @@ private fun LazyListScope.dayGroup(
     m: Motion,
     stagger: Stagger,
     onNewEntry: (() -> Unit)? = null,
+    titled: Boolean = true,
 ) {
     val headerIndex = stagger.take()
+    // Today's group sits under the screen's own title, so it needs only the rule.
     stickyHeader(key = "d$date") {
         val t = tokens
-        Reveal(headerIndex, stagger.active, Modifier.fillMaxWidth().background(t.paper).padding(top = 20.dp)) {
-            MicroLabel(Day.title(date), Modifier.padding(bottom = 6.dp))
+        Reveal(headerIndex, stagger.active, Modifier.fillMaxWidth().background(t.paper).padding(top = if (titled) 20.dp else 12.dp)) {
+            if (titled) MicroLabel(Day.title(date), Modifier.padding(bottom = 6.dp))
             Hairline()
         }
     }

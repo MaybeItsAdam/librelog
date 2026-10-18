@@ -15,6 +15,7 @@ zxing = "3.5.4"
 code-scanner = "16.1.0"
 credentials = "1.6.0"
 googleid = "1.2.1"
+exifinterface = "1.4.1"
 junit = "4.13.2"
 robolectric = "4.17"
 androidx-test-core = "1.7.0"
@@ -43,6 +44,7 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "code-scanner" }
 credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }

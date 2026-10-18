@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared with the camera app for Take photo; nothing else is exposed. -->
+<paths>
+    <cache-path name="camera" path="camera/" />
+</paths>

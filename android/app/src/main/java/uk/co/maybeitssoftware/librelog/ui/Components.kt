@@ -251,7 +251,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
             .padding(vertical = 13.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = Typeface.ui.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+        Text(text, style = Typeface.ui.copy(fontWeight = FontWeight.SemiBold), color = t.onPrimary)
     }
 }
 
@@ -281,6 +281,6 @@ fun NewEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .background(tokens.primary, RoundedCornerShape(Radius.card)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Filled.Add, "New entry", Modifier.size(26.dp), tint = Color.White)
+        Icon(Icons.Filled.Add, "New entry", Modifier.size(26.dp), tint = tokens.onPrimary)
     }
 }

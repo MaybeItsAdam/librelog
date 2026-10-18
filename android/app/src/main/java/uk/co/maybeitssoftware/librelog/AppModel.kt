@@ -11,6 +11,7 @@ import androidx.work.Configuration
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
@@ -27,6 +28,7 @@ import uk.co.maybeitssoftware.librelog.sync.RealtimeChannel
 import uk.co.maybeitssoftware.librelog.sync.SupabaseClient
 import uk.co.maybeitssoftware.librelog.sync.SyncEngine
 import uk.co.maybeitssoftware.librelog.sync.SyncWorker
+import uk.co.maybeitssoftware.librelog.ui.Appearance
 import uniffi.librelog_core.Store
 
 /**
@@ -72,8 +74,35 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
         private set
     private var calendarRefreshedAt = 0L
 
+    /**
+     * Settings → Appearance (docs/appearance.md). Read at launch and again
+     * after every pull that merged something, since it syncs.
+     */
+    var appearance by mutableStateOf(Appearance())
+        private set
+
     init {
-        sync.onChange = { changed() }
+        sync.onChange = {
+            changed()
+            scope.launch { reloadAppearance() }
+        }
+    }
+
+    suspend fun reloadAppearance() {
+        runCatching { run { store -> Appearance.from { store.setting(it) } } }.onSuccess { appearance = it }
+    }
+
+    /** Applies one appearance choice at once, then stores and syncs it. */
+    fun setAppearance(key: String, value: String) {
+        appearance = Appearance.from { if (it == key) value else currentKey(it) }
+        scope.launch { write { it.setSetting(key, value) } }
+    }
+
+    private fun currentKey(key: String): String = when (key) {
+        Appearance.THEME -> appearance.theme.key
+        Appearance.ACCENT -> appearance.accent.key
+        Appearance.FONT -> appearance.font.key
+        else -> appearance.textSize.key
     }
 
     suspend fun <T> run(work: (Store) -> T): T = withContext(Dispatchers.IO) { work(store) }
@@ -158,6 +187,9 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
                 },
             )
             val model = AppModel(store, sync, scope, DeviceCalendar(app))
+            // Read before the first frame, so the chosen theme never flashes
+            // in after the default one. Four indexed reads.
+            runCatching { Appearance.from { store.setting(it) } }.onSuccess { model.appearance = it }
             // Background sync only while sync is on.
             scope.launch {
                 snapshotFlow { sync.phase }.collect { phase ->
@@ -185,6 +217,23 @@ object Day {
 
     fun weekday(s: String): String =
         date(s)?.dayOfWeek?.getDisplayName(TextStyle.FULL, Locale.getDefault()) ?: ""
+
+    /** "Today", "Yesterday", "Tomorrow", or the weekday: a day's name at the top of a screen. */
+    fun relative(s: String, from: String = today): String = when (s) {
+        from -> "Today"
+        adding(-1, from) -> "Yesterday"
+        adding(1, from) -> "Tomorrow"
+        else -> weekday(s).ifEmpty { s }
+    }
+
+    /**
+     * The local day [s] as epoch milliseconds, start inclusive and end
+     * exclusive, in [zone]. Days around a clock change are 23 or 25 hours.
+     */
+    fun millis(s: String, zone: ZoneId = ZoneId.systemDefault()): Pair<Long, Long>? {
+        val d = date(s) ?: return null
+        return d.atStartOfDay(zone).toInstant().toEpochMilli() to d.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    }
 
     /** "Saturday 3 October" (or "Today" / "Yesterday"). */
     fun title(s: String): String {

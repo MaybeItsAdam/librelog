@@ -65,6 +65,8 @@ data class Tokens(
     val muted: Color,
     val dim: Color,
     val primary: Color = Color(Palette.AZURE),
+    /** Text and icons drawn on a [primary] fill: white, or ink on amber. */
+    val onPrimary: Color = Color.White,
     val success: Color = Color(Palette.EMERALD),
     val danger: Color = Color(Palette.RASPBERRY),
     val warning: Color = Color(Palette.AMBER),
@@ -127,9 +129,36 @@ object Typeface {
         Font(R.font.geist_mono, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
     )
 
-    val title = TextStyle(fontFamily = serif, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp)
-    val headline = TextStyle(fontFamily = serif, fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 24.sp)
-    val body = TextStyle(fontFamily = serif, fontSize = 17.sp, lineHeight = 24.sp)
+    /**
+     * The reading and writing face (docs/appearance.md): entry titles and
+     * text, screen titles and the editor follow Settings → Appearance, in
+     * its face and at its size. Chrome ([ui], [small], [micro], [mono])
+     * keeps its own faces.
+     */
+    val title: TextStyle
+        @Composable get() = reading(TextStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp))
+    val headline: TextStyle
+        @Composable get() = reading(TextStyle(fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 24.sp))
+    val body: TextStyle
+        @Composable get() = reading(TextStyle(fontSize = 17.sp, lineHeight = 24.sp))
+
+    @Composable
+    private fun reading(style: TextStyle): TextStyle {
+        val r = LocalReading.current
+        return style.copy(
+            fontFamily = r.family,
+            fontSize = style.fontSize * r.scale,
+            lineHeight = style.lineHeight * r.scale,
+        )
+    }
+
+    fun family(font: Appearance.ReadingFont): FontFamily = when (font) {
+        Appearance.ReadingFont.Arvo -> serif
+        Appearance.ReadingFont.Sans -> FontFamily.SansSerif
+        Appearance.ReadingFont.Serif -> FontFamily.Serif
+        Appearance.ReadingFont.Mono -> mono
+    }
+
     val ui = TextStyle(fontSize = 15.sp)
     val small = TextStyle(fontSize = 13.sp)
 
@@ -140,14 +169,35 @@ object Typeface {
     val micro = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.15.em)
 }
 
+/** The reading face and its size, from Settings → Appearance. */
+@Immutable
+data class Reading(val family: FontFamily, val scale: Float)
+
+val LocalReading = staticCompositionLocalOf { Reading(Typeface.serif, 1f) }
+
+val LocalAppearance = staticCompositionLocalOf { Appearance() }
+
+/** Whether [appearance] asks for dark, following the system when it says so. */
 @Composable
-fun LibrelogTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val t = if (dark) DarkTokens else LightTokens
+fun Appearance.isDark(): Boolean = when (theme) {
+    Appearance.Theme.System -> isSystemInDarkTheme()
+    Appearance.Theme.Light -> false
+    Appearance.Theme.Dark -> true
+}
+
+@Composable
+fun LibrelogTheme(appearance: Appearance = Appearance(), content: @Composable () -> Unit) {
+    val dark = appearance.isDark()
+    val accent = appearance.accent
+    val base = if (dark) DarkTokens else LightTokens
+    val t = base.copy(
+        primary = Color(accent.hex),
+        onPrimary = if (accent.inkOnFill) Color(Palette.GRAPE) else Color.White,
+    )
     // Material is only plumbing (text fields, sheets); map it onto the roles.
     val scheme: ColorScheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
         primary = t.primary,
-        onPrimary = Color.White,
+        onPrimary = t.onPrimary,
         background = t.paper,
         onBackground = t.ink,
         surface = t.raised,
@@ -165,7 +215,13 @@ fun LibrelogTheme(content: @Composable () -> Unit) {
         secondaryContainer = t.well,
         onSecondaryContainer = t.ink,
     )
-    CompositionLocalProvider(LocalTokens provides t, LocalMotion provides rememberMotion()) {
+    val reading = Reading(Typeface.family(appearance.font), appearance.textSize.scale)
+    CompositionLocalProvider(
+        LocalTokens provides t,
+        LocalMotion provides rememberMotion(),
+        LocalReading provides reading,
+        LocalAppearance provides appearance,
+    ) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }

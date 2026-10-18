@@ -2,7 +2,6 @@ package uk.co.maybeitssoftware.librelog
 
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.SaveableStateHolder
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,21 +18,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
@@ -44,6 +40,17 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
@@ -57,11 +64,11 @@ import uk.co.maybeitssoftware.librelog.screens.CalendarScreen
 import uk.co.maybeitssoftware.librelog.screens.ConflictsScreen
 import uk.co.maybeitssoftware.librelog.screens.EntryEditorScreen
 import uk.co.maybeitssoftware.librelog.screens.SearchScreen
-import uk.co.maybeitssoftware.librelog.screens.SyncSettingsScreen
+import uk.co.maybeitssoftware.librelog.screens.OnThisDayScreen
+import uk.co.maybeitssoftware.librelog.screens.SettingsScreen
 import uk.co.maybeitssoftware.librelog.screens.JournalScreen
 import uk.co.maybeitssoftware.librelog.ui.Hairline
 import uk.co.maybeitssoftware.librelog.ui.Haptics
-import uk.co.maybeitssoftware.librelog.ui.IconAction
 import uk.co.maybeitssoftware.librelog.ui.Typeface
 import uk.co.maybeitssoftware.librelog.ui.motion
 import uk.co.maybeitssoftware.librelog.ui.pressable
@@ -72,14 +79,15 @@ enum class Tab(val title: String, val icon: ImageVector) {
     Journal("Journal", Icons.AutoMirrored.Outlined.ViewList),
     Calendar("Calendar", Icons.Outlined.CalendarMonth),
     Search("Search", Icons.Outlined.Search),
+    Settings("Settings", Icons.Outlined.Settings),
 }
 
 /** Screens pushed over the tabs. */
 sealed interface Route {
     data class Entry(val id: String) : Route
     data class History(val entryId: String) : Route
-    /** Sync settings, opened from the gear in Journal. */
-    data object Settings : Route
+    /** Opened from the bottom bar's left end. */
+    data object OnThisDay : Route
 }
 
 /**
@@ -89,7 +97,18 @@ sealed interface Route {
 @Composable
 fun RootScreen(app: AppModel) {
     val t = tokens
-    var tab by rememberSaveable { mutableStateOf(Tab.Journal) }
+    // The tabs are pages: swipe between them, or tap the bar. The pager's
+    // state is saved, so the open tab survives rotation.
+    val pager = rememberPagerState { Tab.entries.size }
+    val scope = rememberCoroutineScope()
+    val m0 = motion
+    val tab = Tab.entries[pager.currentPage]
+    val select: (Tab) -> Unit = { to ->
+        scope.launch {
+            if (m0.reduced) pager.scrollToPage(to.ordinal)
+            else pager.animateScrollToPage(to.ordinal, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
     val stack = remember { mutableStateListOf<Route>() }
     // Each tab keeps its saved state (scroll position, selected day, search)
     // while an entry is open over it and across tab switches, so Back
@@ -135,22 +154,31 @@ fun RootScreen(app: AppModel) {
                     onShowHistory = { stack += Route.History(it) },
                 )
                 is Route.History -> ConflictsScreen(app, top.entryId, onClose = pop)
-                Route.Settings -> SettingsFrame(app, onClose = pop)
+                Route.OnThisDay -> OnThisDayScreen(app, open, onClose = pop)
                 null -> if (wide) {
                     Row(Modifier.fillMaxSize().background(t.paper)) {
-                        Column(Modifier.width(88.dp).fillMaxHeight().background(t.raised).statusBarsPadding().padding(top = 12.dp)) {
-                            Tab.entries.forEach { TabItem(it, it == tab) { tab = it } }
+                        Column(Modifier.width(88.dp).fillMaxHeight().background(t.raised).statusBarsPadding().navigationBarsPadding().padding(top = 12.dp)) {
+                            Tab.entries.forEach { TabItem(it.title, it.icon, it == tab) { select(it) } }
+                            Spacer(Modifier.weight(1f))
+                            Hairline()
+                            TabItem("On this day", Icons.Outlined.History, false) { stack += Route.OnThisDay }
                         }
                         VerticalHairline()
-                        Box(Modifier.weight(1f).statusBarsPadding(), contentAlignment = Alignment.TopCenter) { TabContent(tabStates, app, tab, open) { stack += Route.Settings } }
+                        Box(Modifier.weight(1f).statusBarsPadding(), contentAlignment = Alignment.TopCenter) { TabPages(tabStates, pager, app, open) }
                     }
                 } else {
                     Column(Modifier.fillMaxSize().background(t.paper)) {
-                        Box(Modifier.weight(1f).statusBarsPadding()) { TabContent(tabStates, app, tab, open) { stack += Route.Settings } }
+                        Box(Modifier.weight(1f).statusBarsPadding()) { TabPages(tabStates, pager, app, open) }
                         Column(Modifier.fillMaxWidth().background(t.raised).navigationBarsPadding()) {
                             Hairline()
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                Tab.entries.forEach { Box(Modifier.weight(1f)) { TabItem(it, it == tab) { tab = it } } }
+                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                // On This Day sits apart at the left end: it
+                                // opens over the tabs rather than being one.
+                                Box(Modifier.weight(1f)) {
+                                    TabItem("On this day", Icons.Outlined.History, false) { stack += Route.OnThisDay }
+                                }
+                                VerticalHairline(Modifier.padding(vertical = 8.dp))
+                                Tab.entries.forEach { Box(Modifier.weight(1f)) { TabItem(it.title, it.icon, it == tab) { select(it) } } }
                             }
                         }
                     }
@@ -164,31 +192,22 @@ fun RootScreen(app: AppModel) {
 private data class Screen(val route: Route?, val depth: Int)
 
 @Composable
-private fun TabContent(holder: SaveableStateHolder, app: AppModel, tab: Tab, open: (String) -> Unit, openSettings: () -> Unit) {
-    // A quick crossfade between tabs; each keeps its own saved state.
-    Crossfade(tab, animationSpec = motion.quick(), label = "tab") { shown ->
+private fun TabPages(holder: SaveableStateHolder, pager: PagerState, app: AppModel, open: (String) -> Unit) {
+    // Each tab keeps its own saved state while it's off screen. Pages next
+    // to the shown one are only composed while a swipe reveals them.
+    HorizontalPager(pager, Modifier.fillMaxSize(), key = { Tab.entries[it].name }) { page ->
+        val shown = Tab.entries[page]
         holder.SaveableStateProvider(shown.name) { when (shown) {
-            Tab.Journal -> JournalScreen(app, open, openSettings)
+            Tab.Journal -> JournalScreen(app, open)
             Tab.Calendar -> CalendarScreen(app, open)
             Tab.Search -> SearchScreen(app, open)
+            Tab.Settings -> SettingsScreen(app)
         } }
     }
 }
 
-/** Settings as a pushed screen: a back arrow over the sync settings. */
 @Composable
-private fun SettingsFrame(app: AppModel, onClose: () -> Unit) {
-    BackHandler(onBack = onClose)
-    Column(Modifier.fillMaxSize().background(tokens.paper).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onClose)
-        }
-        Box(Modifier.weight(1f)) { SyncSettingsScreen(app) }
-    }
-}
-
-@Composable
-private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
+private fun TabItem(title: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     val t = tokens
     val m = motion
     val haptics = LocalHapticFeedback.current
@@ -199,6 +218,7 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
+            .semantics(mergeDescendants = true) {}
             .pressable(role = Role.Tab, pressedScale = 0.92f) {
                 if (!selected) Haptics.tick(haptics)
                 onClick()
@@ -208,7 +228,7 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Icon(
-            tab.icon, null,
+            icon, null,
             Modifier.size(22.dp).graphicsLayer {
                 translationY = -lift * 2.dp.toPx()
                 scaleX = 1f + lift * 0.08f
@@ -216,6 +236,6 @@ private fun TabItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
             },
             tint = color,
         )
-        Text(tab.title, style = Typeface.small.copy(fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal), color = color)
+        Text(title, maxLines = 1, softWrap = false, style = Typeface.small.copy(fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal), color = color)
     }
 }

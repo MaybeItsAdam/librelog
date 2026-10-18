@@ -26,7 +26,7 @@ interface EditorHost {
  * backspace into a marker drops the list, and so on. Everything goes through
  * [BlockText]'s spans, so what's on screen is exactly what [blocks] saves.
  */
-class EditorController(private val style: EditorStyle?) {
+class EditorController(internal val style: EditorStyle?) {
     var host: EditorHost? = null
     /** Called after every edit; the screen debounces the save. */
     var onChange: (() -> Unit)? = null

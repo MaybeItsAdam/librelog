@@ -95,7 +95,9 @@ import uk.co.maybeitssoftware.librelog.calendar.DayCalendarSection
 import uk.co.maybeitssoftware.librelog.editor.EditorController
 import uk.co.maybeitssoftware.librelog.editor.RichTextEditor
 import uk.co.maybeitssoftware.librelog.editor.editorStyle
+import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
 import uk.co.maybeitssoftware.librelog.ui.Hairline
+import uk.co.maybeitssoftware.librelog.ui.LocalAppearance
 import uk.co.maybeitssoftware.librelog.ui.IconAction
 import uk.co.maybeitssoftware.librelog.ui.MicroLabel
 import uk.co.maybeitssoftware.librelog.ui.Radius
@@ -119,7 +121,8 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
     val t = tokens
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val controller = remember(entryId) { EditorController(editorStyle(context, t)) }
+    val appearance = LocalAppearance.current
+    val controller = remember(entryId) { EditorController(editorStyle(context, t, appearance)) }
     var entry by remember(entryId) { mutableStateOf<Entry?>(null) }
     var title by remember(entryId) { mutableStateOf("") }
     var wordCount by remember(entryId) { mutableStateOf(0u) }
@@ -130,6 +133,9 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
     var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var editorReady by remember(entryId) { mutableStateOf(false) }
+    // Set once the entry is deleted from the menu, so leaving doesn't save it.
+    var deleted by remember(entryId) { mutableStateOf(false) }
+    var finished by remember(entryId) { mutableStateOf(false) }
 
     suspend fun save() {
         val e = entry ?: return
@@ -157,10 +163,30 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
         }
     }
 
-    fun flushAndClose() {
+    // Leaving the editor (Back, the arrow, version history, or anything else
+    // that takes it off screen) saves what's pending, then deletes the entry
+    // if it was left untouched, so tapping New entry and backing out leaves
+    // nothing behind. The app scope outlives this screen, so this finishes
+    // after it goes.
+    fun finish() {
+        if (finished) return
+        finished = true
+        val pending = saveJob != null
         saveJob?.cancel()
-        // The app scope outlives this screen, so the save finishes after it goes.
-        app.scope.launch { save() }
+        saveJob = null
+        if (deleted) return
+        app.scope.launch {
+            if (pending) save()
+            val discarded = runCatching { app.run { it.discardIfEmpty(entryId) } }.getOrDefault(false)
+            if (discarded) {
+                app.changed()
+                app.sync.schedulePush()
+            }
+        }
+    }
+
+    fun flushAndClose() {
+        finish()
         onClose()
     }
 
@@ -182,7 +208,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
         val e = entry ?: return@LaunchedEffect
         if (editorReady) controller.load(e.body)
     }
-    DisposableEffect(entryId) { onDispose { saveJob?.cancel() } }
+    DisposableEffect(entryId) { onDispose { finish() } }
     BackHandler { flushAndClose() }
 
     Column(Modifier.fillMaxSize().background(t.paper).statusBarsPadding().imePadding()) {
@@ -307,6 +333,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                     }
                 }
                 DayCalendarSection(app, e.date, Modifier.padding(bottom = 6.dp))
+                DayPhotosSection(app, e.date, Modifier.padding(bottom = 6.dp))
                 Hairline()
                 if (e.hasConflict) {
                     StatusBanner("Edited on two devices — review", t.warning, Modifier.padding(top = 10.dp)) { onShowHistory(e.id) }
@@ -332,6 +359,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                 TextButton(onClick = {
                     confirmDelete = false
                     saveJob?.cancel()
+                    deleted = true
                     scope.launch {
                         app.write { it.deleteEntry(entryId) }
                         onClose()

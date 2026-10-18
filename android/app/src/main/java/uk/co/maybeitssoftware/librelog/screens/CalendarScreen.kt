@@ -6,7 +6,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,7 +15,28 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.flow.drop
+import uk.co.maybeitssoftware.librelog.calendar.MonthPages
+import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -48,12 +68,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.time.DayOfWeek
-import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
@@ -82,41 +100,46 @@ import uniffi.librelog_core.EntrySummary
 
 /**
  * Month grid (SPEC.md §6.3). Days with entries are tinted by their rating;
- * tapping one shows that day's entries underneath. Swipe or use the arrows
- * to change month.
+ * tapping one shows that day's entries, calendar and photos underneath.
+ * Months are pages: swipe (the grid follows the finger and settles with a
+ * spring), use the arrows, or tap the title to jump to any month.
  */
 @Composable
 fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
     val t = tokens
     val m = motion
     val haptics = LocalHapticFeedback.current
-    var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
-    var marks by remember { mutableStateOf<Map<String, DayMark>>(emptyMap()) }
+    val pages = remember { MonthPages(YearMonth.now()) }
+    // Its page is saved, so the shown month survives tab switches.
+    val pager = rememberPagerState(initialPage = pages.lastPage) { pages.count }
+    val month = pages.month(pager.currentPage)
     var selected by rememberSaveable { mutableStateOf(Day.today) }
     var dayEntries by remember { mutableStateOf<List<EntrySummary>>(emptyList()) }
     var shownDay by remember { mutableStateOf<String?>(null) }
+    var choosingMonth by remember { mutableStateOf(false) }
 
-    LaunchedEffect(month, app.revision) {
-        val ym = month.toString()
-        marks = runCatching { app.run { it.month(ym, null) } }.getOrDefault(emptyList()).associateBy { it.date }
-    }
     LaunchedEffect(selected, app.revision) {
         val d = selected
         dayEntries = runCatching { app.run { it.day(d, null) } }.getOrDefault(emptyList())
         shownDay = d
     }
-
-    val canGoForward = month < YearMonth.now()
-    fun step(by: Long) {
-        if (by > 0 && !canGoForward) {
-            Haptics.reject(haptics)
-            return
-        }
-        Haptics.tick(haptics)
-        month = month.plusMonths(by)
+    // A tick each time a swipe settles on a new month.
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.drop(1).collect { Haptics.tick(haptics) }
     }
 
     val scope = rememberCoroutineScope()
+    val canGoForward = pager.currentPage < pages.lastPage
+    fun show(page: Int) {
+        if (page > pages.lastPage) {
+            Haptics.reject(haptics)
+            return
+        }
+        scope.launch {
+            if (m.reduced) pager.scrollToPage(page) else pager.animateScrollToPage(page, animationSpec = m.glide())
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(t.paper)) {
     Column(
         Modifier
@@ -127,14 +150,31 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
             .widthIn(max = 720.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // The title opens the month and year chooser.
+            Column(
+                Modifier
+                    .weight(1f)
+                    .pressable(pressedScale = 0.98f) { choosingMonth = true }
+                    .semantics { contentDescription = "${Day.monthTitle(month.toString())}, choose a month" },
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 MicroLabel("Calendar")
-                AnimatedContent(month, transitionSpec = { monthSlide(m, targetState > initialState) }, label = "title") {
-                    Text(Day.monthTitle(it.toString()), style = Typeface.title, color = t.ink)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AnimatedContent(month, Modifier.weight(1f, fill = false), transitionSpec = { monthSlide(m, targetState > initialState) }, label = "title") {
+                        // One line: long month names shrink to fit a narrow phone.
+                        val style = Typeface.title
+                        BasicText(
+                            Day.monthTitle(it.toString()),
+                            style = style.copy(color = t.ink),
+                            maxLines = 1,
+                            autoSize = TextAutoSize.StepBased(minFontSize = style.fontSize * 0.6f, maxFontSize = style.fontSize),
+                        )
+                    }
+                    Icon(Icons.Filled.ArrowDropDown, null, Modifier.size(24.dp), tint = t.muted)
                 }
             }
-            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous month", { step(-1) })
-            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month", { step(1) }, enabled = canGoForward)
+            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous month", { show(pager.currentPage - 1) })
+            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month", { show(pager.currentPage + 1) }, enabled = canGoForward)
         }
 
         val firstDay = WeekFields.of(Locale.getDefault()).firstDayOfWeek
@@ -149,59 +189,22 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
         }
         Hairline()
 
-        // The grid follows a horizontal swipe a little, then changes month
-        // once it passes the threshold.
-        val drag = remember { Animatable(0f) }
-        AnimatedContent(
-            month,
-            transitionSpec = { monthSlide(m, targetState > initialState) },
-            modifier = Modifier
-                .graphicsLayer { translationX = drag.value }
-                .pointerInput(canGoForward) {
-                    val threshold = 64.dp.toPx()
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            val d = drag.value
-                            if (d <= -threshold) step(1) else if (d >= threshold) step(-1)
-                            scope.launch { drag.animateTo(0f, m.glide()) }
-                        },
-                        onDragCancel = { scope.launch { drag.animateTo(0f, m.glide()) } },
-                    ) { change, amount ->
-                        change.consume()
-                        // Resists past the threshold, and towards future months.
-                        val resist = if (drag.value < 0 && !canGoForward) 0.15f else 0.4f
-                        scope.launch { drag.snapTo(drag.value + amount * resist) }
-                    }
-                },
-            label = "grid",
-        ) { shown ->
-            Column {
-                cells(shown, firstDay).chunked(7).forEach { week ->
-                    Row(Modifier.fillMaxWidth()) {
-                        week.forEachIndexed { col, date ->
-                            Box(Modifier.weight(1f).aspectRatio(1f)) {
-                                if (date != null) {
-                                    val mark = marks[date]
-                                    // Joins the neighbouring cell's band unless
-                                    // the week row (or the month) ends there.
-                                    SpanBand(
-                                        visible = mark != null && (mark.spanBefore || mark.spanAfter),
-                                        joinStart = mark?.spanBefore == true && col > 0 && week[col - 1] != null,
-                                        joinEnd = mark?.spanAfter == true && col < 6 && week[col + 1] != null,
-                                        t = t,
-                                        m = m,
-                                    )
-                                    Box(Modifier.padding(2.dp)) {
-                                        DayCell(date, mark, selected == date, date == Day.today, date > Day.today, t, m) {
-                                            if (selected != date) Haptics.tick(haptics)
-                                            selected = date
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        // The grid follows the finger and settles on a month with a spring.
+        // Sideways drags over it are the months' alone: the tabs' pager
+        // underneath never takes them, even at this month's end.
+        HorizontalPager(
+            pager,
+            modifier = Modifier.fillMaxWidth().nestedScroll(KeepHorizontal),
+            beyondViewportPageCount = 1,
+            key = { it },
+            flingBehavior = PagerDefaults.flingBehavior(
+                pager,
+                snapAnimationSpec = if (m.reduced) snap() else spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow),
+            ),
+        ) { page ->
+            MonthGrid(app, pages.month(page), firstDay, selected, t, m) { date ->
+                if (selected != date) Haptics.tick(haptics)
+                selected = date
             }
         }
 
@@ -227,7 +230,10 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
                         }
                     }
                 }
-                shownDay?.let { DayCalendarSection(app, it, Modifier.padding(top = 8.dp)) }
+                shownDay?.let {
+                    DayCalendarSection(app, it, Modifier.padding(top = 8.dp))
+                    DayPhotosSection(app, it, Modifier.padding(top = 4.dp))
+                }
             }
         }
     }
@@ -244,9 +250,115 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
         Modifier.align(Alignment.BottomEnd),
     )
     }
+
+    if (choosingMonth) {
+        MonthChooser(pages, month, onDismiss = { choosingMonth = false }) { picked ->
+            choosingMonth = false
+            Haptics.tick(haptics)
+            show(pages.page(picked))
+        }
+    }
 }
 
 /** Months slide sideways: later months come in from the right. */
+/** Takes every sideways scroll and fling the month pager leaves over. */
+private object KeepHorizontal : NestedScrollConnection {
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource) = Offset(available.x, 0f)
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity) = Velocity(available.x, 0f)
+}
+
+/** One month's six weeks, with its own marks, loaded as the page comes in. */
+@Composable
+private fun MonthGrid(app: AppModel, month: YearMonth, firstDay: DayOfWeek, selected: String, t: Tokens, m: Motion, onSelect: (String) -> Unit) {
+    var marks by remember(month) { mutableStateOf<Map<String, DayMark>>(emptyMap()) }
+    LaunchedEffect(month, app.revision) {
+        val ym = month.toString()
+        marks = runCatching { app.run { it.month(ym, null) } }.getOrDefault(emptyList()).associateBy { it.date }
+    }
+    val today = Day.today
+    Column {
+        MonthPages.cells(month, firstDay).chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth()) {
+                week.forEachIndexed { col, date ->
+                    Box(Modifier.weight(1f).aspectRatio(1f)) {
+                        if (date != null) {
+                            val mark = marks[date]
+                            // Joins the neighbouring cell's band unless
+                            // the week row (or the month) ends there.
+                            SpanBand(
+                                visible = mark != null && (mark.spanBefore || mark.spanAfter),
+                                joinStart = mark?.spanBefore == true && col > 0 && week[col - 1] != null,
+                                joinEnd = mark?.spanAfter == true && col < 6 && week[col + 1] != null,
+                                t = t,
+                                m = m,
+                            )
+                            Box(Modifier.padding(2.dp)) {
+                                DayCell(date, mark, selected == date, date == today, date > today, t, m) { onSelect(date) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Jump to any month: a year stepper over the twelve months. Months after
+ * this one can't be chosen.
+ */
+@Composable
+private fun MonthChooser(pages: MonthPages, shown: YearMonth, onDismiss: () -> Unit, onPick: (YearMonth) -> Unit) {
+    val t = tokens
+    val haptics = LocalHapticFeedback.current
+    var year by remember { mutableStateOf(shown.year) }
+    Sheet(onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                MicroLabel("Go to month")
+                Text(year.toString(), style = Typeface.headline, color = t.ink)
+            }
+            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous year", {
+                Haptics.tick(haptics)
+                year--
+            }, enabled = year > pages.earliest.year)
+            IconAction(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next year", {
+                Haptics.tick(haptics)
+                year++
+            }, enabled = year < pages.latest.year)
+        }
+        (1..12).chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { n ->
+                    val ym = YearMonth.of(year, n)
+                    val enabled = pages.contains(ym)
+                    val current = ym == shown
+                    val shape = RoundedCornerShape(Radius.control)
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .pressable(enabled = enabled) { onPick(ym) }
+                            .background(if (current) t.primary.copy(alpha = 0.1f) else Color.Transparent, shape)
+                            .border(if (current) 1.5.dp else 1.dp, if (current) t.primary else t.hairline, shape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            ym.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                            style = Typeface.ui.copy(fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal),
+                            color = when {
+                                !enabled -> t.dim
+                                current -> t.primary
+                                else -> t.ink
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun monthSlide(m: Motion, forward: Boolean): ContentTransform {
     if (m.reduced) return EnterTransition.None togetherWith ExitTransition.None
     val dir = if (forward) 1 else -1
@@ -323,13 +435,4 @@ private fun ratingColor(rating: Double?, t: Tokens): Color = when {
     rating < 2 -> t.danger
     rating < 3.5 -> t.warning
     else -> t.success
-}
-
-/** Leading blanks, then each day of the month as `YYYY-MM-DD`. */
-private fun cells(month: YearMonth, firstDay: DayOfWeek): List<String?> {
-    val first = month.atDay(1)
-    val lead = Math.floorMod(first.dayOfWeek.value - firstDay.value, 7)
-    val days = (1..month.lengthOfMonth()).map { Day.string(LocalDate.of(month.year, month.month, it)) }
-    val all = List(lead) { null } + days
-    return all + List((7 - all.size % 7) % 7) { null }
 }
