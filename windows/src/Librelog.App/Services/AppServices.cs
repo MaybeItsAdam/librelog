@@ -45,6 +45,22 @@ public static class AppServices
         return result;
     }
 
+    /// Tells every page to reload, as a write would.
+    public static void NotifyChanged() => DataChanged?.Invoke();
+
+    /// Leaving the editor: an entry nothing was ever put in is deleted rather
+    /// than left behind as an empty row. True if it went.
+    public static async Task<bool> DiscardIfEmpty(string id)
+    {
+        var gone = await Task.Run(() => Store.DiscardIfEmpty(id));
+        if (gone)
+        {
+            DataChanged?.Invoke();
+            Sync.SchedulePush();
+        }
+        return gone;
+    }
+
     public static string Today => DateTime.Now.ToString("yyyy-MM-dd");
 }
 

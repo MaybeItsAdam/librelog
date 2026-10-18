@@ -46,5 +46,7 @@
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
     <Capability Name="internetClient" />
+    <!-- Add photo offers the day's photos from the Pictures library (docs/photos.md). -->
+    <uap:Capability Name="picturesLibrary" />
   </Capabilities>
 </Package>

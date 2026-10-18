@@ -11,8 +11,26 @@
     <Page.Resources>
         <pages:JournalTemplateSelector x:Key="JournalTemplates">
             <pages:JournalTemplateSelector.DayTemplate>
+                <!-- The day's name large, the full date beneath; today's
+                     heading also carries New entry. -->
                 <DataTemplate x:DataType="pages:JournalDay">
-                    <TextBlock Text="{x:Bind Label}" Style="{StaticResource MicroLabel}" Margin="0,20,0,4" />
+                    <Grid Margin="0,28,0,6" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4" VerticalAlignment="Bottom">
+                            <TextBlock Text="{x:Bind Name}" Style="{StaticResource DayTitleText}" />
+                            <TextBlock Text="{x:Bind Date}" Style="{StaticResource MicroLabel}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Click="OnNew" VerticalAlignment="Center"
+                                ToolTipService.ToolTip="New entry (Ctrl+N)" Visibility="{x:Bind NewVisibility}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                <TextBlock Text="New entry" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                 </DataTemplate>
             </pages:JournalTemplateSelector.DayTemplate>
             <pages:JournalTemplateSelector.EntryTemplate>
@@ -20,11 +38,6 @@
                     <pages:EntryRow Entry="{x:Bind}" ShowDate="False" />
                 </DataTemplate>
             </pages:JournalTemplateSelector.EntryTemplate>
-            <pages:JournalTemplateSelector.MemoryTemplate>
-                <DataTemplate x:DataType="pages:JournalMemory">
-                    <pages:EntryRow Entry="{x:Bind Entry}" ShowDate="True" />
-                </DataTemplate>
-            </pages:JournalTemplateSelector.MemoryTemplate>
             <pages:JournalTemplateSelector.ActionTemplate>
                 <DataTemplate x:DataType="pages:JournalAction">
                     <Grid Padding="0,12" ColumnSpacing="10" BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,0,0,1">
@@ -41,23 +54,9 @@
         </pages:JournalTemplateSelector>
     </Page.Resources>
 
-    <Grid MaxWidth="760" Padding="40,32,40,0" RowSpacing="8">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Grid>
-            <TextBlock Text="Journal" Style="{StaticResource TitleText}" VerticalAlignment="Center" />
-            <Button Style="{StaticResource PrimaryButton}" Click="OnNew" ToolTipService.ToolTip="New entry (Ctrl+N)"
-                    HorizontalAlignment="Right" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE710;" FontSize="12" />
-                    <TextBlock Text="New entry" />
-                </StackPanel>
-            </Button>
-        </Grid>
-
-        <ListView x:Name="List" Grid.Row="1" SelectionMode="None" IsItemClickEnabled="True"
+    <!-- No page header: the list opens on today's name. -->
+    <Grid MaxWidth="760" Padding="40,4,40,0">
+        <ListView x:Name="List" SelectionMode="None" IsItemClickEnabled="True"
                   ItemClick="OnItemClick" Padding="0,0,0,48"
                   ItemTemplateSelector="{StaticResource JournalTemplates}" />
     </Grid>

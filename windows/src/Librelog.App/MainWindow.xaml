@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Librelog">
 
-    <Grid Background="{ThemeResource PaperBrush}">
+    <!-- The root takes the theme from Settings → Appearance. -->
+    <Grid x:Name="Root" Background="{ThemeResource PaperBrush}">
         <NavigationView
             x:Name="Nav"
             PaneDisplayMode="Left"
@@ -25,7 +26,12 @@
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Find" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
-            <!-- Sync lives behind the built-in Settings item in the pane footer. -->
+            <!-- Bottom left, above the built-in Settings item. -->
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="On This Day" Tag="onthisday">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE81C;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
 
             <!-- Hairline between the pane and the page, not a shadow. -->
             <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="1,0,0,0">

@@ -1,3 +1,4 @@
+using Librelog.App.Services;
 using Librelog.Core;
 using Librelog.Editor;
 using Microsoft.UI;
@@ -40,8 +41,8 @@ public sealed partial class RichEditor : UserControl
             BorderThickness = new Thickness(0),
             Padding = new Thickness(0, 8, 0, 48),
             MinHeight = 320,
-            FontFamily = (FontFamily)Application.Current.Resources["Serif"],
-            FontSize = Appearance.BodySize,
+            FontFamily = AppearanceService.ReadingFont,
+            FontSize = Appearance.BodySize * AppearanceService.Scale,
             PlaceholderText = "Write about your day…",
             DisabledFormattingAccelerators = DisabledFormattingAccelerators.All,
             ClipboardCopyFormat = RichEditClipboardFormat.PlainText,
@@ -207,11 +208,12 @@ public sealed partial class RichEditor : UserControl
         {
             foreach (var (s, l, style) in doc.Runs(start, length))
             {
-                var a = Appearance.Text(style);
+                // The reading face and size from Settings → Appearance.
+                var a = Appearance.Text(style, AppearanceService.Current.ReadingFamily, AppearanceService.Scale);
                 var f = d.GetRange(s, s + l).CharacterFormat;
-                // Code falls back to an installed mono face: RichEdit resolves
+                // Mono falls back to an installed mono face: RichEdit resolves
                 // fonts by family name, and app-packaged fonts may not be visible to it.
-                f.Name = a.Font == Appearance.Mono ? "Cascadia Mono" : "Arvo";
+                f.Name = a.Font == Appearance.Mono ? "Cascadia Mono" : a.Font;
                 f.Size = (float)(a.Size * 0.75); // DIPs → points
                 f.Bold = a.Bold ? FormatEffect.On : FormatEffect.Off;
                 f.Italic = a.Italic ? FormatEffect.On : FormatEffect.Off;
@@ -246,7 +248,8 @@ internal static class Palette
     {
         ColorRole.Ink => dark ? Hex(0xF5F4F7) : Hex(0x444054),
         ColorRole.Muted => dark ? Hex(0xB6B3BF) : Hex(0x6E6B7C),
-        ColorRole.Azure => Hex(0x007FFF),
+        // Links take the accent chosen in Settings → Appearance.
+        ColorRole.Azure => AppearanceService.Rgb(AppearanceService.Current.AccentColor),
         // Amber at 30% over the raised surface (RichEdit has no alpha).
         ColorRole.HighlightAmber => dark ? Hex(0x665221) : Hex(0xFFECB3),
         ColorRole.CodeWell => dark ? Hex(0x2D2B38) : Hex(0xEDEBEF),

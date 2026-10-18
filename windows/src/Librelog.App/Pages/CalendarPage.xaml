@@ -1,5 +1,7 @@
 <!-- Month grid (SPEC.md §6.3): days with entries tinted by rating; select a
-     day to see its entries underneath. -->
+     day to see its entries and photos underneath. Months slide in the way
+     you're going; swipe or scroll sideways to turn them, or pick one from
+     the title. -->
 <Page
     x:Class="Librelog.App.Pages.CalendarPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -13,7 +15,33 @@
             <Grid>
                 <StackPanel Spacing="4">
                     <TextBlock Text="CALENDAR" Style="{StaticResource MicroLabel}" />
-                    <TextBlock x:Name="MonthText" Style="{StaticResource TitleText}" />
+                    <!-- The title opens a month and year chooser. -->
+                    <Button x:Name="MonthButton" Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="6"
+                            ToolTipService.ToolTip="Go to a month">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock x:Name="MonthText" Style="{StaticResource TitleText}" />
+                            <FontIcon Glyph="&#xE70D;" FontSize="12" Foreground="{ThemeResource MutedBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Button.Flyout>
+                            <Flyout x:Name="MonthFlyout" Placement="BottomEdgeAlignedLeft" Opening="OnChooserOpening">
+                                <StackPanel Spacing="10" Width="276">
+                                    <Grid>
+                                        <Button Style="{StaticResource PlainButton}" Click="OnPreviousYear" ToolTipService.ToolTip="Previous year">
+                                            <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                                        </Button>
+                                        <TextBlock x:Name="ChooserYearText" FontFamily="{StaticResource Mono}" FontSize="15"
+                                                   Foreground="{ThemeResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Button Style="{StaticResource PlainButton}" Click="OnNextYear" ToolTipService.ToolTip="Next year"
+                                                HorizontalAlignment="Right">
+                                            <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                                        </Button>
+                                    </Grid>
+                                    <Grid x:Name="MonthChoices" RowSpacing="6" ColumnSpacing="6" />
+                                    <Button Style="{StaticResource PlainButton}" Content="This month" HorizontalAlignment="Stretch" Click="OnThisMonth" />
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Style="{StaticResource PlainButton}" Click="OnPrevious" ToolTipService.ToolTip="Previous month">
@@ -31,10 +59,17 @@
                 </StackPanel>
             </Grid>
 
-            <Border Style="{StaticResource Card}" Padding="12">
+            <!-- Swipes and sideways scrolling land on the card; it clips the
+                 grid as it slides. -->
+            <Border x:Name="MonthCard" Style="{StaticResource Card}" Padding="12" ManipulationMode="System,TranslateX"
+                    ManipulationCompleted="OnSwiped">
                 <StackPanel Spacing="4">
                     <Grid x:Name="WeekdayHeader" />
-                    <Grid x:Name="DayGrid" RowSpacing="4" ColumnSpacing="4" />
+                    <Grid x:Name="DayGrid" RowSpacing="4" ColumnSpacing="4">
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="Slide" />
+                        </Grid.RenderTransform>
+                    </Grid>
                 </StackPanel>
             </Border>
 
@@ -49,6 +84,8 @@
                     </ListView.ItemTemplate>
                 </ListView>
             </StackPanel>
+
+            <pages:DayPhotosView x:Name="Photos" />
         </StackPanel>
     </ScrollViewer>
 </Page>

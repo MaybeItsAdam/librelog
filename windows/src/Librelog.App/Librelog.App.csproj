@@ -19,6 +19,10 @@
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Lets CsWinRT generate the AOT-safe interop for .NET collections of
+         WinRT objects (the photo chooser's List<StorageFile>); without it
+         CsWinRT1030 warns, which fails the build. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- IL2104/IL3053 are one-line summaries for third-party assemblies that
          aren't trim/AOT-annotated; here only WebView2, which the Windows App
          SDK brings in and Librelog never calls. Keep them as warnings. Our

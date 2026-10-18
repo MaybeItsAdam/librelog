@@ -46,6 +46,10 @@ public sealed class CoreStore : IDisposable
     public void DeleteEntry(string id) => Call("delete_entry", ("id", id));
     public void RestoreEntry(string id) => Call("restore_entry", ("id", id));
 
+    /// Deletes the entry if nothing was ever put in it (no title, text,
+    /// rating, favourite, tags or attachments). True if it went.
+    public bool DiscardIfEmpty(string id) => Call("discard_if_empty", ("id", id)).GetBoolean();
+
     // --- Reading ----------------------------------------------------------------
 
     public List<EntrySummary> Day(string date, string? journalId = null) =>
@@ -69,6 +73,26 @@ public sealed class CoreStore : IDisposable
     public void TagEntry(string entryId, string tagId, string? value = null) =>
         Call("tag_entry", ("entry_id", entryId), ("tag_id", tagId), ("value", value));
     public void UntagEntry(string entryId, string tagId) => Call("untag_entry", ("entry_id", entryId), ("tag_id", tagId));
+
+    // --- Photos of the day (docs/photos.md) --------------------------------------
+
+    public DayPhoto AddDayPhoto(string date, NewPhoto photo, string? journalId = null) =>
+        Get("add_day_photo", CoreJson.Default.DayPhoto,
+            ("journal_id", journalId), ("date", date), ("photo", Native.Node(photo, CoreJson.Default.NewPhoto)))!;
+    public List<DayPhoto> DayPhotos(string date, string? journalId = null) =>
+        Get("day_photos", CoreJson.Default.ListDayPhoto, ("journal_id", journalId), ("date", date))!;
+    public void RemoveDayPhoto(string id) => Call("remove_day_photo", ("id", id));
+    /// Empty or null clears it.
+    public void SetPhotoCaption(string id, string? caption) => Call("set_photo_caption", ("id", id), ("caption", caption));
+    public ThumbImage ThumbhashImage(string thumbhash) =>
+        Get("thumbhash_image", CoreJson.Default.ThumbImage, ("thumbhash", thumbhash))!;
+
+    // --- Synced settings (docs/appearance.md) -------------------------------------
+
+    /// Null when never set, which means the default.
+    public string? Setting(string key) => Get("setting", CoreJson.Default.String, ("key", key));
+    /// Null goes back to the default.
+    public void SetSetting(string key, string? value) => Call("set_setting", ("key", key), ("value", value));
 
     // --- Revisions --------------------------------------------------------------
 

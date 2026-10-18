@@ -1,0 +1,82 @@
+<!-- Settings (SPEC.md §14): Appearance here, sync and import & export one
+     step further in. Appearance choices sync to every device
+     (docs/appearance.md). -->
+<Page
+    x:Class="Librelog.App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource PaperBrush}">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="640" Padding="40,32,40,64" Spacing="20">
+            <StackPanel Spacing="4">
+                <TextBlock Text="SETTINGS" Style="{StaticResource MicroLabel}" />
+                <TextBlock Text="Make it yours" Style="{StaticResource TitleText}" />
+            </StackPanel>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="18">
+                    <TextBlock Text="APPEARANCE" Style="{StaticResource MicroLabel}" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="THEME" Style="{StaticResource MicroLabel}" />
+                        <!-- In the order of ThemeChoice. -->
+                        <RadioButtons x:Name="ThemeChoices" MaxColumns="3" SelectionChanged="OnThemeChanged">
+                            <RadioButton Content="System" />
+                            <RadioButton Content="Light" />
+                            <RadioButton Content="Dark" />
+                        </RadioButtons>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="ACCENT" Style="{StaticResource MicroLabel}" />
+                        <StackPanel x:Name="AccentChoices" Orientation="Horizontal" Spacing="8" />
+                        <TextBlock Style="{StaticResource MutedText}" FontSize="13"
+                                   Text="Buttons, links and selection. Status colours keep their meaning." />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="TYPEFACE" Style="{StaticResource MicroLabel}" />
+                        <!-- In the order of FontChoice; each shown in its own face. -->
+                        <ComboBox x:Name="FontChoices" MinWidth="240" CornerRadius="6" SelectionChanged="OnFontChanged">
+                            <ComboBoxItem><TextBlock Text="Arvo" FontFamily="{StaticResource Serif}" /></ComboBoxItem>
+                            <ComboBoxItem><TextBlock Text="Sans (Segoe UI)" FontFamily="Segoe UI" /></ComboBoxItem>
+                            <ComboBoxItem><TextBlock Text="Serif (Cambria)" FontFamily="Cambria" /></ComboBoxItem>
+                            <ComboBoxItem><TextBlock Text="Geist Mono" FontFamily="{StaticResource Mono}" /></ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="TEXT SIZE" Style="{StaticResource MicroLabel}" />
+                        <!-- In the order of TextSizeChoice. -->
+                        <RadioButtons x:Name="SizeChoices" MaxColumns="4" SelectionChanged="OnSizeChanged">
+                            <RadioButton Content="Small" />
+                            <RadioButton Content="Default" />
+                            <RadioButton Content="Large" />
+                            <RadioButton Content="Larger" />
+                        </RadioButtons>
+                    </StackPanel>
+
+                    <!-- How entries will read. -->
+                    <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="PREVIEW" Style="{StaticResource MicroLabel}" />
+                            <TextBlock x:Name="SampleTitle" Text="A walk by the canal" Foreground="{ThemeResource InkBrush}" />
+                            <TextBlock x:Name="SampleBody" Foreground="{ThemeResource InkBrush}" TextWrapping="Wrap"
+                                       Text="Coffee first, then the long way round past the locks. The light on the water was worth getting up for." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="SYNC, IMPORT &amp; EXPORT" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Style="{StaticResource MutedText}"
+                               Text="Your journal on every device, end-to-end encrypted. Backups, and bringing in entries from other apps." />
+                    <Button Style="{StaticResource PlainButton}" Content="Open sync and backups" Click="OnSync" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

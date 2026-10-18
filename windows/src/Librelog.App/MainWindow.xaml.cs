@@ -1,5 +1,6 @@
 using Librelog.App.Pages;
 using Librelog.App.Services;
+using Librelog.Days;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -15,8 +16,13 @@ public sealed partial class MainWindow : Window
         ["journal"] = typeof(JournalPage),
         ["calendar"] = typeof(CalendarPage),
         ["search"] = typeof(SearchPage),
+        ["onthisday"] = typeof(OnThisDayPage),
+        ["settings"] = typeof(SettingsPage),
         ["sync"] = typeof(SyncPage),
     };
+
+    /// The section showing, for Ctrl+Tab; the editor keeps whichever opened it.
+    private string section = "journal";
 
     public MainWindow()
     {
@@ -25,6 +31,9 @@ public sealed partial class MainWindow : Window
         AddShortcut(VirtualKey.N, () => _ = JournalPage.NewEntry(AppServices.Today));
         AddShortcut(VirtualKey.K, () => Go("search"));
         AddShortcut(VirtualKey.F, () => Go("search"));
+        // Ctrl+Tab and Ctrl+Shift+Tab step through the sections, as in a browser.
+        AddShortcut(VirtualKey.Tab, () => Go(Sections.Step(section, 1)));
+        AddShortcut(VirtualKey.Tab, () => Go(Sections.Step(section, -1)), VirtualKeyModifiers.Shift);
         Go("journal");
     }
 
@@ -47,7 +56,7 @@ public sealed partial class MainWindow : Window
 
     private void OnItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (args.IsSettingsInvoked) Go("sync");
+        if (args.IsSettingsInvoked) Go("settings");
         else if (args.InvokedItemContainer?.Tag is string tag) Go(tag);
     }
 
@@ -59,14 +68,16 @@ public sealed partial class MainWindow : Window
         var tag = Pages.FirstOrDefault(kv => kv.Value == e.SourcePageType).Key;
         // The editor and history keep the pane on whatever opened them.
         if (tag is null) return;
-        Nav.SelectedItem = tag == "sync"
+        // Sync is reached from Settings, so Settings stays lit.
+        section = tag == "sync" ? "settings" : tag;
+        Nav.SelectedItem = section == "settings"
             ? Nav.SettingsItem
-            : Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag);
+            : Nav.MenuItems.Concat(Nav.FooterMenuItems).OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == section);
     }
 
-    private void AddShortcut(VirtualKey key, Action action)
+    private void AddShortcut(VirtualKey key, Action action, VirtualKeyModifiers extra = VirtualKeyModifiers.None)
     {
-        var accelerator = new KeyboardAccelerator { Key = key, Modifiers = VirtualKeyModifiers.Control };
+        var accelerator = new KeyboardAccelerator { Key = key, Modifiers = VirtualKeyModifiers.Control | extra };
         accelerator.Invoked += (_, args) =>
         {
             action();

@@ -20,6 +20,10 @@ public sealed partial class EntryPage : Page
     private bool dirty;
     private CancellationTokenSource? saveTimer;
 
+    /// Every write still on its way to the core, so leaving can wait for them
+    /// before asking whether the entry is empty.
+    private Task writes = Task.CompletedTask;
+
     public EntryPage()
     {
         InitializeComponent();
@@ -44,6 +48,9 @@ public sealed partial class EntryPage : Page
         DatePicker.Date = Format.Date(en.Date).ToDateTime(TimeOnly.MinValue);
         TimePicker.SelectedTime = en.Time is { } t ? TimeOnly.ParseExact(t, "HH:mm", CultureInfo.InvariantCulture).ToTimeSpan() : null;
         TitleBox.Text = en.Title ?? "";
+        TitleBox.FontFamily = AppearanceService.TitleFont;
+        TitleBox.FontSize = 26 * AppearanceService.Scale;
+        Photos.Date = en.Date;
         Rating.Value = en.Rating ?? -1;
         FavoriteButton.IsChecked = en.IsFavorite;
         TagList.ItemsSource = en.Tags;
@@ -58,8 +65,26 @@ public sealed partial class EntryPage : Page
     protected override void OnNavigatedFrom(NavigationEventArgs e)
     {
         saveTimer?.Cancel();
-        if (dirty) _ = Save();
+        if (dirty) Track(Save());
+        // An entry left with nothing in it goes, rather than staying as an
+        // empty row. Not when it's only opening its own history.
+        if (entry is { } en && e.SourcePageType != typeof(HistoryPage)) _ = Discard(en.Id);
     }
+
+    private async Task Discard(string id)
+    {
+        try
+        {
+            await writes;
+        }
+        catch (CoreException)
+        {
+            // A failed write is no reason to keep or lose the entry.
+        }
+        await AppServices.DiscardIfEmpty(id);
+    }
+
+    private void Track(Task write) => writes = Task.WhenAll(writes, write);
 
     // --- Saving -----------------------------------------------------------------
 
@@ -91,7 +116,9 @@ public sealed partial class EntryPage : Page
         if (entry is not { } en) return;
         dirty = false;
         var blocks = Editor.Blocks();
-        var words = await AppServices.Write(s => s.SaveBody(en.Id, blocks));
+        var saving = AppServices.Write(s => s.SaveBody(en.Id, blocks));
+        Track(saving);
+        var words = await saving;
         WordCount.Text = Format.Words(words);
         SavedText.Text = "Saved";
     }
@@ -99,7 +126,9 @@ public sealed partial class EntryPage : Page
     private Task Update(Action<CoreStore, string> write)
     {
         if (loading || entry is not { } en) return Task.CompletedTask;
-        return AppServices.Write(s => write(s, en.Id));
+        var task = AppServices.Write(s => write(s, en.Id));
+        Track(task);
+        return task;
     }
 
     // --- Header fields ------------------------------------------------------------
@@ -129,6 +158,7 @@ public sealed partial class EntryPage : Page
     {
         if (DatePicker.Date is not { } d) return;
         var date = Format.Ymd(DateOnly.FromDateTime(d.Date));
+        if (!loading) Photos.Date = date;
         var time = TimePicker.SelectedTime is { } t ? TimeOnly.FromTimeSpan(t).ToString("HH:mm", CultureInfo.InvariantCulture) : null;
         _ = Update((s, id) => s.SetDateTime(id, date, time));
     }
@@ -140,7 +170,9 @@ public sealed partial class EntryPage : Page
         var name = TagBox.Text.Trim();
         if (name.Length == 0) return;
         TagBox.Text = "";
-        await AppServices.Write(s => s.TagEntry(en.Id, s.TagNamed(name).Id));
+        var tagging = AppServices.Write(s => s.TagEntry(en.Id, s.TagNamed(name).Id));
+        Track(tagging);
+        await tagging;
         await ReloadTags();
     }
 
@@ -210,6 +242,7 @@ public sealed partial class EntryPage : Page
         var confirm = new ContentDialog
         {
             XamlRoot = XamlRoot,
+            RequestedTheme = ActualTheme,
             Title = "Delete this entry?",
             Content = "It moves to Trash for 30 days, then it's gone from every device.",
             PrimaryButtonText = "Delete",
@@ -220,6 +253,7 @@ public sealed partial class EntryPage : Page
         dirty = false;
         saveTimer?.Cancel();
         await AppServices.Write(s => s.DeleteEntry(en.Id));
+        entry = null; // gone already: nothing to discard on the way out
         Shell.Window.GoBack();
     }
 }

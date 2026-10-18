@@ -1,0 +1,47 @@
+<!-- Earlier years' entries from today's date (SPEC.md §6.8), grouped by
+     year, newest first. -->
+<Page
+    x:Class="Librelog.App.Pages.OnThisDayPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:Librelog.Core"
+    xmlns:pages="using:Librelog.App.Pages"
+    Background="{ThemeResource PaperBrush}">
+
+    <Page.Resources>
+        <pages:OnThisDayTemplateSelector x:Key="Templates">
+            <pages:OnThisDayTemplateSelector.YearTemplate>
+                <DataTemplate x:DataType="pages:JournalDay">
+                    <StackPanel Margin="0,24,0,4" Spacing="2">
+                        <TextBlock Text="{x:Bind Name}" Style="{StaticResource HeadlineText}" />
+                        <TextBlock Text="{x:Bind Date}" Style="{StaticResource MicroLabel}" />
+                    </StackPanel>
+                </DataTemplate>
+            </pages:OnThisDayTemplateSelector.YearTemplate>
+            <pages:OnThisDayTemplateSelector.EntryTemplate>
+                <DataTemplate x:DataType="core:EntrySummary">
+                    <pages:EntryRow Entry="{x:Bind}" ShowDate="False" />
+                </DataTemplate>
+            </pages:OnThisDayTemplateSelector.EntryTemplate>
+        </pages:OnThisDayTemplateSelector>
+    </Page.Resources>
+
+    <Grid MaxWidth="760" Padding="40,32,40,0" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Spacing="4">
+            <TextBlock Text="ON THIS DAY" Style="{StaticResource MicroLabel}" />
+            <TextBlock x:Name="DateText" Style="{StaticResource TitleText}" />
+        </StackPanel>
+
+        <TextBlock x:Name="EmptyText" Grid.Row="1" Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}"
+                   Margin="0,16,0,0" Visibility="Collapsed"
+                   Text="Nothing written on this day in earlier years yet. Entries from today will show here next year." />
+
+        <ListView x:Name="List" Grid.Row="2" SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnItemClick"
+                  Padding="0,0,0,48" ItemTemplateSelector="{StaticResource Templates}" />
+    </Grid>
+</Page>

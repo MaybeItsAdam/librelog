@@ -28,11 +28,13 @@ public static class Appearance
     public const string Mono = "Geist Mono";
     public const double BodySize = 16;
 
-    public static TextAppearance Text(CharStyle c)
+    /// `face` is the reading face from Settings → Appearance and `scale` its
+    /// text size; code keeps Geist Mono whatever the face.
+    public static TextAppearance Text(CharStyle c, string face = Serif, double scale = 1)
     {
         var kind = BlockText.Decode(c.Kind);
         var code = c.Has(Inline.Code) || kind.T == "code";
-        var size = kind.T == "heading" ? kind.Level switch { 1 => 24, 2 => 20, _ => 18 } : BodySize;
+        var size = (kind.T == "heading" ? kind.Level switch { 1 => 24, 2 => 20, _ => 18 } : BodySize) * scale;
         var bold = c.Has(Inline.Bold) || kind.T == "heading";
         var italic = c.Has(Inline.Italic) || kind.T == "quote";
         var foreground = c.EntryLink is not null ? ColorRole.Azure
@@ -40,8 +42,8 @@ public static class Appearance
             : ColorRole.Ink;
         ColorRole? background = c.Has(Inline.Highlight) ? ColorRole.HighlightAmber : code ? ColorRole.CodeWell : null;
         return new TextAppearance(
-            code ? Mono : Serif,
-            code ? BodySize - 2 : size,
+            code ? Mono : face,
+            code ? (BodySize - 2) * scale : size,
             bold && !code,
             italic && !code,
             c.Has(Inline.Underline) || c.Link is not null || c.EntryLink is not null,

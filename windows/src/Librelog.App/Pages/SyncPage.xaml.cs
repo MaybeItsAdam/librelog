@@ -211,6 +211,7 @@ public sealed partial class SyncPage : Page
     {
         XamlRoot = XamlRoot,
         Style = (Style)Application.Current.Resources["DefaultContentDialogStyle"],
+        RequestedTheme = ActualTheme, // dialogs don't inherit the theme chosen in Settings
         Title = title,
         Content = content,
         PrimaryButtonText = primary,
@@ -221,7 +222,7 @@ public sealed partial class SyncPage : Page
     private void ShowTransfer(string message, bool error = false)
     {
         TransferText.Text = message;
-        TransferText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[error ? "RaspberryBrush" : "InkBrush"];
+        TransferText.Foreground = AppearanceService.Brush(this, error ? "RaspberryBrush" : "InkBrush");
     }
 
     private async void OnExport(object sender, RoutedEventArgs e)
@@ -236,7 +237,7 @@ public sealed partial class SyncPage : Page
             {
                 Text = detail,
                 Style = (Style)Application.Current.Resources["BodyText"],
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["MutedBrush"],
+                Foreground = AppearanceService.Brush(this, "MutedBrush"),
                 FontSize = 13,
                 TextWrapping = TextWrapping.Wrap,
             });
@@ -303,7 +304,7 @@ public sealed partial class SyncPage : Page
 
         var dialog = Dialog(
             $"Import from {preview.SourceName}",
-            PreviewContent(preview),
+            PreviewContent(preview, this),
             preview.ToImport == 0 ? "Nothing new to import" : $"Import {Entries(preview.ToImport)}");
         dialog.IsPrimaryButtonEnabled = preview.ToImport > 0;
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -323,17 +324,18 @@ public sealed partial class SyncPage : Page
         }
     }
 
-    private static StackPanel PreviewContent(ImportPreview p)
+    private static StackPanel PreviewContent(ImportPreview p, FrameworkElement scope)
     {
         var body = (Style)Application.Current.Resources["BodyText"];
-        var muted = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["MutedBrush"];
+        var muted = AppearanceService.Brush(scope, "MutedBrush");
+        var ink = AppearanceService.Brush(scope, "InkBrush");
         var panel = new StackPanel { Spacing = 8, MaxWidth = 420 };
         void Line(string text, bool dim = false) => panel.Children.Add(new TextBlock
         {
             Text = text,
             Style = body,
             TextWrapping = TextWrapping.Wrap,
-            Foreground = dim ? muted : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["InkBrush"],
+            Foreground = dim ? muted : ink,
         });
 
         var range = p.FirstDate is { } first && p.LastDate is { } last

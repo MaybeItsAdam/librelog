@@ -24,7 +24,9 @@ public partial class App : Application
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         AppServices.Start();
+        AppearanceService.Load();
         window = new MainWindow();
+        AppearanceService.ApplyTheme();
         window.Activate();
         HandleActivation(launch);
         _ = AppServices.Sync.Start();

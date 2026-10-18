@@ -136,5 +136,26 @@ public sealed record ImportPreview(
 
 public sealed record ImportResult(string Source, uint Imported, uint Skipped);
 
+/// A photo to keep on a day (core/src/media.rs, docs/photos.md). The core
+/// moves Path and PreviewPath into its media folders, so the app must not use
+/// them afterwards. HashRgba is the photo scaled to fit 100 × 100, straight
+/// RGBA; System.Text.Json sends a byte[] as base64, which is what the C ABI
+/// wants.
+public sealed record NewPhoto(
+    string Path, string Mime, uint Width, uint Height, string? TakenAt, double? Lat, double? Lng,
+    string PreviewPath, byte[] HashRgba, uint HashWidth, uint HashHeight,
+    string? SourceRef = null, string? LocalAsset = null);
+
+/// A photo kept on a day, as this device sees it. PreviewPath and
+/// OriginalPath are set only when this device has the files; otherwise draw
+/// the ThumbHash.
+public sealed record DayPhoto(
+    string Id, string JournalId, string Date, string? Mime, uint? Width, uint? Height, string? TakenAt,
+    string? Caption, string? Thumbhash, string? PreviewPath, string? OriginalPath, string? SourceRef,
+    bool FromThisDevice);
+
+/// A decoded ThumbHash: a small straight-RGBA image to draw stretched.
+public sealed record ThumbImage(uint Width, uint Height, byte[] Rgba);
+
 /// Error envelope from the C ABI.
 public sealed record CoreErrorBody(string Kind, string Message);

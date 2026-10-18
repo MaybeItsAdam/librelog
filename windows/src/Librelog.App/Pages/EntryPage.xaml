@@ -6,6 +6,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:core="using:Librelog.Core"
     xmlns:editor="using:Librelog.App.Editor"
+    xmlns:pages="using:Librelog.App.Pages"
     Background="{ThemeResource PaperBrush}">
 
     <Grid>
@@ -115,6 +116,11 @@
                 </StackPanel>
 
                 <editor:RichEditor x:Name="Editor" />
+
+                <!-- The day's photos sit on the day, not in the entry (docs/photos.md). -->
+                <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                    <pages:DayPhotosView x:Name="Photos" />
+                </Border>
             </StackPanel>
         </ScrollViewer>
 

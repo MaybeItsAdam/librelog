@@ -38,6 +38,12 @@ public sealed partial class EntryRow : UserControl
     private void Update()
     {
         if (entry is not { } e) return;
+        // The reading face from Settings → Appearance, picked up as rows are drawn.
+        TitleText.FontFamily = AppearanceService.TitleFont;
+        TitleText.FontSize = 16 * AppearanceService.Scale;
+        TitleText.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
+        ExcerptText.FontFamily = AppearanceService.ReadingFont;
+        ExcerptText.FontSize = 15 * AppearanceService.Scale;
         DateText.Text = ShowDate ? Format.Caps(Format.ShortDate(e.Date)) : "";
         TimeText.Text = Format.Time(e.Time);
         TitleText.Text = e.Title ?? "";
