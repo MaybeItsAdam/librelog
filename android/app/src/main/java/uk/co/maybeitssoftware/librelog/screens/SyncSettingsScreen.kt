@@ -60,6 +60,7 @@ import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.sync.GoogleSignIn
 import uk.co.maybeitssoftware.librelog.sync.SyncEngine
 import uk.co.maybeitssoftware.librelog.sync.SyncError
+import uk.co.maybeitssoftware.librelog.ui.GoogleSignInButton
 import uk.co.maybeitssoftware.librelog.ui.Hairline
 import uk.co.maybeitssoftware.librelog.ui.MicroLabel
 import uk.co.maybeitssoftware.librelog.ui.PrimaryButton
@@ -132,10 +133,9 @@ private fun SignIn(app: AppModel) {
     // iPhone and Mac; email follows under its own heading.
     if (GoogleSignIn.isConfigured) {
         Section("Sync across your devices") {
-            SecondaryButton(
-                "Continue with Google",
+            GoogleSignInButton(
+                enabled = !busy,
                 onClick = {
-                    if (busy) return@SecondaryButton
                     scope.launch {
                         busy = true
                         message = runCatching {

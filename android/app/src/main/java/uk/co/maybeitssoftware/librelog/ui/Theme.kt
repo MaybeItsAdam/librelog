@@ -102,6 +102,16 @@ object Radius {
     val control: Dp = 6.dp
 }
 
+/**
+ * Google's Sign-In button colours, fixed by its branding guidelines rather
+ * than the house palette: fill, 1dp inside stroke (none for neutral), text.
+ */
+enum class GoogleButtonTheme(val fill: Color, val stroke: Color?, val text: Color) {
+    Light(Color(0xFFFFFFFF), Color(0xFF747775), Color(0xFF1F1F1F)),
+    Dark(Color(0xFF131314), Color(0xFF8E918F), Color(0xFFE3E3E3)),
+    Neutral(Color(0xFFF2F2F2), null, Color(0xFF1F1F1F)),
+}
+
 object Typeface {
     val serif = FontFamily(
         Font(R.font.arvo_regular, FontWeight.Normal),
