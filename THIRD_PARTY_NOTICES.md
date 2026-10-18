@@ -24,6 +24,19 @@ text travels with them; each app ships it beside the font files.
 The OFL forbids selling the fonts on their own and using a Reserved Font
 Name for a modified font; neither applies to shipping them inside the app.
 
+## Brand marks
+
+The Google "G" on the Sign in with Google buttons is Google's trademark,
+used as Google's [Sign-In branding
+guidelines](https://developers.google.com/identity/branding-guidelines)
+allow; it is not covered by LibreLog's licence. It is taken from the
+guidelines' downloadable kit (`signin-assets.zip`) and converted, outline,
+colours and highlights unchanged, into each platform's vector format by
+`scripts/google-g-logo.py`: `apple/App/Assets.xcassets/GoogleG.imageset/`,
+`android/app/src/main/res/drawable/ic_google_g.xml` and
+`windows/src/Librelog.App/Assets/GoogleG.svg`. Sign in with Apple uses
+Apple's own system button, so no Apple mark is bundled.
+
 ## Rust core (`core/`)
 
 Statically linked into every app. Normal dependencies across all targets,
