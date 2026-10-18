@@ -20,6 +20,10 @@
             <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#FAF8F4" />
             <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#FAF8F4" />
             <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#FAF8F4" />
+            <!-- Google's Sign-In button, light theme (its guidelines' colours). -->
+            <SolidColorBrush x:Key="GoogleButtonFillBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="GoogleButtonStrokeBrush" Color="#747775" />
+            <SolidColorBrush x:Key="GoogleButtonTextBrush" Color="#1F1F1F" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="PaperBrush" Color="#1C1A23" />
@@ -33,6 +37,10 @@
             <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#1C1A23" />
             <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#1C1A23" />
             <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#1C1A23" />
+            <!-- Google's Sign-In button, dark theme. -->
+            <SolidColorBrush x:Key="GoogleButtonFillBrush" Color="#131314" />
+            <SolidColorBrush x:Key="GoogleButtonStrokeBrush" Color="#8E918F" />
+            <SolidColorBrush x:Key="GoogleButtonTextBrush" Color="#E3E3E3" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -116,5 +124,75 @@
         <Setter Property="BorderBrush" Value="{ThemeResource HairlineBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
+    </Style>
+
+    <!-- "Continue with Google", drawn to Google's Sign-In branding guidelines:
+         the standard-colour G at 20px, 12px in from the edge with 10px before
+         the label, the system font at 14px medium (Roboto isn't bundled), and
+         Google's light or dark colours following the theme, on a 40px button.
+         The transparent root makes the hit target 44px without growing the
+         painted button. -->
+    <Style x:Key="GoogleSignInButton" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource GoogleButtonFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource GoogleButtonStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{ThemeResource GoogleButtonTextBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid" Background="Transparent" MinHeight="44">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateLayer.Opacity" Value="0.08" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateLayer.Opacity" Value="0.12" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Surface.Opacity" Value="0.38" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="Surface" Height="40" VerticalAlignment="Center"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <Grid>
+                                <Border x:Name="StateLayer" Background="{TemplateBinding Foreground}" Opacity="0"
+                                        CornerRadius="{TemplateBinding CornerRadius}" />
+                                <StackPanel Orientation="Horizontal" Spacing="10" Padding="12,0"
+                                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}">
+                                    <Image Width="20" Height="20" VerticalAlignment="Center">
+                                        <Image.Source>
+                                            <SvgImageSource UriSource="ms-appx:///Assets/GoogleG.svg" />
+                                        </Image.Source>
+                                    </Image>
+                                    <ContentPresenter Content="{TemplateBinding Content}"
+                                                      Foreground="{TemplateBinding Foreground}"
+                                                      FontSize="{TemplateBinding FontSize}"
+                                                      FontWeight="{TemplateBinding FontWeight}"
+                                                      VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 </ResourceDictionary>

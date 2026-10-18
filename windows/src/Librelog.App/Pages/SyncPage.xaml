@@ -33,7 +33,8 @@
                     <TextBlock Text="SIGN IN" Style="{StaticResource MicroLabel}" />
                     <TextBlock Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}"
                                Text="Entries are encrypted on this PC before they're uploaded. The server only ever stores ciphertext." />
-                    <Button Style="{StaticResource PlainButton}" Content="Continue with Google" Click="OnGoogle" HorizontalAlignment="Stretch" />
+                    <Button Style="{StaticResource GoogleSignInButton}" Content="Continue with Google" Click="OnGoogle"
+                            AutomationProperties.Name="Continue with Google" />
                     <TextBlock Text="OR WITH EMAIL" Style="{StaticResource MicroLabel}" />
                     <TextBox x:Name="EmailBox" PlaceholderText="you@example.com" InputScope="EmailSmtpAddress" CornerRadius="6" />
                     <Button x:Name="SendButton" Style="{StaticResource PrimaryButton}" Content="Email me a sign-in link" Click="OnSendEmail" />
