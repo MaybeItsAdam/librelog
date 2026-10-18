@@ -32,6 +32,8 @@ pub(crate) struct Inner {
 #[derive(uniffi::Object)]
 pub struct Store {
     device_id: String,
+    /// The folder holding the database; media/ and thumbs/ live beside it.
+    pub(crate) dir: std::path::PathBuf,
     inner: Mutex<Inner>,
 }
 
@@ -68,7 +70,8 @@ impl Store {
             tx.commit()?;
         }
 
-        Ok(Arc::new(Store { device_id, inner: Mutex::new(Inner { conn, clock, key: None }) }))
+        let dir = std::path::Path::new(&path).parent().map(|p| p.to_path_buf()).unwrap_or_default();
+        Ok(Arc::new(Store { device_id, dir, inner: Mutex::new(Inner { conn, clock, key: None }) }))
     }
 
     /// This install's id, a UUID. Sent as `p_device_id` to every sync RPC.
@@ -238,8 +241,45 @@ impl Store {
         self.write("entries", &id, json!({ "deleted_at": now_rfc3339() }))
     }
 
+    /// Deletes an entry that was opened and left untouched: no title, no
+    /// words, no rating, tags or favourite. The apps call this when the
+    /// editor closes. Returns whether it was deleted.
+    pub fn discard_if_empty(&self, id: String) -> Result<bool> {
+        let empty: bool = self.lock().conn.query_row(
+            "select coalesce(trim(title), '') = '' and trim(body_text) = '' and rating is null and not is_favorite
+               and not exists (select 1 from entry_tags t where t.entry_id = e.id and t.deleted_at is null)
+               and not exists (select 1 from attachments a where a.entry_id = e.id and a.deleted_at is null)
+             from entries e where id = ?1 and deleted_at is null",
+            [&id],
+            |r| r.get(0),
+        ).optional()?.unwrap_or(false);
+        if empty {
+            self.delete_entry(id)?;
+        }
+        Ok(empty)
+    }
+
     pub fn restore_entry(&self, id: String) -> Result<()> {
         self.write("entries", &id, json!({ "deleted_at": null }))
+    }
+
+    // --- Settings that follow the user to every device -------------------------
+
+    /// A synced setting, or none if never set. Keys are dotted names the apps
+    /// agree on (docs/appearance.md lists them).
+    pub fn setting(&self, key: String) -> Result<Option<String>> {
+        Ok(self
+            .lock()
+            .conn
+            .query_row("select value from synced_settings where id = ?1 and deleted_at is null", [key], |r| r.get(0))
+            .optional()?
+            .flatten())
+    }
+
+    /// Sets a synced setting; none goes back to the default.
+    pub fn set_setting(&self, key: String, value: Option<String>) -> Result<()> {
+        let key = non_empty(key, "setting key")?;
+        self.write("synced_settings", &key, json!({ "value": value, "deleted_at": null }))
     }
 
     // --- Reading -------------------------------------------------------------
@@ -1063,6 +1103,33 @@ mod tests {
         let cursor = TimelineCursor { date: last.date.clone(), time: last.time.clone(), id: last.id.clone() };
         let page2 = s.timeline(TimelineFilter::default(), Some(cursor), 10).unwrap();
         assert_eq!(page2.iter().map(|e| e.excerpt.as_str()).collect::<Vec<_>>(), ["two", "one"]);
+    }
+
+    #[test]
+    fn settings_round_trip_and_reset() {
+        let s = store();
+        assert_eq!(s.setting("appearance.theme".into()).unwrap(), None);
+        s.set_setting("appearance.theme".into(), Some("dark".into())).unwrap();
+        assert_eq!(s.setting("appearance.theme".into()).unwrap().as_deref(), Some("dark"));
+        s.set_setting("appearance.theme".into(), None).unwrap();
+        assert_eq!(s.setting("appearance.theme".into()).unwrap(), None);
+    }
+
+    #[test]
+    fn untouched_entries_are_discarded_and_written_ones_kept() {
+        let s = store();
+        let blank = s.create_entry(None, "2026-10-18".into(), None).unwrap();
+        assert!(s.discard_if_empty(blank.id.clone()).unwrap());
+        assert!(s.day("2026-10-18".into(), None).unwrap().is_empty());
+
+        let rated = s.create_entry(None, "2026-10-18".into(), None).unwrap();
+        s.set_rating(rated.id.clone(), Some(4.0)).unwrap();
+        assert!(!s.discard_if_empty(rated.id).unwrap());
+
+        let written = s.create_entry(None, "2026-10-18".into(), None).unwrap();
+        s.save_body(written.id.clone(), para("Hello")).unwrap();
+        assert!(!s.discard_if_empty(written.id).unwrap());
+        assert_eq!(s.day("2026-10-18".into(), None).unwrap().len(), 2);
     }
 
     #[test]

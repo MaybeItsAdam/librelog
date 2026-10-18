@@ -165,6 +165,18 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
             let id = args!(id: String);
             ok(json!(s.delete_entry(id)?))
         }
+        "setting" => {
+            let key = args!(key: String);
+            ok(json!(s.setting(key)?))
+        }
+        "set_setting" => {
+            let (key, value) = args!(key: String, value: Option<String>);
+            ok(json!(s.set_setting(key, value)?))
+        }
+        "discard_if_empty" => {
+            let id = args!(id: String);
+            ok(json!(s.discard_if_empty(id)?))
+        }
         "restore_entry" => {
             let id = args!(id: String);
             ok(json!(s.restore_entry(id)?))
@@ -305,6 +317,31 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
         "refresh_calendar_events" => {
             let lookups = args!(lookups: Vec<crate::CalendarLookup>);
             ok(json!(s.refresh_calendar_events(lookups)?))
+        }
+        "add_day_photo" => {
+            // `photo.hash_rgba` travels as base64, like every byte string here.
+            let (journal_id, date, mut photo) = args!(journal_id: Option<String>, date: String, photo: Value);
+            let rgba = photo.get("hash_rgba").and_then(Value::as_str).map(bytes).transpose()?.unwrap_or_default();
+            photo["hash_rgba"] = json!(rgba);
+            let photo: crate::NewPhoto = serde_json::from_value(photo)?;
+            ok(json!(s.add_day_photo(journal_id, date, photo)?))
+        }
+        "day_photos" => {
+            let (journal_id, date) = args!(journal_id: Option<String>, date: String);
+            ok(json!(s.day_photos(journal_id, date)?))
+        }
+        "remove_day_photo" => {
+            let id = args!(id: String);
+            ok(json!(s.remove_day_photo(id)?))
+        }
+        "set_photo_caption" => {
+            let (id, caption) = args!(id: String, caption: Option<String>);
+            ok(json!(s.set_photo_caption(id, caption)?))
+        }
+        "thumbhash_image" => {
+            let thumbhash = args!(thumbhash: String);
+            let img = crate::thumbhash_image(thumbhash)?;
+            ok(json!({ "width": img.width, "height": img.height, "rgba": B64.encode(img.rgba) }))
         }
         other => Err(CoreError::Invalid(format!("unknown store method {other}"))),
     }
@@ -475,6 +512,21 @@ mod tests {
         let gone = json!({"lookups": [{"key": "windows:1", "event": null}]});
         assert_eq!(call(h, "refresh_calendar_events", gone)["ok"], 1);
         assert_eq!(call(h, "kept_calendar_events", json!({"date": "2026-10-03"}))["ok"][0]["state"], "cancelled");
+
+        let (orig, prev) = (dir.path().join("p.jpg"), dir.path().join("p-preview.jpg"));
+        std::fs::write(&orig, b"pixels").unwrap();
+        std::fs::write(&prev, b"preview").unwrap();
+        let photo = json!({"path": orig, "mime": "image/jpeg", "width": 40, "height": 30, "taken_at": null,
+                           "lat": null, "lng": null, "preview_path": prev,
+                           "hash_rgba": B64.encode([9u8, 9, 9, 255].repeat(4)), "hash_width": 2, "hash_height": 2,
+                           "source_ref": null, "local_asset": null});
+        let added = call(h, "add_day_photo", json!({"date": "2026-10-03", "photo": photo}));
+        let thumb = added["ok"]["thumbhash"].as_str().unwrap();
+        assert!(call(h, "thumbhash_image", json!({"thumbhash": thumb}))["ok"]["rgba"].is_string());
+        assert_eq!(call(h, "day_photos", json!({"date": "2026-10-03"}))["ok"].as_array().unwrap().len(), 1);
+
+        let blank = call(h, "create_entry", json!({"date": "2026-10-04"}))["ok"]["id"].clone();
+        assert_eq!(call(h, "discard_if_empty", json!({"id": blank}))["ok"], true);
         unsafe { dl_store_close(h) };
     }
 }

@@ -681,6 +681,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_func_markdown_shortcut(
     ): Int
+    external fun uniffi_librelog_core_checksum_func_thumbhash_image(
+    ): Int
     external fun uniffi_librelog_core_checksum_func_parse_pairing_qr(
     ): Int
     external fun uniffi_librelog_core_checksum_func_export_extension(
@@ -705,6 +707,18 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_tracked_calendar_events(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_add_day_photo(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_day_photos(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_photos_awaiting_source_ref(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_remove_day_photo(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_photo_caption(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_photo_source_ref(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_apply_incoming(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_apply_snapshot(
@@ -720,6 +734,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_librelog_core_checksum_method_store_delete_entry(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_device_id(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_discard_if_empty(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_entry(
     ): Int
@@ -783,7 +799,11 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_set_rating(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_setting(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_set_title(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_setting(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_snapshot(
     ): Int
@@ -857,6 +877,18 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_tracked_calendar_events(`ptr`: Long,`keyPrefix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_add_day_photo(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`photo`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_day_photos(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_photos_awaiting_source_ref(`ptr`: Long,`assetPrefix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_remove_day_photo(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_photo_caption(`ptr`: Long,`id`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_photo_source_ref(`ptr`: Long,`id`: RustBuffer.ByValue,`sourceRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_librelog_core_fn_method_store_apply_incoming(`ptr`: Long,`rows`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_apply_snapshot(`ptr`: Long,`seq`: Long,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -873,6 +905,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_device_id(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_discard_if_empty(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_librelog_core_fn_method_store_entry(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_export(`ptr`: Long,`format`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,`journalId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -935,8 +969,12 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_set_rating(`ptr`: Long,`id`: RustBuffer.ByValue,`rating`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_setting(`ptr`: Long,`key`: RustBuffer.ByValue,`value`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_librelog_core_fn_method_store_set_title(`ptr`: Long,`id`: RustBuffer.ByValue,`title`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_librelog_core_fn_method_store_setting(`ptr`: Long,`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_snapshot(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_stats(`ptr`: Long,`today`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -958,6 +996,8 @@ internal object UniffiLib {
     external fun uniffi_librelog_core_fn_func_blocks_word_count(`blocks`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
     external fun uniffi_librelog_core_fn_func_markdown_shortcut(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_func_thumbhash_image(`thumbhash`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_func_parse_pairing_qr(`qr`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1091,6 +1131,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_func_markdown_shortcut() and 0xFFFF) != 49686) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_func_thumbhash_image() and 0xFFFF) != 63422) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_func_parse_pairing_qr() and 0xFFFF) != 37035) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1127,6 +1170,24 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_tracked_calendar_events() and 0xFFFF) != 2002) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_method_store_add_day_photo() and 0xFFFF) != 11669) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_day_photos() and 0xFFFF) != 12701) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_photos_awaiting_source_ref() and 0xFFFF) != 62904) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_remove_day_photo() and 0xFFFF) != 35833) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_photo_caption() and 0xFFFF) != 33176) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_photo_source_ref() and 0xFFFF) != 62731) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_method_store_apply_incoming() and 0xFFFF) != 46898) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1149,6 +1210,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_device_id() and 0xFFFF) != 28483) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_discard_if_empty() and 0xFFFF) != 57575) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_entry() and 0xFFFF) != 55598) {
@@ -1244,7 +1308,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_set_rating() and 0xFFFF) != 30071) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_setting() and 0xFFFF) != 57492) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_method_store_set_title() and 0xFFFF) != 27285) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_setting() and 0xFFFF) != 11310) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_snapshot() and 0xFFFF) != 6241) {
@@ -2109,6 +2179,41 @@ public interface StoreInterface {
     fun `trackedCalendarEvents`(`keyPrefix`: kotlin.String): List<KeptEvent>
     
     /**
+     * Keeps a photo on a journal day. Keeping the same file on the same day
+     * again (on any device) lands on the same row, bringing it back if it
+     * had been removed.
+     */
+    fun `addDayPhoto`(`journalId`: kotlin.String?, `date`: kotlin.String, `photo`: NewPhoto): DayPhoto
+    
+    /**
+     * The photos kept on one day, in the order they were taken.
+     */
+    fun `dayPhotos`(`journalId`: kotlin.String?, `date`: kotlin.String): List<DayPhoto>
+    
+    /**
+     * Photos added here whose `source_ref` isn't known yet and whose local
+     * asset id starts with `asset_prefix` ("apple:"), for the app to look up
+     * when it comes to the front.
+     */
+    fun `photosAwaitingSourceRef`(`assetPrefix`: kotlin.String): List<PhotoAsset>
+    
+    /**
+     * Takes a photo off its day, on every device. The files go too, unless
+     * the same photo is still kept on another day.
+     */
+    fun `removeDayPhoto`(`id`: kotlin.String)
+    
+    /**
+     * The user's caption on a photo; empty clears it.
+     */
+    fun `setPhotoCaption`(`id`: kotlin.String, `caption`: kotlin.String?)
+    
+    /**
+     * Records where other devices can find a photo, once the app knows.
+     */
+    fun `setPhotoSourceRef`(`id`: kotlin.String, `sourceRef`: kotlin.String)
+    
+    /**
      * Merges rows from `pull_ops`, in the order the server returned them.
      */
     fun `applyIncoming`(`rows`: List<IncomingOps>): PullResult
@@ -2144,6 +2249,13 @@ public interface StoreInterface {
      * This install's id, a UUID. Sent as `p_device_id` to every sync RPC.
      */
     fun `deviceId`(): kotlin.String
+    
+    /**
+     * Deletes an entry that was opened and left untouched: no title, no
+     * words, no rating, tags or favourite. The apps call this when the
+     * editor closes. Returns whether it was deleted.
+     */
+    fun `discardIfEmpty`(`id`: kotlin.String): kotlin.Boolean
     
     fun `entry`(`id`: kotlin.String): Entry
     
@@ -2275,7 +2387,18 @@ public interface StoreInterface {
      */
     fun `setRating`(`id`: kotlin.String, `rating`: kotlin.Double?)
     
+    /**
+     * Sets a synced setting; none goes back to the default.
+     */
+    fun `setSetting`(`key`: kotlin.String, `value`: kotlin.String?)
+    
     fun `setTitle`(`id`: kotlin.String, `title`: kotlin.String?)
+    
+    /**
+     * A synced setting, or none if never set. Keys are dotted names the apps
+     * agree on (docs/appearance.md lists them).
+     */
+    fun `setting`(`key`: kotlin.String): kotlin.String?
     
     /**
      * The whole synced state, sealed, for `put_snapshot` (SPEC.md §12.5).
@@ -2558,6 +2681,121 @@ open class Store: Disposable, AutoCloseable, StoreInterface
 
     
     /**
+     * Keeps a photo on a journal day. Keeping the same file on the same day
+     * again (on any device) lands on the same row, bringing it back if it
+     * had been removed.
+     */
+    @Throws(CoreException::class)override fun `addDayPhoto`(`journalId`: kotlin.String?, `date`: kotlin.String, `photo`: NewPhoto): DayPhoto {
+            return FfiConverterTypeDayPhoto.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_add_day_photo(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterTypeNewPhoto.lower(`photo`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The photos kept on one day, in the order they were taken.
+     */
+    @Throws(CoreException::class)override fun `dayPhotos`(`journalId`: kotlin.String?, `date`: kotlin.String): List<DayPhoto> {
+            return FfiConverterSequenceTypeDayPhoto.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_day_photos(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Photos added here whose `source_ref` isn't known yet and whose local
+     * asset id starts with `asset_prefix` ("apple:"), for the app to look up
+     * when it comes to the front.
+     */
+    @Throws(CoreException::class)override fun `photosAwaitingSourceRef`(`assetPrefix`: kotlin.String): List<PhotoAsset> {
+            return FfiConverterSequenceTypePhotoAsset.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_photos_awaiting_source_ref(
+        it,
+        
+        FfiConverterString.lower(`assetPrefix`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Takes a photo off its day, on every device. The files go too, unless
+     * the same photo is still kept on another day.
+     */
+    @Throws(CoreException::class)override fun `removeDayPhoto`(`id`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_remove_day_photo(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * The user's caption on a photo; empty clears it.
+     */
+    @Throws(CoreException::class)override fun `setPhotoCaption`(`id`: kotlin.String, `caption`: kotlin.String?)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_photo_caption(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalString.lower(`caption`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Records where other devices can find a photo, once the app knows.
+     */
+    @Throws(CoreException::class)override fun `setPhotoSourceRef`(`id`: kotlin.String, `sourceRef`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_photo_source_ref(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterString.lower(`sourceRef`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * Merges rows from `pull_ops`, in the order the server returned them.
      */
     @Throws(CoreException::class)override fun `applyIncoming`(`rows`: List<IncomingOps>): PullResult {
@@ -2691,6 +2929,26 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     UniffiLib.uniffi_librelog_core_fn_method_store_device_id(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Deletes an entry that was opened and left untouched: no title, no
+     * words, no rating, tags or favourite. The apps call this when the
+     * editor closes. Returns whether it was deleted.
+     */
+    @Throws(CoreException::class)override fun `discardIfEmpty`(`id`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_discard_if_empty(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
 }
     }
     )
@@ -3225,6 +3483,24 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     
 
     
+    /**
+     * Sets a synced setting; none goes back to the default.
+     */
+    @Throws(CoreException::class)override fun `setSetting`(`key`: kotlin.String, `value`: kotlin.String?)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_setting(
+        it,
+        
+        FfiConverterString.lower(`key`),
+        FfiConverterOptionalString.lower(`value`),_status)
+}
+    }
+    
+    
+
+    
     @Throws(CoreException::class)override fun `setTitle`(`id`: kotlin.String, `title`: kotlin.String?)
         = 
     callWithHandle {
@@ -3237,6 +3513,25 @@ open class Store: Disposable, AutoCloseable, StoreInterface
 }
     }
     
+    
+
+    
+    /**
+     * A synced setting, or none if never set. Keys are dotted names the apps
+     * agree on (docs/appearance.md lists them).
+     */
+    @Throws(CoreException::class)override fun `setting`(`key`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_setting(
+        it,
+        
+        FfiConverterString.lower(`key`),_status)
+}
+    }
+    )
+    }
     
 
     
@@ -3712,6 +4007,117 @@ public object FfiConverterTypeDayMark: FfiConverterRustBuffer<DayMark> {
             FfiConverterOptionalDouble.write(value.`rating`, buf)
             FfiConverterBoolean.write(value.`spanBefore`, buf)
             FfiConverterBoolean.write(value.`spanAfter`, buf)
+    }
+}
+
+
+
+/**
+ * A photo kept on a day, as one device sees it.
+ */
+data class DayPhoto (
+    var `id`: kotlin.String
+    , 
+    var `journalId`: kotlin.String
+    , 
+    var `date`: kotlin.String
+    , 
+    var `mime`: kotlin.String?
+    , 
+    var `width`: kotlin.UInt?
+    , 
+    var `height`: kotlin.UInt?
+    , 
+    var `takenAt`: kotlin.String?
+    , 
+    var `caption`: kotlin.String?
+    , 
+    /**
+     * Base64 ThumbHash: decode with [`thumbhash_image`] for the blurred tile.
+     */
+    var `thumbhash`: kotlin.String?
+    , 
+    /**
+     * The preview JPEG, when this device has it.
+     */
+    var `previewPath`: kotlin.String?
+    , 
+    /**
+     * The original, when this device has it.
+     */
+    var `originalPath`: kotlin.String?
+    , 
+    /**
+     * Where this device might find it in its own library ("icloud:<id>").
+     */
+    var `sourceRef`: kotlin.String?
+    , 
+    /**
+     * Added on this device.
+     */
+    var `fromThisDevice`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDayPhoto: FfiConverterRustBuffer<DayPhoto> {
+    override fun read(buf: ByteBuffer): DayPhoto {
+        return DayPhoto(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DayPhoto) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`journalId`) +
+            FfiConverterString.allocationSize(value.`date`) +
+            FfiConverterOptionalString.allocationSize(value.`mime`) +
+            FfiConverterOptionalUInt.allocationSize(value.`width`) +
+            FfiConverterOptionalUInt.allocationSize(value.`height`) +
+            FfiConverterOptionalString.allocationSize(value.`takenAt`) +
+            FfiConverterOptionalString.allocationSize(value.`caption`) +
+            FfiConverterOptionalString.allocationSize(value.`thumbhash`) +
+            FfiConverterOptionalString.allocationSize(value.`previewPath`) +
+            FfiConverterOptionalString.allocationSize(value.`originalPath`) +
+            FfiConverterOptionalString.allocationSize(value.`sourceRef`) +
+            FfiConverterBoolean.allocationSize(value.`fromThisDevice`)
+    )
+
+    override fun write(value: DayPhoto, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`journalId`, buf)
+            FfiConverterString.write(value.`date`, buf)
+            FfiConverterOptionalString.write(value.`mime`, buf)
+            FfiConverterOptionalUInt.write(value.`width`, buf)
+            FfiConverterOptionalUInt.write(value.`height`, buf)
+            FfiConverterOptionalString.write(value.`takenAt`, buf)
+            FfiConverterOptionalString.write(value.`caption`, buf)
+            FfiConverterOptionalString.write(value.`thumbhash`, buf)
+            FfiConverterOptionalString.write(value.`previewPath`, buf)
+            FfiConverterOptionalString.write(value.`originalPath`, buf)
+            FfiConverterOptionalString.write(value.`sourceRef`, buf)
+            FfiConverterBoolean.write(value.`fromThisDevice`, buf)
     }
 }
 
@@ -4314,6 +4720,127 @@ public object FfiConverterTypeMark: FfiConverterRustBuffer<Mark> {
 
 
 /**
+ * A photo to keep on a day. The app owns the image work; the core owns where
+ * the files go and what syncs.
+ */
+data class NewPhoto (
+    /**
+     * The original, exactly as picked or taken. Moved into the journal's
+     * media folder, so the app must not use this path afterwards.
+     */
+    var `path`: kotlin.String
+    , 
+    /**
+     * `image/heic`, `image/jpeg`, …
+     */
+    var `mime`: kotlin.String
+    , 
+    var `width`: kotlin.UInt
+    , 
+    var `height`: kotlin.UInt
+    , 
+    /**
+     * When it was taken, RFC 3339, from the photo's metadata.
+     */
+    var `takenAt`: kotlin.String?
+    , 
+    var `lat`: kotlin.Double?
+    , 
+    var `lng`: kotlin.Double?
+    , 
+    /**
+     * A JPEG of at most 1024 px on the long side, made by the app. Moved in
+     * like `path`.
+     */
+    var `previewPath`: kotlin.String
+    , 
+    /**
+     * The photo scaled to fit 100 × 100, as RGBA bytes, for the ThumbHash.
+     */
+    var `hashRgba`: kotlin.ByteArray
+    , 
+    var `hashWidth`: kotlin.UInt
+    , 
+    var `hashHeight`: kotlin.UInt
+    , 
+    /**
+     * Where other devices can find it themselves, if known now.
+     */
+    var `sourceRef`: kotlin.String?
+    , 
+    /**
+     * This device's own id for it in the system library ("apple:<local
+     * identifier>"), so `source_ref` can be filled in later. Never synced.
+     */
+    var `localAsset`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNewPhoto: FfiConverterRustBuffer<NewPhoto> {
+    override fun read(buf: ByteBuffer): NewPhoto {
+        return NewPhoto(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalDouble.read(buf),
+            FfiConverterOptionalDouble.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterByteArray.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: NewPhoto) = (
+            FfiConverterString.allocationSize(value.`path`) +
+            FfiConverterString.allocationSize(value.`mime`) +
+            FfiConverterUInt.allocationSize(value.`width`) +
+            FfiConverterUInt.allocationSize(value.`height`) +
+            FfiConverterOptionalString.allocationSize(value.`takenAt`) +
+            FfiConverterOptionalDouble.allocationSize(value.`lat`) +
+            FfiConverterOptionalDouble.allocationSize(value.`lng`) +
+            FfiConverterString.allocationSize(value.`previewPath`) +
+            FfiConverterByteArray.allocationSize(value.`hashRgba`) +
+            FfiConverterUInt.allocationSize(value.`hashWidth`) +
+            FfiConverterUInt.allocationSize(value.`hashHeight`) +
+            FfiConverterOptionalString.allocationSize(value.`sourceRef`) +
+            FfiConverterOptionalString.allocationSize(value.`localAsset`)
+    )
+
+    override fun write(value: NewPhoto, buf: ByteBuffer) {
+            FfiConverterString.write(value.`path`, buf)
+            FfiConverterString.write(value.`mime`, buf)
+            FfiConverterUInt.write(value.`width`, buf)
+            FfiConverterUInt.write(value.`height`, buf)
+            FfiConverterOptionalString.write(value.`takenAt`, buf)
+            FfiConverterOptionalDouble.write(value.`lat`, buf)
+            FfiConverterOptionalDouble.write(value.`lng`, buf)
+            FfiConverterString.write(value.`previewPath`, buf)
+            FfiConverterByteArray.write(value.`hashRgba`, buf)
+            FfiConverterUInt.write(value.`hashWidth`, buf)
+            FfiConverterUInt.write(value.`hashHeight`, buf)
+            FfiConverterOptionalString.write(value.`sourceRef`, buf)
+            FfiConverterOptionalString.write(value.`localAsset`, buf)
+    }
+}
+
+
+
+/**
  * A batch of local changes ready for `push_ops`. `payload` is already
  * encrypted and base64-encoded; the app sends it as-is and calls
  * `push_succeeded` with the same `batch_id` once the server accepts it.
@@ -4440,6 +4967,47 @@ public object FfiConverterTypePairingCode: FfiConverterRustBuffer<PairingCode> {
     override fun write(value: PairingCode, buf: ByteBuffer) {
             FfiConverterString.write(value.`id`, buf)
             FfiConverterByteArray.write(value.`publicKey`, buf)
+    }
+}
+
+
+
+/**
+ * A photo whose `source_ref` isn't known yet, with this device's asset id.
+ */
+data class PhotoAsset (
+    var `id`: kotlin.String
+    , 
+    var `localAsset`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePhotoAsset: FfiConverterRustBuffer<PhotoAsset> {
+    override fun read(buf: ByteBuffer): PhotoAsset {
+        return PhotoAsset(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PhotoAsset) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`localAsset`)
+    )
+
+    override fun write(value: PhotoAsset, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`localAsset`, buf)
     }
 }
 
@@ -4746,6 +5314,52 @@ public object FfiConverterTypeTag: FfiConverterRustBuffer<Tag> {
             FfiConverterOptionalString.write(value.`color`, buf)
             FfiConverterBoolean.write(value.`isTracker`, buf)
             FfiConverterOptionalString.write(value.`value`, buf)
+    }
+}
+
+
+
+/**
+ * A decoded ThumbHash, ready to draw scaled up.
+ */
+data class ThumbImage (
+    var `width`: kotlin.UInt
+    , 
+    var `height`: kotlin.UInt
+    , 
+    var `rgba`: kotlin.ByteArray
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeThumbImage: FfiConverterRustBuffer<ThumbImage> {
+    override fun read(buf: ByteBuffer): ThumbImage {
+        return ThumbImage(
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterByteArray.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ThumbImage) = (
+            FfiConverterUInt.allocationSize(value.`width`) +
+            FfiConverterUInt.allocationSize(value.`height`) +
+            FfiConverterByteArray.allocationSize(value.`rgba`)
+    )
+
+    override fun write(value: ThumbImage, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`width`, buf)
+            FfiConverterUInt.write(value.`height`, buf)
+            FfiConverterByteArray.write(value.`rgba`, buf)
     }
 }
 
@@ -5419,6 +6033,38 @@ public object FfiConverterTypeMarkKind : FfiConverterRustBuffer<MarkKind>{
 /**
  * @suppress
  */
+public object FfiConverterOptionalUInt: FfiConverterRustBuffer<kotlin.UInt?> {
+    override fun read(buf: ByteBuffer): kotlin.UInt? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterUInt.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.UInt?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterUInt.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.UInt?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterUInt.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalDouble: FfiConverterRustBuffer<kotlin.Double?> {
     override fun read(buf: ByteBuffer): kotlin.Double? {
         if (buf.get().toInt() == 0) {
@@ -5751,6 +6397,34 @@ public object FfiConverterSequenceTypeDayMark: FfiConverterRustBuffer<List<DayMa
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeDayPhoto: FfiConverterRustBuffer<List<DayPhoto>> {
+    override fun read(buf: ByteBuffer): List<DayPhoto> {
+        val len = buf.getInt()
+        return List<DayPhoto>(len) {
+            FfiConverterTypeDayPhoto.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<DayPhoto>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeDayPhoto.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<DayPhoto>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeDayPhoto.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeEntrySummary: FfiConverterRustBuffer<List<EntrySummary>> {
     override fun read(buf: ByteBuffer): List<EntrySummary> {
         val len = buf.getInt()
@@ -5891,6 +6565,34 @@ public object FfiConverterSequenceTypeMark: FfiConverterRustBuffer<List<Mark>> {
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypePhotoAsset: FfiConverterRustBuffer<List<PhotoAsset>> {
+    override fun read(buf: ByteBuffer): List<PhotoAsset> {
+        val len = buf.getInt()
+        return List<PhotoAsset>(len) {
+            FfiConverterTypePhotoAsset.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<PhotoAsset>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypePhotoAsset.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<PhotoAsset>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypePhotoAsset.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeRevision: FfiConverterRustBuffer<List<Revision>> {
     override fun read(buf: ByteBuffer): List<Revision> {
         val len = buf.getInt()
@@ -5996,6 +6698,22 @@ public object FfiConverterSequenceTypeTag: FfiConverterRustBuffer<List<Tag>> {
     
         
         FfiConverterString.lower(`text`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decodes a ThumbHash from [`DayPhoto::thumbhash`] into a small RGBA image
+         * (about 32 px on the long side) for the app to draw stretched and smooth.
+         */
+    @Throws(CoreException::class) fun `thumbhashImage`(`thumbhash`: kotlin.String): ThumbImage {
+            return FfiConverterTypeThumbImage.lift(
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_func_thumbhash_image(
+    
+        
+        FfiConverterString.lower(`thumbhash`),_status)
 }
     )
     }

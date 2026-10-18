@@ -70,6 +70,9 @@ importing the new zip only adds what's new.
 To try an import on a scratch database: `cargo run --example import --
 /tmp/test.sqlite <file>` in `core/`.
 
+Photos kept on a day: [docs/photos.md](docs/photos.md). Theme, accent, font
+and text size: [docs/appearance.md](docs/appearance.md).
+
 ## Not built yet
 
 Payments (Stripe, store subscriptions), branded sign-in emails (needs SMTP),

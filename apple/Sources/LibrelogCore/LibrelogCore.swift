@@ -847,6 +847,41 @@ public protocol StoreProtocol: AnyObject, Sendable {
     func trackedCalendarEvents(keyPrefix: String) throws  -> [KeptEvent]
     
     /**
+     * Keeps a photo on a journal day. Keeping the same file on the same day
+     * again (on any device) lands on the same row, bringing it back if it
+     * had been removed.
+     */
+    func addDayPhoto(journalId: String?, date: String, photo: NewPhoto) throws  -> DayPhoto
+    
+    /**
+     * The photos kept on one day, in the order they were taken.
+     */
+    func dayPhotos(journalId: String?, date: String) throws  -> [DayPhoto]
+    
+    /**
+     * Photos added here whose `source_ref` isn't known yet and whose local
+     * asset id starts with `asset_prefix` ("apple:"), for the app to look up
+     * when it comes to the front.
+     */
+    func photosAwaitingSourceRef(assetPrefix: String) throws  -> [PhotoAsset]
+    
+    /**
+     * Takes a photo off its day, on every device. The files go too, unless
+     * the same photo is still kept on another day.
+     */
+    func removeDayPhoto(id: String) throws 
+    
+    /**
+     * The user's caption on a photo; empty clears it.
+     */
+    func setPhotoCaption(id: String, caption: String?) throws 
+    
+    /**
+     * Records where other devices can find a photo, once the app knows.
+     */
+    func setPhotoSourceRef(id: String, sourceRef: String) throws 
+    
+    /**
      * Merges rows from `pull_ops`, in the order the server returned them.
      */
     func applyIncoming(rows: [IncomingOps]) throws  -> PullResult
@@ -882,6 +917,13 @@ public protocol StoreProtocol: AnyObject, Sendable {
      * This install's id, a UUID. Sent as `p_device_id` to every sync RPC.
      */
     func deviceId()  -> String
+    
+    /**
+     * Deletes an entry that was opened and left untouched: no title, no
+     * words, no rating, tags or favourite. The apps call this when the
+     * editor closes. Returns whether it was deleted.
+     */
+    func discardIfEmpty(id: String) throws  -> Bool
     
     func entry(id: String) throws  -> Entry
     
@@ -1013,7 +1055,18 @@ public protocol StoreProtocol: AnyObject, Sendable {
      */
     func setRating(id: String, rating: Double?) throws 
     
+    /**
+     * Sets a synced setting; none goes back to the default.
+     */
+    func setSetting(key: String, value: String?) throws 
+    
     func setTitle(id: String, title: String?) throws 
+    
+    /**
+     * A synced setting, or none if never set. Keys are dotted names the apps
+     * agree on (docs/appearance.md lists them).
+     */
+    func setting(key: String) throws  -> String?
     
     /**
      * The whole synced state, sealed, for `put_snapshot` (SPEC.md §12.5).
@@ -1222,6 +1275,91 @@ open func trackedCalendarEvents(keyPrefix: String)throws  -> [KeptEvent]  {
 }
     
     /**
+     * Keeps a photo on a journal day. Keeping the same file on the same day
+     * again (on any device) lands on the same row, bringing it back if it
+     * had been removed.
+     */
+open func addDayPhoto(journalId: String?, date: String, photo: NewPhoto)throws  -> DayPhoto  {
+    return try  FfiConverterTypeDayPhoto_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_add_day_photo(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterTypeNewPhoto_lower(photo),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The photos kept on one day, in the order they were taken.
+     */
+open func dayPhotos(journalId: String?, date: String)throws  -> [DayPhoto]  {
+    return try  FfiConverterSequenceTypeDayPhoto.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_day_photos(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Photos added here whose `source_ref` isn't known yet and whose local
+     * asset id starts with `asset_prefix` ("apple:"), for the app to look up
+     * when it comes to the front.
+     */
+open func photosAwaitingSourceRef(assetPrefix: String)throws  -> [PhotoAsset]  {
+    return try  FfiConverterSequenceTypePhotoAsset.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_photos_awaiting_source_ref(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(assetPrefix),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Takes a photo off its day, on every device. The files go too, unless
+     * the same photo is still kept on another day.
+     */
+open func removeDayPhoto(id: String)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_remove_day_photo(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * The user's caption on a photo; empty clears it.
+     */
+open func setPhotoCaption(id: String, caption: String?)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_photo_caption(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionString.lower(caption),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Records where other devices can find a photo, once the app knows.
+     */
+open func setPhotoSourceRef(id: String, sourceRef: String)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_photo_source_ref(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterString.lower(sourceRef),uniffiCallStatus
+    )
+}
+}
+    
+    /**
      * Merges rows from `pull_ops`, in the order the server returned them.
      */
 open func applyIncoming(rows: [IncomingOps])throws  -> PullResult  {
@@ -1320,6 +1458,21 @@ open func deviceId() -> String  {
         uniffiCallStatus in
     uniffi_librelog_core_fn_method_store_device_id(
             self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Deletes an entry that was opened and left untouched: no title, no
+     * words, no rating, tags or favourite. The apps call this when the
+     * editor closes. Returns whether it was deleted.
+     */
+open func discardIfEmpty(id: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_discard_if_empty(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),uniffiCallStatus
     )
 })
 }
@@ -1697,6 +1850,19 @@ open func setRating(id: String, rating: Double?)throws   {try rustCallWithError(
 }
 }
     
+    /**
+     * Sets a synced setting; none goes back to the default.
+     */
+open func setSetting(key: String, value: String?)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_setting(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(key),
+        FfiConverterOptionString.lower(value),uniffiCallStatus
+    )
+}
+}
+    
 open func setTitle(id: String, title: String?)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
         uniffiCallStatus in
     uniffi_librelog_core_fn_method_store_set_title(
@@ -1705,6 +1871,20 @@ open func setTitle(id: String, title: String?)throws   {try rustCallWithError(Ff
         FfiConverterOptionString.lower(title),uniffiCallStatus
     )
 }
+}
+    
+    /**
+     * A synced setting, or none if never set. Keys are dotted names the apps
+     * agree on (docs/appearance.md lists them).
+     */
+open func setting(key: String)throws  -> String?  {
+    return try  FfiConverterOptionString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_setting(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(key),uniffiCallStatus
+    )
+})
 }
     
     /**
@@ -2236,6 +2416,137 @@ public func FfiConverterTypeDayMark_lift(_ buf: RustBuffer) throws -> DayMark {
 #endif
 public func FfiConverterTypeDayMark_lower(_ value: DayMark) -> RustBuffer {
     return FfiConverterTypeDayMark.lower(value)
+}
+
+
+/**
+ * A photo kept on a day, as one device sees it.
+ */
+public struct DayPhoto: Equatable, Hashable {
+    public var id: String
+    public var journalId: String
+    public var date: String
+    public var mime: String?
+    public var width: UInt32?
+    public var height: UInt32?
+    public var takenAt: String?
+    public var caption: String?
+    /**
+     * Base64 ThumbHash: decode with [`thumbhash_image`] for the blurred tile.
+     */
+    public var thumbhash: String?
+    /**
+     * The preview JPEG, when this device has it.
+     */
+    public var previewPath: String?
+    /**
+     * The original, when this device has it.
+     */
+    public var originalPath: String?
+    /**
+     * Where this device might find it in its own library ("icloud:<id>").
+     */
+    public var sourceRef: String?
+    /**
+     * Added on this device.
+     */
+    public var fromThisDevice: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, journalId: String, date: String, mime: String?, width: UInt32?, height: UInt32?, takenAt: String?, caption: String?, 
+        /**
+         * Base64 ThumbHash: decode with [`thumbhash_image`] for the blurred tile.
+         */thumbhash: String?, 
+        /**
+         * The preview JPEG, when this device has it.
+         */previewPath: String?, 
+        /**
+         * The original, when this device has it.
+         */originalPath: String?, 
+        /**
+         * Where this device might find it in its own library ("icloud:<id>").
+         */sourceRef: String?, 
+        /**
+         * Added on this device.
+         */fromThisDevice: Bool) {
+        self.id = id
+        self.journalId = journalId
+        self.date = date
+        self.mime = mime
+        self.width = width
+        self.height = height
+        self.takenAt = takenAt
+        self.caption = caption
+        self.thumbhash = thumbhash
+        self.previewPath = previewPath
+        self.originalPath = originalPath
+        self.sourceRef = sourceRef
+        self.fromThisDevice = fromThisDevice
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DayPhoto: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDayPhoto: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DayPhoto {
+        return
+            try DayPhoto(
+                id: FfiConverterString.read(from: &buf), 
+                journalId: FfiConverterString.read(from: &buf), 
+                date: FfiConverterString.read(from: &buf), 
+                mime: FfiConverterOptionString.read(from: &buf), 
+                width: FfiConverterOptionUInt32.read(from: &buf), 
+                height: FfiConverterOptionUInt32.read(from: &buf), 
+                takenAt: FfiConverterOptionString.read(from: &buf), 
+                caption: FfiConverterOptionString.read(from: &buf), 
+                thumbhash: FfiConverterOptionString.read(from: &buf), 
+                previewPath: FfiConverterOptionString.read(from: &buf), 
+                originalPath: FfiConverterOptionString.read(from: &buf), 
+                sourceRef: FfiConverterOptionString.read(from: &buf), 
+                fromThisDevice: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DayPhoto, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.journalId, into: &buf)
+        FfiConverterString.write(value.date, into: &buf)
+        FfiConverterOptionString.write(value.mime, into: &buf)
+        FfiConverterOptionUInt32.write(value.width, into: &buf)
+        FfiConverterOptionUInt32.write(value.height, into: &buf)
+        FfiConverterOptionString.write(value.takenAt, into: &buf)
+        FfiConverterOptionString.write(value.caption, into: &buf)
+        FfiConverterOptionString.write(value.thumbhash, into: &buf)
+        FfiConverterOptionString.write(value.previewPath, into: &buf)
+        FfiConverterOptionString.write(value.originalPath, into: &buf)
+        FfiConverterOptionString.write(value.sourceRef, into: &buf)
+        FfiConverterBool.write(value.fromThisDevice, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDayPhoto_lift(_ buf: RustBuffer) throws -> DayPhoto {
+    return try FfiConverterTypeDayPhoto.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDayPhoto_lower(_ value: DayPhoto) -> RustBuffer {
+    return FfiConverterTypeDayPhoto.lower(value)
 }
 
 
@@ -2967,6 +3278,156 @@ public func FfiConverterTypeMark_lower(_ value: Mark) -> RustBuffer {
 
 
 /**
+ * A photo to keep on a day. The app owns the image work; the core owns where
+ * the files go and what syncs.
+ */
+public struct NewPhoto: Equatable, Hashable {
+    /**
+     * The original, exactly as picked or taken. Moved into the journal's
+     * media folder, so the app must not use this path afterwards.
+     */
+    public var path: String
+    /**
+     * `image/heic`, `image/jpeg`, …
+     */
+    public var mime: String
+    public var width: UInt32
+    public var height: UInt32
+    /**
+     * When it was taken, RFC 3339, from the photo's metadata.
+     */
+    public var takenAt: String?
+    public var lat: Double?
+    public var lng: Double?
+    /**
+     * A JPEG of at most 1024 px on the long side, made by the app. Moved in
+     * like `path`.
+     */
+    public var previewPath: String
+    /**
+     * The photo scaled to fit 100 × 100, as RGBA bytes, for the ThumbHash.
+     */
+    public var hashRgba: Data
+    public var hashWidth: UInt32
+    public var hashHeight: UInt32
+    /**
+     * Where other devices can find it themselves, if known now.
+     */
+    public var sourceRef: String?
+    /**
+     * This device's own id for it in the system library ("apple:<local
+     * identifier>"), so `source_ref` can be filled in later. Never synced.
+     */
+    public var localAsset: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The original, exactly as picked or taken. Moved into the journal's
+         * media folder, so the app must not use this path afterwards.
+         */path: String, 
+        /**
+         * `image/heic`, `image/jpeg`, …
+         */mime: String, width: UInt32, height: UInt32, 
+        /**
+         * When it was taken, RFC 3339, from the photo's metadata.
+         */takenAt: String?, lat: Double?, lng: Double?, 
+        /**
+         * A JPEG of at most 1024 px on the long side, made by the app. Moved in
+         * like `path`.
+         */previewPath: String, 
+        /**
+         * The photo scaled to fit 100 × 100, as RGBA bytes, for the ThumbHash.
+         */hashRgba: Data, hashWidth: UInt32, hashHeight: UInt32, 
+        /**
+         * Where other devices can find it themselves, if known now.
+         */sourceRef: String?, 
+        /**
+         * This device's own id for it in the system library ("apple:<local
+         * identifier>"), so `source_ref` can be filled in later. Never synced.
+         */localAsset: String?) {
+        self.path = path
+        self.mime = mime
+        self.width = width
+        self.height = height
+        self.takenAt = takenAt
+        self.lat = lat
+        self.lng = lng
+        self.previewPath = previewPath
+        self.hashRgba = hashRgba
+        self.hashWidth = hashWidth
+        self.hashHeight = hashHeight
+        self.sourceRef = sourceRef
+        self.localAsset = localAsset
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension NewPhoto: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeNewPhoto: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NewPhoto {
+        return
+            try NewPhoto(
+                path: FfiConverterString.read(from: &buf), 
+                mime: FfiConverterString.read(from: &buf), 
+                width: FfiConverterUInt32.read(from: &buf), 
+                height: FfiConverterUInt32.read(from: &buf), 
+                takenAt: FfiConverterOptionString.read(from: &buf), 
+                lat: FfiConverterOptionDouble.read(from: &buf), 
+                lng: FfiConverterOptionDouble.read(from: &buf), 
+                previewPath: FfiConverterString.read(from: &buf), 
+                hashRgba: FfiConverterData.read(from: &buf), 
+                hashWidth: FfiConverterUInt32.read(from: &buf), 
+                hashHeight: FfiConverterUInt32.read(from: &buf), 
+                sourceRef: FfiConverterOptionString.read(from: &buf), 
+                localAsset: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: NewPhoto, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterString.write(value.mime, into: &buf)
+        FfiConverterUInt32.write(value.width, into: &buf)
+        FfiConverterUInt32.write(value.height, into: &buf)
+        FfiConverterOptionString.write(value.takenAt, into: &buf)
+        FfiConverterOptionDouble.write(value.lat, into: &buf)
+        FfiConverterOptionDouble.write(value.lng, into: &buf)
+        FfiConverterString.write(value.previewPath, into: &buf)
+        FfiConverterData.write(value.hashRgba, into: &buf)
+        FfiConverterUInt32.write(value.hashWidth, into: &buf)
+        FfiConverterUInt32.write(value.hashHeight, into: &buf)
+        FfiConverterOptionString.write(value.sourceRef, into: &buf)
+        FfiConverterOptionString.write(value.localAsset, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNewPhoto_lift(_ buf: RustBuffer) throws -> NewPhoto {
+    return try FfiConverterTypeNewPhoto.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNewPhoto_lower(_ value: NewPhoto) -> RustBuffer {
+    return FfiConverterTypeNewPhoto.lower(value)
+}
+
+
+/**
  * A batch of local changes ready for `push_ops`. `payload` is already
  * encrypted and base64-encoded; the app sends it as-is and calls
  * `push_succeeded` with the same `batch_id` once the server accepts it.
@@ -3142,6 +3603,63 @@ public func FfiConverterTypePairingCode_lift(_ buf: RustBuffer) throws -> Pairin
 #endif
 public func FfiConverterTypePairingCode_lower(_ value: PairingCode) -> RustBuffer {
     return FfiConverterTypePairingCode.lower(value)
+}
+
+
+/**
+ * A photo whose `source_ref` isn't known yet, with this device's asset id.
+ */
+public struct PhotoAsset: Equatable, Hashable {
+    public var id: String
+    public var localAsset: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, localAsset: String) {
+        self.id = id
+        self.localAsset = localAsset
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PhotoAsset: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePhotoAsset: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PhotoAsset {
+        return
+            try PhotoAsset(
+                id: FfiConverterString.read(from: &buf), 
+                localAsset: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PhotoAsset, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.localAsset, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePhotoAsset_lift(_ buf: RustBuffer) throws -> PhotoAsset {
+    return try FfiConverterTypePhotoAsset.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePhotoAsset_lower(_ value: PhotoAsset) -> RustBuffer {
+    return FfiConverterTypePhotoAsset.lower(value)
 }
 
 
@@ -3553,6 +4071,67 @@ public func FfiConverterTypeTag_lift(_ buf: RustBuffer) throws -> Tag {
 #endif
 public func FfiConverterTypeTag_lower(_ value: Tag) -> RustBuffer {
     return FfiConverterTypeTag.lower(value)
+}
+
+
+/**
+ * A decoded ThumbHash, ready to draw scaled up.
+ */
+public struct ThumbImage: Equatable, Hashable {
+    public var width: UInt32
+    public var height: UInt32
+    public var rgba: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(width: UInt32, height: UInt32, rgba: Data) {
+        self.width = width
+        self.height = height
+        self.rgba = rgba
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ThumbImage: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeThumbImage: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThumbImage {
+        return
+            try ThumbImage(
+                width: FfiConverterUInt32.read(from: &buf), 
+                height: FfiConverterUInt32.read(from: &buf), 
+                rgba: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ThumbImage, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.width, into: &buf)
+        FfiConverterUInt32.write(value.height, into: &buf)
+        FfiConverterData.write(value.rgba, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThumbImage_lift(_ buf: RustBuffer) throws -> ThumbImage {
+    return try FfiConverterTypeThumbImage.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThumbImage_lower(_ value: ThumbImage) -> RustBuffer {
+    return FfiConverterTypeThumbImage.lower(value)
 }
 
 
@@ -4300,6 +4879,30 @@ public func FfiConverterTypeMarkKind_lower(_ value: MarkKind) -> RustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
+    typealias SwiftType = UInt32?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterUInt32.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterUInt32.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionDouble: FfiConverterRustBuffer {
     typealias SwiftType = Double?
 
@@ -4569,6 +5172,31 @@ fileprivate struct FfiConverterSequenceTypeDayMark: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeDayPhoto: FfiConverterRustBuffer {
+    typealias SwiftType = [DayPhoto]
+
+    public static func write(_ value: [DayPhoto], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDayPhoto.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DayPhoto] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DayPhoto]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDayPhoto.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeEntrySummary: FfiConverterRustBuffer {
     typealias SwiftType = [EntrySummary]
 
@@ -4694,6 +5322,31 @@ fileprivate struct FfiConverterSequenceTypeMark: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypePhotoAsset: FfiConverterRustBuffer {
+    typealias SwiftType = [PhotoAsset]
+
+    public static func write(_ value: [PhotoAsset], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypePhotoAsset.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [PhotoAsset] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [PhotoAsset]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypePhotoAsset.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeRevision: FfiConverterRustBuffer {
     typealias SwiftType = [Revision]
 
@@ -4789,6 +5442,18 @@ public func markdownShortcut(text: String) -> Shortcut?  {
     )
 })
 }
+/**
+ * Decodes a ThumbHash from [`DayPhoto::thumbhash`] into a small RGBA image
+ * (about 32 px on the long side) for the app to draw stretched and smooth.
+ */
+public func thumbhashImage(thumbhash: String)throws  -> ThumbImage  {
+    return try  FfiConverterTypeThumbImage_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_func_thumbhash_image(
+        FfiConverterString.lower(thumbhash),uniffiCallStatus
+    )
+})
+}
 public func parsePairingQr(qr: String)throws  -> PairingCode  {
     return try  FfiConverterTypePairingCode_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
         uniffiCallStatus in
@@ -4830,6 +5495,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_func_markdown_shortcut() != 49686) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_librelog_core_checksum_func_thumbhash_image() != 63422) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_librelog_core_checksum_func_parse_pairing_qr() != 37035) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4866,6 +5534,24 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_tracked_calendar_events() != 2002) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_librelog_core_checksum_method_store_add_day_photo() != 11669) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_day_photos() != 12701) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_photos_awaiting_source_ref() != 62904) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_remove_day_photo() != 35833) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_photo_caption() != 33176) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_photo_source_ref() != 62731) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_librelog_core_checksum_method_store_apply_incoming() != 46898) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4888,6 +5574,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_device_id() != 28483) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_discard_if_empty() != 57575) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_entry() != 55598) {
@@ -4983,7 +5672,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_set_rating() != 30071) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_librelog_core_checksum_method_store_set_setting() != 57492) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_librelog_core_checksum_method_store_set_title() != 27285) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_setting() != 11310) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_snapshot() != 6241) {

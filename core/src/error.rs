@@ -30,4 +30,12 @@ impl From<serde_json::Error> for CoreError {
     }
 }
 
+/// File work (photos in media/). Reported as a storage failure, like the
+/// database, so the apps need no new case.
+impl From<std::io::Error> for CoreError {
+    fn from(e: std::io::Error) -> Self {
+        CoreError::Database(format!("file: {e}"))
+    }
+}
+
 pub type Result<T> = std::result::Result<T, CoreError>;

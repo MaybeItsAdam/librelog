@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Synced tables and the columns that sync. Anything not listed here
-/// (attachments.local_path, the FTS index, sync bookkeeping) stays on the
+/// (attachments.local_path and local_asset, the FTS index, sync bookkeeping) stays on the
 /// device. `changes::write` refuses fields outside this list, so a new
 /// column has to be added here deliberately to start syncing.
 pub const SYNCED: &[(&str, &[&str])] = &[
@@ -29,8 +29,9 @@ pub const SYNCED: &[(&str, &[&str])] = &[
     (
         "attachments",
         &[
-            "entry_id", "kind", "content_hash", "mime", "bytes", "width", "height", "duration_ms",
-            "taken_at", "lat", "lng", "caption", "sort", "thumbhash", "origin_device_id", "deleted_at",
+            "entry_id", "journal_id", "date", "kind", "content_hash", "mime", "bytes", "width", "height",
+            "duration_ms", "taken_at", "lat", "lng", "caption", "sort", "thumbhash", "source_ref",
+            "origin_device_id", "created_at", "deleted_at",
         ],
     ),
     (
@@ -289,6 +290,48 @@ const MIGRATIONS: &[&str] = &[
     );
     create index calendar_events_day on calendar_events (journal_id, date) where deleted_at is null;
     create index calendar_events_key on calendar_events (event_key) where deleted_at is null;
+    "#,
+    // 5: photos kept on a journal day (media.rs). Attachments no longer need
+    // an entry, so the table is rebuilt with entry_id nullable. Nothing wrote
+    // to it before this, but rows are copied anyway.
+    r#"
+    create table attachments_new (
+      id                text primary key,
+      entry_id          text,           -- the entry it belongs to, or none for a day's photo
+      journal_id        text,
+      date              text,           -- the journal day, YYYY-MM-DD
+      kind              text not null default 'photo',  -- photo | video | audio | file | drawing
+      content_hash      text,           -- BLAKE3 of the original; names its file in media/
+      mime              text,
+      bytes             integer,
+      width             integer,
+      height            integer,
+      duration_ms       integer,
+      taken_at          text,
+      lat               real,
+      lng               real,
+      caption           text,
+      sort              integer not null default 0,
+      thumbhash         text,           -- base64, ~25 bytes: the blurred preview other devices show
+      source_ref        text,           -- where other devices can find it themselves: "icloud:<id>"
+      origin_device_id  text,
+      created_at        text,
+      local_path        text,           -- device-local; never synced
+      local_asset       text,           -- device-local: "apple:<PHAsset id>", until source_ref is known
+      updated_at        text not null,
+      deleted_at        text
+    );
+    insert into attachments_new
+      (id, entry_id, kind, content_hash, mime, bytes, width, height, duration_ms, taken_at, lat, lng,
+       caption, sort, thumbhash, origin_device_id, local_path, updated_at, deleted_at)
+    select id, entry_id, kind, content_hash, mime, bytes, width, height, duration_ms, taken_at, lat, lng,
+       caption, sort, thumbhash, origin_device_id, local_path, updated_at, deleted_at
+    from attachments;
+    drop table attachments;
+    alter table attachments_new rename to attachments;
+    create index attachments_entry on attachments (entry_id) where deleted_at is null;
+    create index attachments_day on attachments (journal_id, date) where deleted_at is null;
+    create index attachments_hash on attachments (content_hash) where deleted_at is null;
     "#,
 ];
 

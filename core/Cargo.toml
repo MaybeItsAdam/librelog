@@ -38,6 +38,7 @@ x25519-dalek = { version = "3", features = ["static_secrets"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 csv = "1"
 jiff = "0.2"
+thumbhash = "0.1.0"
 
 [dev-dependencies]
 tempfile = "3"

@@ -14,6 +14,7 @@ pub mod doc;
 mod error;
 mod hlc;
 mod markdown;
+mod media;
 mod model;
 mod pairing;
 mod search;
@@ -22,6 +23,7 @@ mod transfer;
 
 pub use calendar::*;
 pub use error::CoreError;
+pub use media::*;
 pub use model::*;
 pub use pairing::*;
 pub use store::Store;

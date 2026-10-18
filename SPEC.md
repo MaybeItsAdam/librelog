@@ -357,7 +357,9 @@ journals, kept integration data, synced settings, and attachment
 
 Photos, video, audio, files and drawings stay on the device they were added
 on. Other devices show the attachment as a blurred ThumbHash tile labelled
-"On iPhone" (the origin device's name). Media moves between devices only via
+"On iPhone" (the origin device's name). Apple devices sharing an iCloud Photos library
+show the real photo from their own library through a synced
+`source_ref` (`docs/photos.md`). Media moves between devices only via
 export/backup (§16). Media sync is a possible later add-on (§19).
 
 Why: text is ≈ 1–5 MB per user per year even encrypted, so hosting cost
