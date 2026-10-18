@@ -17,6 +17,9 @@ struct EntryEditorView: View {
     @State private var newTag = ""
     @State private var showConflicts = false
     @State private var confirmDelete = false
+    /// Set when leaving discarded the entry for being empty, so coming back
+    /// to it (from a full-screen photo, say) can bring it back.
+    @State private var discarded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -44,7 +47,8 @@ struct EntryEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task(id: entryID) { await load() }
-        .onDisappear { flushSave() }
+        .onAppear(perform: reopen)
+        .onDisappear(perform: close)
         .sheet(isPresented: $showConflicts) {
             if let entry { ConflictsView(entryID: entry.id) }
         }
@@ -93,6 +97,7 @@ struct EntryEditorView: View {
 
             tagRow(entry)
             DayCalendarSection(date: entry.date)
+            DayPhotosSection(date: entry.date)
             Divider().overlay(Color.hairline)
         }
     }
@@ -310,9 +315,24 @@ struct EntryEditorView: View {
         }
     }
 
-    private func flushSave() {
+    /// Leaving: saves what's pending, then deletes the entry if nothing was
+    /// ever written in it, so a stray "New entry" leaves nothing behind.
+    private func close() {
         saveTask?.cancel()
-        Task { await save() }
+        let id = entryID
+        let deleting = confirmDelete
+        Task {
+            await save()
+            guard !deleting else { return }
+            if await app.discardIfEmpty(id) { discarded = true }
+        }
+    }
+
+    private func reopen() {
+        guard discarded else { return }
+        discarded = false
+        let id = entryID
+        Task { await app.write { try $0.restoreEntry(id: id) } }
     }
 
     private func save() async {

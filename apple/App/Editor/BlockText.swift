@@ -224,7 +224,7 @@ enum BlockText {
                     if let value { s.addAttribute(key, value: value, range: r) } else { s.removeAttribute(key, range: r) }
                 }
                 if attrs[entryLink] != nil {
-                    s.addAttribute(.foregroundColor, value: PlatformColor.hex(Palette.azure), range: r)
+                    s.addAttribute(.foregroundColor, value: PlatformColor.hex(Appearance.current.accentHex), range: r)
                 }
             }
             location = NSMaxRange(para)
@@ -238,6 +238,7 @@ enum BlockText {
             return PlatformFont(name: "GeistMono-Regular", size: bodySize - 2)
                 ?? .monospacedSystemFont(ofSize: bodySize - 2, weight: .regular)
         }
+        let appearance = Appearance.current
         var size = bodySize
         var b = bold
         var i = italic
@@ -249,17 +250,51 @@ enum BlockText {
             i = true
         default: break
         }
-        let name = switch (b, i) {
-        case (true, true): "Arvo-BoldItalic"
-        case (true, false): "Arvo-Bold"
-        case (false, true): "Arvo-Italic"
-        case (false, false): "Arvo"
-        }
+        size *= appearance.scale
         #if canImport(UIKit)
-        let scaled = UIFontMetrics(forTextStyle: .body).scaledValue(for: size)
-        return PlatformFont(name: name, size: scaled) ?? .systemFont(ofSize: scaled)
+        size = UIFontMetrics(forTextStyle: .body).scaledValue(for: size)
+        #endif
+        // The reading face the user chose (docs/appearance.md).
+        switch appearance.face {
+        case .arvo:
+            let name = switch (b, i) {
+            case (true, true): "Arvo-BoldItalic"
+            case (true, false): "Arvo-Bold"
+            case (false, true): "Arvo-Italic"
+            case (false, false): "Arvo"
+            }
+            return PlatformFont(name: name, size: size) ?? .systemFont(ofSize: size)
+        case .mono:
+            let base = PlatformFont(name: "GeistMono-Regular", size: size)
+                ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+            return styled(base, bold: b, italic: i)
+        case .sans:
+            return styled(.systemFont(ofSize: size), bold: b, italic: i)
+        case .serif:
+            let base = PlatformFont.systemFont(ofSize: size)
+            #if canImport(UIKit)
+            let serif = base.fontDescriptor.withDesign(.serif).map { PlatformFont(descriptor: $0, size: size) } ?? base
+            #else
+            let serif = base.fontDescriptor.withDesign(.serif).flatMap { PlatformFont(descriptor: $0, size: size) } ?? base
+            #endif
+            return styled(serif, bold: b, italic: i)
+        }
+    }
+
+    /// `font` with bold and italic traits, where the face has them.
+    private static func styled(_ font: PlatformFont, bold: Bool, italic: Bool) -> PlatformFont {
+        guard bold || italic else { return font }
+        #if canImport(UIKit)
+        var traits = font.fontDescriptor.symbolicTraits
+        if bold { traits.insert(.traitBold) }
+        if italic { traits.insert(.traitItalic) }
+        guard let d = font.fontDescriptor.withSymbolicTraits(traits) else { return font }
+        return PlatformFont(descriptor: d, size: font.pointSize)
         #else
-        return PlatformFont(name: name, size: size) ?? .systemFont(ofSize: size)
+        var traits = font.fontDescriptor.symbolicTraits
+        if bold { traits.insert(.bold) }
+        if italic { traits.insert(.italic) }
+        return PlatformFont(descriptor: font.fontDescriptor.withSymbolicTraits(traits), size: font.pointSize) ?? font
         #endif
     }
 

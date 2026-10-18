@@ -52,8 +52,14 @@ extension Color {
     static let muted = Color(light: 0x6e6b7c, dark: 0xb6b3bf)
     static let dim = Color(light: 0xb6b3bf, dark: 0x6e6b7c)
 
-    // Accents: same hex in both modes.
-    static let primary = Color(hex: Palette.azure)
+    // Accents: same hex in both modes. The primary role follows the user's
+    // accent (docs/appearance.md); status colours keep their meaning.
+    @MainActor static var primary: Color { Color(hex: AppearanceModel.shared.value.accentHex) }
+    /// Text and icons drawn on a primary fill: white, or ink on amber.
+    @MainActor static var onPrimary: Color {
+        AppearanceModel.shared.value.accentNeedsInk ? Color(hex: Palette.grape) : .white
+    }
+    static let info = Color(hex: Palette.azure)
     static let success = Color(hex: Palette.emerald)
     static let danger = Color(hex: Palette.raspberry)
     static let warning = Color(hex: Palette.amber)
@@ -105,6 +111,7 @@ enum Radius {
 }
 
 enum Typeface {
+    /// The brand serif, for display and chrome.
     static func serif(_ size: CGFloat, bold: Bool = false, relativeTo style: Font.TextStyle = .body) -> Font {
         .custom(bold ? "Arvo-Bold" : "Arvo", size: size, relativeTo: style)
     }
@@ -113,10 +120,54 @@ enum Typeface {
         .custom("GeistMono-Regular", size: size, relativeTo: style)
     }
 
-    static let body = serif(17)
-    static let title = serif(28, bold: true, relativeTo: .largeTitle)
-    static let headline = serif(19, bold: true, relativeTo: .headline)
+    /// The reading and writing face the user chose (Settings → Appearance),
+    /// at their text size on top of Dynamic Type. Entries, titles and the
+    /// editor use it; chrome keeps its own faces.
+    @MainActor static func reading(_ size: CGFloat, bold: Bool = false, relativeTo style: Font.TextStyle = .body) -> Font {
+        let a = AppearanceModel.shared.value
+        let s = size * a.scale
+        switch a.face {
+        case .arvo: return serif(s, bold: bold, relativeTo: style)
+        case .mono: return .custom("GeistMono-Regular", size: s, relativeTo: style).weight(bold ? .bold : .regular)
+        case .sans: return .system(size: scaled(s, style), weight: bold ? .bold : .regular)
+        case .serif: return .system(size: scaled(s, style), weight: bold ? .bold : .regular, design: .serif)
+        }
+    }
+
+    /// The system faces don't follow Dynamic Type at a fixed size, so scale
+    /// the size the way `.custom(_:size:relativeTo:)` would.
+    private static func scaled(_ size: CGFloat, _ style: Font.TextStyle) -> CGFloat {
+        #if canImport(UIKit)
+        UIFontMetrics(forTextStyle: style.uiKit).scaledValue(for: size)
+        #else
+        size
+        #endif
+    }
+
+    @MainActor static var body: Font { reading(17) }
+    @MainActor static var title: Font { reading(28, bold: true, relativeTo: .largeTitle) }
+    @MainActor static var headline: Font { reading(19, bold: true, relativeTo: .headline) }
 }
+
+#if canImport(UIKit)
+private extension Font.TextStyle {
+    var uiKit: UIFont.TextStyle {
+        switch self {
+        case .largeTitle: .largeTitle
+        case .title: .title1
+        case .title2: .title2
+        case .title3: .title3
+        case .headline: .headline
+        case .subheadline: .subheadline
+        case .callout: .callout
+        case .footnote: .footnote
+        case .caption: .caption1
+        case .caption2: .caption2
+        default: .body
+        }
+    }
+}
+#endif
 
 extension View {
     /// The micro-label: 10pt, bold, uppercase, 0.15em tracking, muted.

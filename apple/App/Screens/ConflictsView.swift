@@ -27,7 +27,7 @@ struct ConflictsView: View {
                                 .foregroundStyle(Color.muted)
                         }
                         Text(blocksToMarkdown(blocks: r.body))
-                            .font(Typeface.serif(15))
+                            .font(Typeface.reading(15))
                             .foregroundStyle(Color.ink)
                             .textSelection(.enabled)
                     }

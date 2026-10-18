@@ -3,8 +3,9 @@ import CoreImage.CIFilterBuiltins
 import CryptoKit
 import SwiftUI
 
-/// Sync setup and status (SPEC.md §12). Everything here is optional: the
-/// journal works fully without an account.
+/// Settings: appearance, then sync setup and status (SPEC.md §12), then
+/// import and export. Sync is optional: the journal works fully without an
+/// account.
 struct SyncSettingsView: View {
     @Environment(AppModel.self) private var app
     @State private var email = ""
@@ -17,6 +18,7 @@ struct SyncSettingsView: View {
     var body: some View {
         let sync = app.sync
         Form {
+            AppearanceSection()
             switch sync.phase {
             case .off: signIn
             case .needsKey: KeySetupView()
@@ -378,7 +380,7 @@ private struct RecoveryPhraseSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Write these 24 words down")
-                        .font(Typeface.title)
+                        .font(Typeface.serif(28, bold: true, relativeTo: .largeTitle))
                         .foregroundStyle(Color.ink)
                     Text("They're the only way to read your synced journal on a new device if you lose this one. Nobody can reset them for you, including us.")
                         .font(Typeface.serif(15))

@@ -2,13 +2,10 @@ import SwiftUI
 
 /// The home screen: every entry, newest first, grouped by day. Today is
 /// always the first group, so there's one place to look and one place to
-/// write. On This Day sits under today as a single row that opens in place.
+/// write. On This Day has its own button in the bottom bar.
 struct JournalView: View {
     @Environment(AppModel.self) private var app
     @State private var entries: [EntrySummary] = []
-    @State private var memories: [EntrySummary] = []
-    @State private var showMemories = false
-    @State private var showSettings = false
     @State private var done = false
     @State private var loading = false
     /// True until shortly after the first page is in, while rows fade in.
@@ -20,6 +17,7 @@ struct JournalView: View {
 
     var body: some View {
         List {
+            heading
             todaySection
             ForEach(earlierDays, id: \.date) { day in
                 Section {
@@ -38,31 +36,36 @@ struct JournalView: View {
         .scrollContentBackground(.hidden)
         .background(Color.paper)
         .navigationTitle("Journal")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showSettings = true } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-            }
-        }
+        #if os(iOS)
+        // The day itself is the heading; a bar above it is dead space.
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
         .overlay(alignment: .bottomTrailing) { NewEntryButton(date: nil) }
-        .sheet(isPresented: $showSettings) {
-            NavigationStack {
-                SyncSettingsView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showSettings = false }
-                        }
-                    }
-            }
-            #if os(macOS)
-            .frame(minWidth: 460, minHeight: 520)
-            #endif
-        }
         .task(id: app.revision) { await reload() }
     }
 
     // MARK: Today
+
+    /// The day, large ("Today"), and its full date underneath.
+    private var heading: some View {
+        TimelineView(.everyMinute) { _ in
+            let today = Day.today
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Day.heading(today))
+                    .font(Typeface.serif(34, bold: true, relativeTo: .largeTitle))
+                    .foregroundStyle(Color.ink)
+                Text(Day.fullDate(today))
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.muted)
+            }
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+        }
+        .listRowBackground(Color.paper)
+        .listRowSeparator(.hidden)
+    }
 
     private var todayEntries: [EntrySummary] {
         entries.filter { $0.date == Day.today }
@@ -87,37 +90,6 @@ struct JournalView: View {
                 ForEach(todayEntries, id: \.id) { e in
                     row(e).transition(.opacity.combined(with: .move(edge: .top)))
                 }
-            }
-            if !memories.isEmpty { onThisDay }
-        } header: {
-            Text(Day.title(Day.today)).microLabel()
-        }
-    }
-
-    @ViewBuilder
-    private var onThisDay: some View {
-        Button { withMotion(Motion.snappy, reduce: reduceMotion) { showMemories.toggle() } } label: {
-            HStack {
-                Text("On this day · \(memories.count)")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.ink)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.muted)
-                    .rotationEffect(.degrees(showMemories ? 90 : 0))
-            }
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.pressable)
-        .listRowBackground(Color.paper)
-        .listRowSeparatorTint(Color.hairline)
-        .accessibilityHint(showMemories ? "Hides earlier years" : "Shows entries from this date in earlier years")
-
-        if showMemories {
-            ForEach(memories, id: \.id) { e in
-                row(e).transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
@@ -162,16 +134,12 @@ struct JournalView: View {
 
     private func reload() async {
         let size = pageSize
-        let today = Day.today
-        let result = try? await app.run { store in
-            (try store.timeline(filter: Self.noFilter, after: nil, limit: size),
-             try store.onThisDay(date: today))
-        }
-        guard let (page, m) = result else { return }
+        guard let page = try? await app.run({ store in
+            try store.timeline(filter: Self.noFilter, after: nil, limit: size)
+        }) else { return }
         // The first load fades in; later ones animate what changed.
         withMotion(Motion.snappy, reduce: reduceMotion || firstLoad) {
             entries = page
-            memories = m
         }
         done = page.count < Int(pageSize)
         if firstLoad {
@@ -202,7 +170,7 @@ struct NewEntryButton: View {
         Button { Task { await app.newEntry(on: date ?? Day.today) } } label: {
             Image(systemName: "plus")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.onPrimary)
                 .frame(width: 56, height: 56)
                 .background(Color.primary, in: RoundedRectangle(cornerRadius: Radius.card))
                 .contentShape(RoundedRectangle(cornerRadius: Radius.card))

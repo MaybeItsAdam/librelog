@@ -26,11 +26,13 @@ struct LibrelogApp: App {
                 .environment(app)
                 .task { await app.sync.start() }
                 .task { await app.refreshCalendar() }
+                .task { await app.resolvePhotoSourceRefs() }
                 .onOpenURL { url in Task { await app.sync.handle(url: url) } }
                 .onChange(of: phase) { _, now in
                     if now == .active {
                         Task { await app.sync.syncNow() }
                         Task { await app.refreshCalendar() }
+                        Task { await app.resolvePhotoSourceRefs() }
                     }
                 }
         }

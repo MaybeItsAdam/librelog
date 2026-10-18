@@ -33,7 +33,13 @@ final class AppModel {
         self.store = store
         self.sync = SyncEngine(store: store)
         self.calendarAccess = calendar.access
-        sync.onChange = { [weak self] in self?.changed() }
+        // Read once before the first frame, so the theme doesn't flash.
+        if let a = try? Appearance.load(from: store) { AppearanceModel.shared.apply(a) }
+        sync.onChange = { [weak self] in
+            self?.changed()
+            // Appearance is synced, so a pull may have changed it.
+            Task { await self?.loadAppearance() }
+        }
     }
 
     static func launch() -> AppModel {
@@ -72,6 +78,54 @@ final class AppModel {
 
     func changed() {
         revision &+= 1
+    }
+
+    // MARK: Appearance (docs/appearance.md)
+
+    func loadAppearance() async {
+        if let a = try? await run({ try Appearance.load(from: $0) }) {
+            AppearanceModel.shared.apply(a)
+        }
+    }
+
+    /// Applies one appearance choice at once and saves it as a synced
+    /// setting; the default is stored as unset.
+    func setAppearance<V: RawRepresentable<String> & Sendable>(_ path: WritableKeyPath<Appearance, V>, _ value: V, key: String) {
+        var a = AppearanceModel.shared.value
+        a[keyPath: path] = value
+        AppearanceModel.shared.apply(a)
+        let stored: String? = Appearance()[keyPath: path] == value ? nil : value.rawValue
+        Task { await write { try $0.setSetting(key: key, value: stored) } }
+    }
+
+    // MARK: Entries
+
+    /// Deletes the entry if nothing was ever written in it, as the editor
+    /// closes, and refreshes lists when it did.
+    @discardableResult
+    func discardIfEmpty(_ id: String) async -> Bool {
+        guard (try? await run({ try $0.discardIfEmpty(id: id) })) == true else { return false }
+        changed()
+        sync.schedulePush()
+        return true
+    }
+
+    // MARK: Photos (docs/photos.md)
+
+    /// Fills in the iCloud identifier of photos added before iCloud had
+    /// uploaded them, so other devices can find them in their own library.
+    func resolvePhotoSourceRefs() async {
+        guard PhotoLibrary.canRead,
+              let waiting = try? await run({ try $0.photosAwaitingSourceRef(assetPrefix: "apple:") }),
+              !waiting.isEmpty else { return }
+        let refs = PhotoLibrary.cloudRefs(for: waiting.map { String($0.localAsset.dropFirst("apple:".count)) })
+        let updates = waiting.compactMap { p in
+            refs[String(p.localAsset.dropFirst("apple:".count))].map { (p.id, $0) }
+        }
+        guard !updates.isEmpty else { return }
+        await write { store in
+            for (id, ref) in updates { try store.setPhotoSourceRef(id: id, sourceRef: ref) }
+        }
     }
 
     // MARK: Calendar (docs/calendar.md)
@@ -159,6 +213,22 @@ enum Day {
         if s == adding(-1, to: today) { return String(localized: "Yesterday") }
         guard let d = date(s) else { return s }
         return d.formatted(.dateTime.weekday(.wide).day().month(.wide))
+    }
+
+    /// "Today", "Yesterday", "Tomorrow", or the weekday: a day's name as
+    /// the heading of a screen showing it.
+    static func heading(_ s: String) -> String {
+        if s == today { return String(localized: "Today") }
+        if s == adding(-1, to: today) { return String(localized: "Yesterday") }
+        if s == adding(1, to: today) { return String(localized: "Tomorrow") }
+        guard let d = date(s) else { return s }
+        return d.formatted(.dateTime.weekday(.wide))
+    }
+
+    /// "Sunday 18 October 2026"
+    static func fullDate(_ s: String) -> String {
+        guard let d = date(s) else { return s }
+        return d.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
     }
 
     /// "3 Oct 2025"

@@ -41,7 +41,7 @@ struct EntryRow: View {
                     Text("Empty entry").foregroundStyle(Color.dim)
                 }
             }
-            .font(Typeface.serif(15))
+            .font(Typeface.reading(15))
             .foregroundStyle(Color.ink.opacity(0.85))
             .lineLimit(3)
 

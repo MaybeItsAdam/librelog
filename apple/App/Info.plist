@@ -40,7 +40,11 @@
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>LibreLog shows a day's calendar events so you can add them to your journal, and keeps the ones you add up to date. Nothing else is read or stored.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Librelog uses the camera only to scan another device's pairing code.</string>
+	<string>LibreLog uses the camera to take a photo for a day in your journal, and to scan another device's pairing code.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LibreLog saves photos you take for a day to your library, so your other devices can show them through iCloud Photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>LibreLog shows the photos you took on a day so you can add them to it. Photos you add stay on your devices; only a tiny blurred preview is synced.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Arvo-Regular.ttf</string>
