@@ -67,13 +67,15 @@ public sealed record Tag(string Id, string Name, string? Color, bool IsTracker, 
 public sealed record Entry(
     string Id, string JournalId, string Date, string? Time, string? Title,
     IReadOnlyList<Block> Body, uint WordCount, double? Rating, bool IsFavorite,
-    IReadOnlyList<Tag> Tags, bool HasConflict, string UpdatedAt);
+    IReadOnlyList<Tag> Tags, bool HasConflict, string UpdatedAt, string? EndDate = null);
 
 public sealed record EntrySummary(
     string Id, string JournalId, string Date, string? Time, string? Title, string Excerpt,
-    uint WordCount, double? Rating, bool IsFavorite, IReadOnlyList<string> TagNames);
+    uint WordCount, double? Rating, bool IsFavorite, IReadOnlyList<string> TagNames, string? EndDate = null);
 
-public sealed record DayMark(string Date, uint EntryCount, double? Rating);
+/// SpanBefore / SpanAfter: a multi-day entry continues into the previous /
+/// next day, so the calendar can join the days into one band.
+public sealed record DayMark(string Date, uint EntryCount, double? Rating, bool SpanBefore = false, bool SpanAfter = false);
 
 /// Search snippet with matches wrapped in U+E000 … U+E001.
 public sealed record SearchHit(EntrySummary Entry, string Snippet);

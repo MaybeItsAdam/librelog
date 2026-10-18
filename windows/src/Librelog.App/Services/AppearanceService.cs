@@ -15,6 +15,7 @@ public static class AppearanceService
     private static readonly string[] AccentKeys =
     [
         "AccentBrush",
+        "AzureTintBrush", // keeps its own 10% opacity: the multi-day band
         "AccentFillColorDefaultBrush",
         "AccentFillColorSecondaryBrush",
         "AccentFillColorTertiaryBrush",

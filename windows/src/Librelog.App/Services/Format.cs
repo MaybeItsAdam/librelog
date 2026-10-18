@@ -19,6 +19,20 @@ public static class Format
 
     public static string ShortDate(string ymd) => Date(ymd).ToString("ddd d MMM yyyy", Culture);
 
+    /// "26 – 27 Aug 2026", "30 Aug – 2 Sep 2026", "30 Dec 2025 – 2 Jan 2026";
+    /// a single day when there's no end.
+    public static string Range(string start, string? end)
+    {
+        if (end is null) return ShortDate(start);
+        var (a, b) = (Date(start), Date(end));
+        var first = a.Year != b.Year ? "d MMM yyyy" : a.Month != b.Month ? "d MMM" : "%d";
+        return $"{a.ToString(first, Culture)} – {b.ToString("d MMM yyyy", Culture)}";
+    }
+
+    /// "Day 2 of 4" for a day inside a multi-day entry.
+    public static string DayOfSpan(string day, string start, string end) =>
+        $"Day {Date(day).DayNumber - Date(start).DayNumber + 1} of {Date(end).DayNumber - Date(start).DayNumber + 1}";
+
     /// Micro-label casing, done on the text because TextBlock can't.
     public static string Caps(string s) => s.ToUpper(CultureInfo.CurrentCulture);
 

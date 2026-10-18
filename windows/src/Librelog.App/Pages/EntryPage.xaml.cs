@@ -47,6 +47,7 @@ public sealed partial class EntryPage : Page
         var en = entry;
         DatePicker.Date = Format.Date(en.Date).ToDateTime(TimeOnly.MinValue);
         TimePicker.SelectedTime = en.Time is { } t ? TimeOnly.ParseExact(t, "HH:mm", CultureInfo.InvariantCulture).ToTimeSpan() : null;
+        ShowSpan(en.Date, en.EndDate);
         TitleBox.Text = en.Title ?? "";
         TitleBox.FontFamily = AppearanceService.TitleFont;
         TitleBox.FontSize = 26 * AppearanceService.Scale;
@@ -160,7 +161,74 @@ public sealed partial class EntryPage : Page
         var date = Format.Ymd(DateOnly.FromDateTime(d.Date));
         if (!loading) Photos.Date = date;
         var time = TimePicker.SelectedTime is { } t ? TimeOnly.FromTimeSpan(t).ToString("HH:mm", CultureInfo.InvariantCulture) : null;
-        _ = Update((s, id) => s.SetDateTime(id, date, time));
+        _ = MoveTo(date, time);
+    }
+
+    /// The core keeps a multi-day entry's length when its first day moves, so
+    /// read the new end back rather than working it out here.
+    private async Task MoveTo(string date, string? time)
+    {
+        if (loading || entry is not { } en) return;
+        await AppServices.Write(s => s.SetDateTime(en.Id, date, time));
+        var moved = await AppServices.Run(s => s.Entry(en.Id));
+        loading = true;
+        ShowSpan(moved.Date, moved.EndDate);
+        loading = false;
+    }
+
+    // --- Several days -------------------------------------------------------------
+
+    private const int MaxSpanDays = 365;
+
+    private static DateTimeOffset At(DateOnly d) => new(d.ToDateTime(TimeOnly.MinValue));
+
+    /// Sets the range label, the checkbox and the last-day picker (limited to
+    /// the day after the start up to a year on) without saving anything.
+    private void ShowSpan(string start, string? end)
+    {
+        var first = Format.Date(start);
+        var (min, max) = (At(first.AddDays(1)), At(first.AddDays(MaxSpanDays)));
+        // Never let Min pass Max on the way: move whichever bound is in the way first.
+        if (min > EndPicker.MaxDate)
+        {
+            EndPicker.MaxDate = max;
+            EndPicker.MinDate = min;
+        }
+        else
+        {
+            EndPicker.MinDate = min;
+            EndPicker.MaxDate = max;
+        }
+        EndPicker.Date = end is null ? null : At(Format.Date(end));
+        SeveralDaysBox.IsChecked = end is not null;
+        EndPicker.Visibility = Format.Shown(end is not null);
+        RangeText.Text = Format.Caps(end is null
+            ? Format.LongDate(start)
+            : $"{Format.Range(start, end)} · {Format.Date(end).DayNumber - first.DayNumber + 1} days");
+    }
+
+    private void OnSeveralDays(object sender, RoutedEventArgs e)
+    {
+        if (loading || entry is null || DatePicker.Date is not { } d) return;
+        var start = DateOnly.FromDateTime(d.Date);
+        // Turning it on starts as two days; the picker refines it.
+        string? end = SeveralDaysBox.IsChecked == true ? Format.Ymd(start.AddDays(1)) : null;
+        _ = SaveEnd(Format.Ymd(start), end);
+    }
+
+    private void OnEndChanged(CalendarDatePicker sender, CalendarDatePickerDateChangedEventArgs args)
+    {
+        if (loading || entry is null || DatePicker.Date is not { } d || EndPicker.Date is not { } end) return;
+        _ = SaveEnd(Format.Ymd(DateOnly.FromDateTime(d.Date)), Format.Ymd(DateOnly.FromDateTime(end.Date)));
+    }
+
+    private async Task SaveEnd(string start, string? end)
+    {
+        if (entry is not { } en) return;
+        await AppServices.Write(s => s.SetEndDate(en.Id, end));
+        loading = true;
+        ShowSpan(start, end);
+        loading = false;
     }
 
     private async void OnTagKeyDown(object sender, KeyRoutedEventArgs e)

@@ -8,10 +8,22 @@ public sealed partial class EntryRow : UserControl
 {
     private EntrySummary? entry;
     private string? snippet;
+    private string? day;
 
     public EntryRow() => InitializeComponent();
 
     public bool ShowDate { get; set; } = true;
+
+    /// The day being shown (Calendar), so a multi-day entry reads "Day 2 of 4".
+    public string? Day
+    {
+        get => day;
+        set
+        {
+            day = value;
+            Update();
+        }
+    }
 
     /// Set by x:Bind in list templates; recycled rows get the next entry.
     public EntrySummary? Entry
@@ -44,7 +56,14 @@ public sealed partial class EntryRow : UserControl
         TitleText.FontWeight = Microsoft.UI.Text.FontWeights.Bold;
         ExcerptText.FontFamily = AppearanceService.ReadingFont;
         ExcerptText.FontSize = 15 * AppearanceService.Scale;
-        DateText.Text = ShowDate ? Format.Caps(Format.ShortDate(e.Date)) : "";
+        // A multi-day entry always says which days it covers, even in a list
+        // already grouped by day.
+        DateText.Text = Format.Caps(e.EndDate switch
+        {
+            { } end when day is not null => Format.DayOfSpan(day, e.Date, end),
+            { } end => Format.Range(e.Date, end),
+            null => ShowDate ? Format.ShortDate(e.Date) : "",
+        });
         TimeText.Text = Format.Time(e.Time);
         TitleText.Text = e.Title ?? "";
         TitleText.Visibility = Format.Shown(!string.IsNullOrEmpty(e.Title));

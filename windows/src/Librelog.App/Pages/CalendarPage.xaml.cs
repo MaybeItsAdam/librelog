@@ -76,7 +76,7 @@ public sealed partial class CalendarPage : Page
         MonthText.Text = Format.Month(shown);
         DrawGrid(shown, marks.ToDictionary(m => m.Date));
         SelectedText.Text = Format.Caps(Format.LongDate(day));
-        DayList.ItemsSource = entries;
+        DayList.ItemsSource = entries.Select(e => new DayEntry(e, day)).ToList();
         NothingText.Visibility = Format.Shown(entries.Count == 0);
         Photos.Date = day;
 
@@ -101,6 +101,29 @@ public sealed partial class CalendarPage : Page
             marks.TryGetValue(ymd, out var mark);
             var isSelected = ymd == selected;
             var isToday = ymd == AppServices.Today;
+            var row = cell / 7;
+            var column = cell % 7;
+
+            // Days a multi-day entry covers sit on one accent-tinted band: square and
+            // bridging the gap where it carries on into the next cell, rounded
+            // where it starts, ends, or meets the edge of the week or month.
+            var banded = mark is { SpanBefore: true } or { SpanAfter: true };
+            if (banded)
+            {
+                var joinLeft = mark!.SpanBefore && column > 0 && d > 1;
+                var joinRight = mark.SpanAfter && column < 6 && d < days;
+                const double gap = 2; // half the grid's column spacing
+                var band = new Border
+                {
+                    Background = Themed("AzureTintBrush"),
+                    Margin = new Thickness(joinLeft ? -gap : 0, 0, joinRight ? -gap : 0, 0),
+                    CornerRadius = new CornerRadius(joinLeft ? 0 : 6, joinRight ? 0 : 6, joinRight ? 0 : 6, joinLeft ? 0 : 6),
+                    IsHitTestVisible = false,
+                };
+                Grid.SetRow(band, row);
+                Grid.SetColumn(band, column);
+                DayGrid.Children.Add(band);
+            }
 
             var number = new TextBlock
             {
@@ -123,8 +146,11 @@ public sealed partial class CalendarPage : Page
                 Content = new StackPanel { Spacing = 4, Children = { number, dot } },
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                Background = Themed(isSelected ? "WellBrush" : "RaisedBrush"),
-                BorderBrush = Themed(isSelected ? "AccentBrush" : "HairlineBrush"),
+                // On a band the cell lets the band show through, so the days read as one.
+                Background = isSelected ? Themed("WellBrush")
+                    : banded ? new SolidColorBrush(Microsoft.UI.Colors.Transparent) : Themed("RaisedBrush"),
+                BorderBrush = isSelected ? Themed("AccentBrush")
+                    : banded ? new SolidColorBrush(Microsoft.UI.Colors.Transparent) : Themed("HairlineBrush"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(6),
                 Tag = ymd,
@@ -132,8 +158,8 @@ public sealed partial class CalendarPage : Page
             ToolTipService.SetToolTip(button, mark is null ? Format.LongDate(ymd)
                 : $"{Format.LongDate(ymd)} · {mark.EntryCount} {(mark.EntryCount == 1 ? "entry" : "entries")}");
             button.Click += OnDayClick;
-            Grid.SetRow(button, cell / 7);
-            Grid.SetColumn(button, cell % 7);
+            Grid.SetRow(button, row);
+            Grid.SetColumn(button, column);
             DayGrid.Children.Add(button);
         }
     }
@@ -278,6 +304,10 @@ public sealed partial class CalendarPage : Page
 
     private void OnEntryClick(object sender, ItemClickEventArgs e)
     {
-        if (e.ClickedItem is EntrySummary entry) Shell.Window.OpenEntry(entry.Id);
+        if (e.ClickedItem is DayEntry item) Shell.Window.OpenEntry(item.Entry.Id);
     }
 }
+
+/// An entry in the selected day's list, with the day so a multi-day entry
+/// can say which of its days this is.
+public sealed record DayEntry(EntrySummary Entry, string Day);

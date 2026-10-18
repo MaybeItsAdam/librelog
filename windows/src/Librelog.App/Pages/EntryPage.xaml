@@ -84,9 +84,18 @@
                     </Grid>
                 </Border>
 
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                    <CalendarDatePicker x:Name="DatePicker" DateChanged="OnDateChanged" CornerRadius="6" />
-                    <TimePicker x:Name="TimePicker" SelectedTimeChanged="OnTimeChanged" CornerRadius="6" MinuteIncrement="1" />
+                <StackPanel Spacing="8">
+                    <TextBlock x:Name="RangeText" Style="{StaticResource MicroLabel}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <CalendarDatePicker x:Name="DatePicker" DateChanged="OnDateChanged" CornerRadius="6" />
+                        <TimePicker x:Name="TimePicker" SelectedTimeChanged="OnTimeChanged" CornerRadius="6" MinuteIncrement="1" />
+                    </StackPanel>
+                    <!-- Multi-day entries (SPEC.md §4): a trip, a festival. -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <CheckBox x:Name="SeveralDaysBox" Content="Several days" Click="OnSeveralDays" MinWidth="0" />
+                        <CalendarDatePicker x:Name="EndPicker" DateChanged="OnEndChanged" CornerRadius="6"
+                                            PlaceholderText="Last day" Visibility="Collapsed" />
+                    </StackPanel>
                 </StackPanel>
 
                 <TextBox x:Name="TitleBox" PlaceholderText="Title" FontFamily="{StaticResource SerifBold}" FontSize="26"
