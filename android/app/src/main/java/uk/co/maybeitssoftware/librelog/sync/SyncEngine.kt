@@ -181,6 +181,17 @@ class SyncEngine(
         email = null
     }
 
+    /**
+     * Deletes the account and everything synced to it, then forgets it here.
+     * The journal on this device is untouched, and is queued to upload in
+     * full if the user signs in to a new account later.
+     */
+    suspend fun deleteAccount() {
+        client.rpc("delete_account", buildJsonObject {})
+        signOut()
+        io { store.resetSync() }
+    }
+
     // MARK: Journal key
 
     /**

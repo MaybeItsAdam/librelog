@@ -112,6 +112,22 @@ public sealed partial class SyncPage : Page
         await Try(Sync.SignOut);
     }
 
+    private async void OnDeleteAccount(object sender, RoutedEventArgs e)
+    {
+        var dialog = Dialog("Delete your account?", new TextBlock
+        {
+            Text = "Your account and everything synced to it are removed from the server for good, and your other devices stop syncing. The journal on each device stays where it is.",
+            TextWrapping = TextWrapping.Wrap,
+        }, "Delete account");
+        // A destructive choice: Enter cancels rather than deletes.
+        dialog.DefaultButton = ContentDialogButton.Close;
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        pairing?.Cancel();
+        DeleteAccountButton.IsEnabled = false;
+        await Try(Sync.DeleteAccount);
+        DeleteAccountButton.IsEnabled = true;
+    }
+
     // --- Journal key --------------------------------------------------------------
 
     private async void OnUsePhrase(object sender, RoutedEventArgs e) => await Try(() => Sync.UseRecoveryPhrase(PhraseBox.Text));

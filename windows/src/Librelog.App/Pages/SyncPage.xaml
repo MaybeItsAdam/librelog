@@ -112,7 +112,12 @@
                     </StackPanel>
                 </Border>
 
-                <Button Style="{StaticResource PlainButton}" Content="Sign out" Click="OnSignOut" Foreground="{StaticResource RaspberryBrush}" />
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <Button Style="{StaticResource PlainButton}" Content="Sign out" Click="OnSignOut" Foreground="{StaticResource RaspberryBrush}" />
+                    <Button x:Name="DeleteAccountButton" Style="{StaticResource PlainButton}" Content="Delete account" Click="OnDeleteAccount" Foreground="{StaticResource RaspberryBrush}" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap"
+                           Text="Signing out keeps everything on this device. Deleting the account also removes everything synced to it from the server." />
             </StackPanel>
 
             <!-- Import and export work with or without sync. -->

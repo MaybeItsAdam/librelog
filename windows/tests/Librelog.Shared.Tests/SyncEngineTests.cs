@@ -141,6 +141,23 @@ public sealed class SyncEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task DeletingTheAccountEmptiesTheServerAndKeepsTheJournal()
+    {
+        var (a, aStore) = Device("u1", "laptop");
+        await a.Start();
+        var id = Write(aStore, "Coffee by the canal");
+        await a.SyncNow();
+        Assert.Equal(0u, a.Pending);
+
+        await a.DeleteAccount();
+        Assert.False(server.HasAccount("u1"));
+        Assert.Equal(SyncPhase.Off, a.Phase);
+        Assert.Null(a.Email);
+        Assert.Equal("Coffee by the canal", aStore.Entry(id).Body[0].Text);
+        Assert.True(a.Pending > 0); // queued again for whichever account comes next
+    }
+
+    [Fact]
     public async Task WithoutASessionSyncIsOffAndNothingIsSent()
     {
         var (a, _) = Device("", "offline");
@@ -207,6 +224,8 @@ internal sealed class FakeSupabase : HttpMessageHandler
         static string B64(string s) => Convert.ToBase64String(Encoding.UTF8.GetBytes(s)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         return $"{B64("{}")}.{B64($$"""{"sub":"{{user}}"}""")}.sig";
     }
+
+    public bool HasAccount(string user) => accounts.ContainsKey(user);
 
     public IEnumerable<string> AllPayloads() => accounts.Values.SelectMany(a => a.Ops.Select(o => o.Payload));
 
@@ -287,6 +306,9 @@ internal sealed class FakeSupabase : HttpMessageHandler
                 Pairings.Remove(id);
                 return Json(JsonValue.Create(payload));
             }
+            case "delete_account":
+                accounts.Remove(user);
+                return Reply(HttpStatusCode.NoContent, "");
             default:
                 return Reply(HttpStatusCode.NotFound, $$"""{"message":"no function {{rpc}}"}""");
         }

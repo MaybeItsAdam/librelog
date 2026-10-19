@@ -23,12 +23,14 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -258,6 +260,9 @@ private fun Status(app: AppModel) {
     val scope = rememberCoroutineScope()
     var adding by remember { mutableStateOf(false) }
     var revealing by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     Section("Sync") {
         Labeled("Account") { Text(sync.email ?: "—", style = Typeface.small, color = t.ink) }
@@ -285,10 +290,40 @@ private fun Status(app: AppModel) {
 
     Section("Account") {
         SecondaryButton("Sign out", { scope.launch { sync.signOut() } }, color = t.danger)
+        SecondaryButton("Delete account", { if (!deleting) confirmDelete = true }, color = t.danger)
+        deleteError?.let { StatusBanner(it, t.danger) }
         Text(
-            "Signing out keeps everything on this device. It stops syncing until you sign in again.",
+            "Signing out keeps everything on this device. It stops syncing until you sign in again. " +
+                "Deleting the account also removes everything synced to it from the server.",
             style = Typeface.small.copy(fontSize = 12.sp),
             color = t.muted,
+        )
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete your account?") },
+            text = {
+                Text(
+                    "Your account and everything synced to it are removed from the server for good, and your " +
+                        "other devices stop syncing. The journal on each device stays where it is.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    deleting = true
+                    scope.launch {
+                        deleteError = runCatching { sync.deleteAccount() }.exceptionOrNull()
+                            ?.let { "Couldn't delete the account: ${it.message}" }
+                        deleting = false
+                    }
+                }) { Text("Delete account", color = t.danger) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+            shape = RoundedCornerShape(Radius.card),
+            containerColor = t.raised,
         )
     }
 

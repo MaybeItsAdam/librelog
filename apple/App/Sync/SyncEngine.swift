@@ -163,6 +163,15 @@ final class SyncEngine {
         email = nil
     }
 
+    /// Deletes the account and everything synced to it, then forgets it
+    /// here. The journal on this device is untouched, and is queued to upload
+    /// in full if the user signs in to a new account later.
+    func deleteAccount() async throws {
+        let _: SupabaseClient.Empty = try await client.rpc("delete_account", [:])
+        await signOut()
+        try store.resetSync()
+    }
+
     // MARK: Journal key
 
     /// After sign-in: create the account's key if it has none, or use this

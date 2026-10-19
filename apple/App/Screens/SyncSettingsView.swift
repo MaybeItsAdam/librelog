@@ -14,6 +14,7 @@ struct SyncSettingsView: View {
     @State private var busy = false
     @State private var message: String?
     @State private var nonce = ""
+    @State private var confirmDelete = false
 
     var body: some View {
         let sync = app.sync
@@ -135,14 +136,32 @@ struct SyncSettingsView: View {
 
             Section {
                 Button("Sign out", role: .destructive) { Task { await sync.signOut() } }
+                Button("Delete account", role: .destructive) { confirmDelete = true }
+                    .disabled(busy)
             } footer: {
-                Text("Signing out keeps everything on this device. It stops syncing until you sign in again.")
+                Text("Signing out keeps everything on this device. It stops syncing until you sign in again. Deleting the account also removes everything synced to it from the server.")
                     .font(.system(size: 12))
+            }
+            .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete account", role: .destructive) { Task { await deleteAccount() } }
+            } message: {
+                Text("Your account and everything synced to it are removed from the server for good, and your other devices stop syncing. The journal on each device stays where it is.")
             }
         }
     }
 
     // MARK: Actions
+
+    private func deleteAccount() async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await app.sync.deleteAccount()
+            message = nil
+        } catch {
+            message = String(localized: "Couldn't delete the account: \(error.localizedDescription)")
+        }
+    }
 
     private func sendEmail() async {
         busy = true
