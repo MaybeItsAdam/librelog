@@ -71,7 +71,8 @@ To try an import on a scratch database: `cargo run --example import --
 /tmp/test.sqlite <file>` in `core/`.
 
 Photos kept on a day: [docs/photos.md](docs/photos.md). Theme, accent, font
-and text size: [docs/appearance.md](docs/appearance.md).
+and text size: [docs/appearance.md](docs/appearance.md). Password-locked notes
+on a day: [docs/locked-notes.md](docs/locked-notes.md).
 
 ## Not built yet
 
