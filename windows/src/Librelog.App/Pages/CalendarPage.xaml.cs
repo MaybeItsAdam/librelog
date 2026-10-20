@@ -85,6 +85,8 @@ public sealed partial class CalendarPage : Page
         DayList.ItemsSource = entries.Select(e => new DayEntry(e, day)).ToList();
         NothingText.Visibility = Format.Shown(entries.Count == 0);
         Photos.Date = day;
+        DayEvents.Date = day;
+        LockedNote.Date = day;
 
         if (slideDirection != 0) SlideIn(slideDirection);
         slideDirection = 0;

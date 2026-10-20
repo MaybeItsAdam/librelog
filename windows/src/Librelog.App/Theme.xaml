@@ -188,6 +188,43 @@
         <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
     </Style>
 
+    <!-- Secondary actions in a day's sections ("Add event", "Add photo"):
+         no box, muted, so the day's content carries the weight. -->
+    <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource PlainButton}">
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{ThemeResource MutedBrush}" />
+        <Setter Property="Padding" Value="8,4" />
+    </Style>
+
+    <!-- One row in a day's section (an event, the locked note): the whole
+         row is the target, at least 44px tall, with no box of its own. -->
+    <Style x:Key="DayRowButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,8" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
+    </Style>
+
+    <!-- The editor's metadata line under the title: a micro-label that opens
+         the details. Flat, flush left, no box. -->
+    <Style x:Key="MetaButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="MinHeight" Value="28" />
+    </Style>
+
+    <!-- A destructive button in a dialog: raspberry text, the usual 6px box. -->
+    <Style x:Key="DangerDialogButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="Foreground" Value="{StaticResource RaspberryBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+
     <!-- "Continue with Google", drawn to Google's Sign-In branding guidelines:
          the standard-colour G at 20px, 12px in from the edge with 10px before
          the label, the system font at 14px medium (Roboto isn't bundled), and

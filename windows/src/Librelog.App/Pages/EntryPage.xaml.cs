@@ -1,6 +1,7 @@
 using System.Globalization;
 using Librelog.App.Services;
 using Librelog.Core;
+using Librelog.Days;
 using Librelog.Editor;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -16,6 +17,7 @@ public sealed partial class EntryPage : Page
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(700);
 
     private Entry? entry;
+    private List<Journal> journals = [];
     private bool loading;
     private bool dirty;
     private CancellationTokenSource? saveTimer;
@@ -46,16 +48,19 @@ public sealed partial class EntryPage : Page
             return;
         }
         var en = entry;
+        journals = await AppServices.Run(s => s.Journals());
+        ShowJournals(en.JournalId);
         DatePicker.Date = Format.Date(en.Date).ToDateTime(TimeOnly.MinValue);
         TimePicker.SelectedTime = en.Time is { } t ? TimeOnly.ParseExact(t, "HH:mm", CultureInfo.InvariantCulture).ToTimeSpan() : null;
         ShowSpan(en.Date, en.EndDate);
         TitleBox.Text = en.Title ?? "";
         TitleBox.FontFamily = AppearanceService.TitleFont;
         TitleBox.FontSize = 26 * AppearanceService.Scale;
-        Photos.Date = en.Date;
+        ShowDay(en.Date);
         Rating.Value = en.Rating ?? -1;
         ColorStars(en.Rating, animate: false);
-        FavoriteButton.IsChecked = en.IsFavorite;
+        FavoriteBox.IsChecked = en.IsFavorite;
+        FavoriteMark.Visibility = Format.Shown(en.IsFavorite);
         TagList.ItemsSource = en.Tags;
         ConflictBanner.Visibility = Format.Shown(en.HasConflict);
         Editor.Load(en.Body);
@@ -166,9 +171,53 @@ public sealed partial class EntryPage : Page
 
     private void OnFavorite(object sender, RoutedEventArgs e)
     {
-        var fav = FavoriteButton.IsChecked == true;
-        if (fav) Motion.Pop(FavoriteButton);
+        if (loading || entry is null) return;
+        var fav = FavoriteBox.IsChecked == true;
+        entry = entry with { IsFavorite = fav };
+        FavoriteMark.Visibility = Format.Shown(fav);
+        if (fav) Motion.Pop(FavoriteMark);
         _ = Update((s, id) => s.SetFavorite(id, fav));
+    }
+
+    // --- Details: the metadata line and its flyout ----------------------------------
+
+    private void OnDetails(object sender, RoutedEventArgs e) => DetailsFlyout.ShowAt(MetaButton);
+
+    /// The day's own sections follow the entry's first day.
+    private void ShowDay(string date)
+    {
+        Photos.Date = date;
+        DayEvents.Date = date;
+        LockedNote.Date = date;
+    }
+
+    /// "TUE 14 OCT · 09:30 · 3 DAYS", plus the journal when there's a choice.
+    private void UpdateMeta()
+    {
+        if (entry is not { } en) return;
+        var journal = journals.Count > 1 ? journals.FirstOrDefault(j => j.Id == en.JournalId)?.Name : null;
+        MetaText.Text = EntryMeta.Line(en.Date, en.Time, en.EndDate, DateOnly.FromDateTime(DateTime.Now), CultureInfo.CurrentCulture, journal);
+    }
+
+    private void ShowJournals(string current)
+    {
+        JournalPanel.Visibility = Format.Shown(journals.Count > 1);
+        JournalChoice.Items.Clear();
+        foreach (var j in journals)
+        {
+            var item = new ComboBoxItem { Content = j.Name, Tag = j.Id };
+            JournalChoice.Items.Add(item);
+            if (j.Id == current) JournalChoice.SelectedItem = item;
+        }
+    }
+
+    private void OnJournalChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (loading || entry is not { } en || JournalChoice.SelectedItem is not ComboBoxItem { Tag: string journalId }) return;
+        if (journalId == en.JournalId) return;
+        entry = en with { JournalId = journalId };
+        UpdateMeta();
+        _ = Update((s, id) => s.MoveEntry(id, journalId));
     }
 
     private void OnDateChanged(CalendarDatePicker sender, CalendarDatePickerDateChangedEventArgs args) => SaveDateTime();
@@ -178,7 +227,7 @@ public sealed partial class EntryPage : Page
     {
         if (DatePicker.Date is not { } d) return;
         var date = Format.Ymd(DateOnly.FromDateTime(d.Date));
-        if (!loading) Photos.Date = date;
+        if (!loading) ShowDay(date);
         var time = TimePicker.SelectedTime is { } t ? TimeOnly.FromTimeSpan(t).ToString("HH:mm", CultureInfo.InvariantCulture) : null;
         _ = MoveTo(date, time);
     }
@@ -190,6 +239,7 @@ public sealed partial class EntryPage : Page
         if (loading || entry is not { } en) return;
         await AppServices.Write(s => s.SetDateTime(en.Id, date, time));
         var moved = await AppServices.Run(s => s.Entry(en.Id));
+        if (entry is { } current) entry = current with { Date = moved.Date, Time = moved.Time, EndDate = moved.EndDate };
         loading = true;
         ShowSpan(moved.Date, moved.EndDate);
         loading = false;
@@ -201,7 +251,7 @@ public sealed partial class EntryPage : Page
 
     private static DateTimeOffset At(DateOnly d) => new(d.ToDateTime(TimeOnly.MinValue));
 
-    /// Sets the range label, the checkbox and the last-day picker (limited to
+    /// Sets the metadata line, the checkbox and the last-day picker (limited to
     /// the day after the start up to a year on) without saving anything.
     private void ShowSpan(string start, string? end)
     {
@@ -221,9 +271,7 @@ public sealed partial class EntryPage : Page
         EndPicker.Date = end is null ? null : At(Format.Date(end));
         SeveralDaysBox.IsChecked = end is not null;
         EndPicker.Visibility = Format.Shown(end is not null);
-        RangeText.Text = Format.Caps(end is null
-            ? Format.LongDate(start)
-            : $"{Format.Range(start, end)} · {Format.Date(end).DayNumber - first.DayNumber + 1} days");
+        UpdateMeta();
     }
 
     private void OnSeveralDays(object sender, RoutedEventArgs e)
@@ -245,6 +293,7 @@ public sealed partial class EntryPage : Page
     {
         if (entry is not { } en) return;
         await AppServices.Write(s => s.SetEndDate(en.Id, end));
+        if (entry is { } current) entry = current with { EndDate = end };
         loading = true;
         ShowSpan(start, end);
         loading = false;

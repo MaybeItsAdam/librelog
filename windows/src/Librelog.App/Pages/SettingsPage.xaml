@@ -1,4 +1,4 @@
-<!-- Settings (SPEC.md §14): Appearance here, sync and import & export one
+<!-- Settings (SPEC.md §14): Appearance and Privacy here, sync and import & export one
      step further in. Appearance choices sync to every device
      (docs/appearance.md). -->
 <Page
@@ -66,6 +66,33 @@
                                        Text="Coffee first, then the long way round past the locks. The light on the water was worth getting up for." />
                         </StackPanel>
                     </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Locked notes (docs/locked-notes.md). -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="PRIVACY" Style="{StaticResource MicroLabel}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Locked notes" Style="{StaticResource BodyText}" />
+                            <TextBlock Style="{StaticResource MutedText}" FontSize="13"
+                                       Text="A few private lines on any day, opened with the lock password every time. Turning this off hides them; it deletes nothing." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="LockSwitch" Grid.Column="1" OnContent="" OffContent="" MinWidth="0"
+                                      VerticalAlignment="Center" Toggled="OnLockToggled"
+                                      AutomationProperties.Name="Locked notes" />
+                    </Grid>
+                    <StackPanel x:Name="LockActions" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                        <Button Style="{StaticResource PlainButton}" Content="Change password" Click="OnChangeLockPassword" />
+                        <Button Style="{StaticResource PlainButton}" Content="Reset locked notes" Click="OnResetLock"
+                                Foreground="{StaticResource RaspberryBrush}" />
+                    </StackPanel>
+                    <TextBlock x:Name="LockMessage" Style="{StaticResource MutedText}" FontSize="13" Visibility="Collapsed" />
                 </StackPanel>
             </Border>
 

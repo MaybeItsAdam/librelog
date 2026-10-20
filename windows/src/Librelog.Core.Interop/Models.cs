@@ -159,5 +159,26 @@ public sealed record DayPhoto(
 /// A decoded ThumbHash: a small straight-RGBA image to draw stretched.
 public sealed record ThumbImage(uint Width, uint Height, byte[] Rgba);
 
+/// A calendar event kept on a journal day (core/src/calendar.rs). Start is
+/// `YYYY-MM-DDTHH:MM`, or `YYYY-MM-DD` when AllDay. TimeLabel is
+/// "09:30–10:00", "09:30", or empty for all day. State is "scheduled",
+/// "moved" or "cancelled" (a string, so the JSON stays reflection-free).
+/// IsOwn: added by hand, so editable here rather than following a calendar.
+public sealed record KeptEvent(
+    string Id, string JournalId, string Date, string Key, string Title, string? Location, string? Calendar,
+    string Start, string? End, bool AllDay, string TimeLabel, string State, bool MovedToAnotherDay,
+    string? Note, bool IsOwn = false)
+{
+    [JsonIgnore] public bool IsMoved => State == "moved";
+    [JsonIgnore] public bool IsCancelled => State == "cancelled";
+}
+
+/// An event the user adds to a day by hand. Times are `HH:MM` on that day;
+/// no start time makes it all day.
+public sealed record OwnEvent(string Title, string? StartTime = null, string? EndTime = null, string? Location = null);
+
+/// Settings → Privacy → Locked notes (docs/locked-notes.md).
+public sealed record LockStatus(bool Enabled, bool HasPassword);
+
 /// Error envelope from the C ABI.
 public sealed record CoreErrorBody(string Kind, string Message);

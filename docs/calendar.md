@@ -99,8 +99,10 @@ source only has to produce `CalendarEvent` records with `windows:` keys.
 `Windows.ApplicationModel.Appointments` (the system calendar store) is
 another option that needs no OAuth.
 
-TODO(windows): pick a source, then add the day section to `EntryPage` and
-`CalendarPage`.
+`EntryPage` and `CalendarPage` already show the day's Calendar section
+(`DayCalendarView.cs`): events kept on other devices, and events added by
+hand. TODO(windows): pick a source so the section can also suggest the
+device's own events.
 
 ## Not done yet
 

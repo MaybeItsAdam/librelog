@@ -50,13 +50,11 @@
                     </ToggleButton>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
-                    <ToggleButton x:Name="FavoriteButton" Click="OnFavorite" ToolTipService.ToolTip="Favourite" CornerRadius="6" Padding="10,6">
-                        <FontIcon Glyph="&#xEB51;" FontSize="14" />
-                    </ToggleButton>
                     <Button CornerRadius="6" Padding="10,6" ToolTipService.ToolTip="More">
                         <FontIcon Glyph="&#xE712;" FontSize="14" />
                         <Button.Flyout>
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuFlyoutItem Text="Details…" Click="OnDetails" />
                                 <MenuFlyoutItem Text="Copy as Markdown" Click="OnCopyMarkdown" />
                                 <MenuFlyoutItem Text="Version history" Click="OnHistory" />
                                 <MenuFlyoutSeparator />
@@ -84,31 +82,61 @@
                     </Grid>
                 </Border>
 
-                <StackPanel Spacing="8">
-                    <TextBlock x:Name="RangeText" Style="{StaticResource MicroLabel}" />
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <CalendarDatePicker x:Name="DatePicker" DateChanged="OnDateChanged" CornerRadius="6" />
-                        <TimePicker x:Name="TimePicker" SelectedTimeChanged="OnTimeChanged" CornerRadius="6" MinuteIncrement="1" />
-                    </StackPanel>
-                    <!-- Multi-day entries (SPEC.md §4): a trip, a festival. -->
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <CheckBox x:Name="SeveralDaysBox" Content="Several days" Click="OnSeveralDays" MinWidth="0" />
-                        <CalendarDatePicker x:Name="EndPicker" DateChanged="OnEndChanged" CornerRadius="6"
-                                            PlaceholderText="Last day" Visibility="Collapsed" />
-                    </StackPanel>
+                <!-- The title, and under it one quiet line of metadata that
+                     opens the details: day and time, several days, journal,
+                     favourite. -->
+                <StackPanel Spacing="2">
+                    <TextBox x:Name="TitleBox" PlaceholderText="Title" FontFamily="{StaticResource SerifBold}" FontSize="26"
+                             BorderThickness="0" Background="Transparent" Padding="0" TextChanged="OnTitleChanged" />
+                    <Button x:Name="MetaButton" Style="{StaticResource MetaButton}" ToolTipService.ToolTip="Day, time and details">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="MetaText" Style="{StaticResource MicroLabel}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="FavoriteMark" Text="♥" FontSize="11" Foreground="{StaticResource RaspberryBrush}"
+                                       VerticalAlignment="Center" Visibility="Collapsed" />
+                            <FontIcon Glyph="&#xE70D;" FontSize="9" Foreground="{ThemeResource MutedBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Button.Flyout>
+                            <Flyout x:Name="DetailsFlyout" Placement="BottomEdgeAlignedLeft">
+                                <StackPanel Spacing="16" Width="280">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="DAY AND TIME" Style="{StaticResource MicroLabel}" />
+                                        <CalendarDatePicker x:Name="DatePicker" DateChanged="OnDateChanged" CornerRadius="6"
+                                                            HorizontalAlignment="Stretch" />
+                                        <TimePicker x:Name="TimePicker" SelectedTimeChanged="OnTimeChanged" CornerRadius="6"
+                                                    MinuteIncrement="1" HorizontalAlignment="Stretch" />
+                                    </StackPanel>
+                                    <!-- Multi-day entries (SPEC.md §4): a trip, a festival. -->
+                                    <StackPanel Spacing="6">
+                                        <CheckBox x:Name="SeveralDaysBox" Content="Several days" Click="OnSeveralDays" MinWidth="0" />
+                                        <CalendarDatePicker x:Name="EndPicker" DateChanged="OnEndChanged" CornerRadius="6"
+                                                            PlaceholderText="Last day" HorizontalAlignment="Stretch" Visibility="Collapsed" />
+                                    </StackPanel>
+                                    <!-- Only when there's another journal to move it to. -->
+                                    <StackPanel x:Name="JournalPanel" Spacing="6" Visibility="Collapsed">
+                                        <TextBlock Text="JOURNAL" Style="{StaticResource MicroLabel}" />
+                                        <ComboBox x:Name="JournalChoice" CornerRadius="6" HorizontalAlignment="Stretch"
+                                                  SelectionChanged="OnJournalChanged" />
+                                    </StackPanel>
+                                    <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                                        <CheckBox x:Name="FavoriteBox" Content="Favourite" Click="OnFavorite" MinWidth="0" />
+                                    </Border>
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
 
-                <TextBox x:Name="TitleBox" PlaceholderText="Title" FontFamily="{StaticResource SerifBold}" FontSize="26"
-                         BorderThickness="0" Background="Transparent" Padding="0" TextChanged="OnTitleChanged" />
-
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                    <RatingControl x:Name="Rating" MaxRating="5" IsClearEnabled="True" ValueChanged="OnRatingChanged">
+                <!-- Rating and tags: one compact line. -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <RatingControl x:Name="Rating" MaxRating="5" IsClearEnabled="True" ValueChanged="OnRatingChanged"
+                                   VerticalAlignment="Center">
                         <!-- Stars take the calendar's rating colours, tweened as they change. -->
                         <RatingControl.Resources>
                             <SolidColorBrush x:Key="RatingControlSelectedForeground" Color="#FFBF00" />
                             <SolidColorBrush x:Key="RatingControlPointerOverSelectedForeground" Color="#FFBF00" />
                         </RatingControl.Resources>
                     </RatingControl>
+                    <Border Width="1" Margin="0,6" Background="{ThemeResource HairlineBrush}" />
                     <ItemsControl x:Name="TagList" VerticalAlignment="Center">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
@@ -127,14 +155,21 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBox x:Name="TagBox" PlaceholderText="Add tag" Width="140" CornerRadius="6" KeyDown="OnTagKeyDown" />
+                    <TextBox x:Name="TagBox" PlaceholderText="+ Tag" Width="110" CornerRadius="6" FontSize="12"
+                             VerticalAlignment="Center" KeyDown="OnTagKeyDown" ToolTipService.ToolTip="Type a tag and press Enter" />
                 </StackPanel>
 
                 <editor:RichEditor x:Name="Editor" />
 
-                <!-- The day's photos sit on the day, not in the entry (docs/photos.md). -->
-                <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
-                    <pages:DayPhotosView x:Name="Photos" />
+                <!-- The day's own things sit on the day, not in the entry, and
+                     below it: its calendar events (docs/calendar.md), photos
+                     (docs/photos.md) and locked note (docs/locked-notes.md). -->
+                <Border BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,20,0,0" Margin="0,24,0,0">
+                    <StackPanel Spacing="28">
+                        <pages:DayCalendarView x:Name="DayEvents" />
+                        <pages:DayPhotosView x:Name="Photos" />
+                        <pages:DayLockedNoteView x:Name="LockedNote" />
+                    </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>

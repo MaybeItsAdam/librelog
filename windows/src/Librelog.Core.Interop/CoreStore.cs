@@ -90,6 +90,43 @@ public sealed class CoreStore : IDisposable
     public ThumbImage ThumbhashImage(string thumbhash) =>
         Get("thumbhash_image", CoreJson.Default.ThumbImage, ("thumbhash", thumbhash))!;
 
+    // --- Calendar events kept on a day (docs/calendar.md) --------------------------
+
+    /// The events kept on a day: kept from a calendar on some device, or
+    /// added by hand (IsOwn).
+    public List<KeptEvent> KeptCalendarEvents(string date, string? journalId = null) =>
+        Get("kept_calendar_events", CoreJson.Default.ListKeptEvent, ("journal_id", journalId), ("date", date))!;
+    /// "Remove from this day": a synced tombstone.
+    public void RemoveCalendarEvent(string id) => Call("remove_calendar_event", ("id", id));
+    /// An event of the user's own on any day. No times means all day; an
+    /// invalid title or time is an "invalid" error.
+    public KeptEvent AddOwnEvent(string date, OwnEvent ev, string? journalId = null) =>
+        Get("add_own_event", CoreJson.Default.KeptEvent,
+            ("journal_id", journalId), ("date", date), ("event", Native.Node(ev, CoreJson.Default.OwnEvent)))!;
+    /// Only events with IsOwn can be edited.
+    public KeptEvent UpdateOwnEvent(string id, OwnEvent ev) =>
+        Get("update_own_event", CoreJson.Default.KeptEvent, ("id", id), ("event", Native.Node(ev, CoreJson.Default.OwnEvent)))!;
+
+    // --- Locked notes (docs/locked-notes.md) ---------------------------------------
+
+    public LockStatus LockStatus() => Get("lock_status", CoreJson.Default.LockStatus)!;
+    /// First set (current null) or change; also turns locked notes on. A
+    /// wrong current password is a "crypto" error.
+    public void SetLockPassword(string? current, string newPassword) =>
+        Call("set_lock_password", ("current", current), ("new_password", newPassword));
+    public void SetLockEnabled(bool enabled) => Call("set_lock_enabled", ("enabled", enabled));
+    /// Forgot the password: deletes every locked note and the password.
+    public void ResetLock() => Call("reset_lock");
+    public bool CheckLockPassword(string password) => Call("check_lock_password", ("password", password)).GetBoolean();
+    public bool HasLockedNote(string date, string? journalId = null) =>
+        Call("has_locked_note", ("journal_id", journalId), ("date", date)).GetBoolean();
+    /// Null when the day has none. A wrong password is a "crypto" error.
+    public string? LockedNote(string date, string password, string? journalId = null) =>
+        Get("locked_note", CoreJson.Default.String, ("journal_id", journalId), ("date", date), ("password", password));
+    /// Empty text removes the note.
+    public void SetLockedNote(string date, string password, string text, string? journalId = null) =>
+        Call("set_locked_note", ("journal_id", journalId), ("date", date), ("password", password), ("text", text));
+
     // --- Synced settings (docs/appearance.md) -------------------------------------
 
     /// Null when never set, which means the default.

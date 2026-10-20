@@ -31,7 +31,7 @@ public sealed partial class DayPhotosView : UserControl
         var addContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         addContent.Children.Add(new FontIcon { Glyph = GlyphAdd, FontSize = 12 });
         addContent.Children.Add(new TextBlock { Text = "Add photo" });
-        var add = new Button { Style = Res<Style>("PlainButton"), Content = addContent, HorizontalAlignment = HorizontalAlignment.Right };
+        var add = new Button { Style = Res<Style>("QuietButton"), Content = addContent, HorizontalAlignment = HorizontalAlignment.Right };
         ToolTipService.SetToolTip(add, "Add photos taken this day");
         add.Click += OnAdd;
         var header = new Grid();

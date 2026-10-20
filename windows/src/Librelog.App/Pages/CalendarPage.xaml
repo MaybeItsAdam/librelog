@@ -1,5 +1,5 @@
 <!-- Month grid (SPEC.md §6.3): days with entries tinted by rating; select a
-     day to see its entries and photos underneath. Months slide in the way
+     day to see its entries, events, photos and locked note underneath. Months slide in the way
      you're going; swipe or scroll sideways to turn them, or pick one from
      the title. -->
 <Page
@@ -85,7 +85,10 @@
                 </ListView>
             </StackPanel>
 
+            <!-- The selected day's own things: events, photos, locked note. -->
+            <pages:DayCalendarView x:Name="DayEvents" />
             <pages:DayPhotosView x:Name="Photos" />
+            <pages:DayLockedNoteView x:Name="LockedNote" />
         </StackPanel>
     </ScrollViewer>
 </Page>
