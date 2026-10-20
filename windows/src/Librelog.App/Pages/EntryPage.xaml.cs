@@ -191,7 +191,7 @@ public sealed partial class EntryPage : Page
         LockedNote.Date = date;
     }
 
-    /// "TUE 14 OCT · 09:30 · 3 DAYS", plus the journal when there's a choice.
+    /// "WED 14 OCT · 09:30 · 3 DAYS", plus the journal when there's a choice.
     private void UpdateMeta()
     {
         if (entry is not { } en) return;

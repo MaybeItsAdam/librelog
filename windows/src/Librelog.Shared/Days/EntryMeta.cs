@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Librelog.Days;
 
 /// The editor's quiet metadata line under the title, as a micro-label:
-/// "TUE 14 OCT · 09:30 · 3 DAYS". The year shows only when it isn't this
+/// "WED 14 OCT · 09:30 · 3 DAYS". The year shows only when it isn't this
 /// year's; the journal only when there's more than one to be in.
 public static class EntryMeta
 {

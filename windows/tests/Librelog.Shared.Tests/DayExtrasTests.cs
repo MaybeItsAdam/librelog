@@ -127,9 +127,9 @@ public sealed class DayExtrasTests : IDisposable
     public void MetadataLine()
     {
         var today = new DateOnly(2026, 10, 20);
-        Assert.Equal("TUE 14 OCT · 09:30 · 3 DAYS", EntryMeta.Line("2026-10-14", "09:30", "2026-10-16", today, En));
-        Assert.Equal("TUE 14 OCT", EntryMeta.Line("2026-10-14", null, null, today, En));
+        Assert.Equal("WED 14 OCT · 09:30 · 3 DAYS", EntryMeta.Line("2026-10-14", "09:30", "2026-10-16", today, En));
+        Assert.Equal("WED 14 OCT", EntryMeta.Line("2026-10-14", null, null, today, En));
         Assert.Equal("MON 13 OCT 2025 · 08:00", EntryMeta.Line("2025-10-13", "08:00", "2025-10-13", today, En));
-        Assert.Equal("TUE 14 OCT · WORK", EntryMeta.Line("2026-10-14", "", null, today, En, "Work"));
+        Assert.Equal("WED 14 OCT · WORK", EntryMeta.Line("2026-10-14", "", null, today, En, "Work"));
     }
 }
