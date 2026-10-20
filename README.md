@@ -104,7 +104,7 @@ bundle exec fastlane ios internal                                        # TestF
 ```
 
 Or from GitHub: Actions → **Android · Play internal** → Run workflow, with a
-versionName. It needs `PLAY_STORE_SERVICE_ACCOUNT_JSON`, the same Play key as
+versionName. It uploads a draft; roll it out to testers in Play Console. It needs `PLAY_STORE_SERVICE_ACCOUNT_JSON`, the same Play key as
 the Takt repo.
 
 ## Open source and hosted sync

@@ -1,7 +1,8 @@
 name: Android · Play internal
 
-# Builds the signed release bundle and puts it on Play's internal testing
-# track. Run it from the Actions tab. Needs the signing secrets and
+# Builds the signed release bundle and uploads it to Play's internal testing
+# track as a draft: nothing reaches testers until you roll it out in Play
+# Console (or run with release_status=completed). Run it from the Actions tab. Needs the signing secrets and
 # PLAY_STORE_SERVICE_ACCOUNT_JSON, the same Play service account key the
 # Takt repo uses (it has access to every app on the account).
 
@@ -15,6 +16,11 @@ on:
         description: "versionCode (blank: today's date and the run attempt, e.g. 2026102101)"
         required: false
         default: ""
+      release_status:
+        description: "draft: upload only, roll out in Play Console. completed: straight to internal testers"
+        type: choice
+        options: [draft, completed]
+        default: draft
 
 concurrency:
   group: android-internal
@@ -130,12 +136,13 @@ jobs:
       - name: Upload to Play (internal)
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          RELEASE_STATUS: ${{ inputs.release_status }}
         run: |
           if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::error::Secret PLAY_STORE_SERVICE_ACCOUNT_JSON is not set"; exit 1; fi
           KEY="$RUNNER_TEMP/play.json"
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$KEY"
           bundle exec fastlane run upload_to_play_store \
-            package_name:uk.co.maybeitssoftware.librelog track:internal release_status:completed \
+            package_name:uk.co.maybeitssoftware.librelog track:internal release_status:"$RELEASE_STATUS" \
             aab:android/app/build/outputs/bundle/release/app-release.aab \
             json_key:"$KEY" \
             skip_upload_metadata:true skip_upload_images:true skip_upload_screenshots:true skip_upload_changelogs:true
