@@ -100,6 +100,12 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
         StoreSession(await Post("auth/v1/verify",
             new JsonObject { ["type"] = "email", ["email"] = email, ["token"] = code }, auth: false, ct));
 
+    /// Email and password, for accounts made with one in the dashboard (the
+    /// App Review account). Everyone else signs in with a code or a provider.
+    public async Task SignIn(string email, string password, CancellationToken ct = default) =>
+        StoreSession(await Post("auth/v1/token?grant_type=password",
+            new JsonObject { ["email"] = email, ["password"] = password }, auth: false, ct));
+
     /// Where to send the browser to sign in with `provider` through Supabase's
     /// web flow (PKCE). It comes back to `redirect` with `?code=…`, which
     /// <see cref="ExchangeCode"/> turns into a session.

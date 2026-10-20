@@ -106,6 +106,24 @@ public sealed partial class SyncPage : Page
 
     private async void OnVerify(object sender, RoutedEventArgs e) => await Try(() => Sync.Verify(CodeBox.Text));
 
+    /// Swaps the emailed link for a password, for accounts that have one.
+    private void OnTogglePassword(object sender, RoutedEventArgs e)
+    {
+        var show = PasswordPanel.Visibility == Visibility.Collapsed;
+        PasswordPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        SendButton.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        PasswordToggle.Content = show ? "Email me a sign-in link instead" : "Use a password instead";
+        if (!show) PasswordBox.Password = "";
+    }
+
+    private async void OnPasswordSignIn(object sender, RoutedEventArgs e)
+    {
+        var email = EmailBox.Text.Trim();
+        if (!email.Contains('@') || PasswordBox.Password.Length == 0) return;
+        await Try(() => Sync.SignIn(email, PasswordBox.Password));
+        PasswordBox.Password = "";
+    }
+
     private async void OnSignOut(object sender, RoutedEventArgs e)
     {
         pairing?.Cancel();

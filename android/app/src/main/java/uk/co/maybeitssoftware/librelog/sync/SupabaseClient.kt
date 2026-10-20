@@ -85,6 +85,16 @@ class SupabaseClient(
     }
 
     /**
+     * Email and password, for accounts made with one in the dashboard (the
+     * App Review account). Everyone else signs in with a code or a provider.
+     */
+    suspend fun signIn(email: String, password: String) {
+        val url = "$baseUrl/auth/v1/token".toHttpUrl().newBuilder().addQueryParameter("grant_type", "password").build()
+        val body = buildJsonObject { put("email", email); put("password", password) }
+        storeSession(post(url.toString(), body, auth = false))
+    }
+
+    /**
      * Native sign-in with a provider's OpenID token (Google's, from Credential
      * Manager): Supabase checks the token's audience and that it carries the
      * SHA-256 of [nonce], then answers with a session.

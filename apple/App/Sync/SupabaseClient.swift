@@ -71,6 +71,13 @@ actor SupabaseClient {
         try store(sessionJSON: data)
     }
 
+    /// Email and password, for accounts made with one in the dashboard (the
+    /// App Review account). Everyone else signs in with a code or a provider.
+    func signIn(email: String, password: String) async throws {
+        let data = try await post(tokenURL("password"), body: ["email": email, "password": password], auth: false)
+        try store(sessionJSON: data)
+    }
+
     /// Native Sign in with Apple: exchange the identity token.
     func signInWithApple(idToken: String, nonce: String) async throws {
         let data = try await post(tokenURL("id_token"),

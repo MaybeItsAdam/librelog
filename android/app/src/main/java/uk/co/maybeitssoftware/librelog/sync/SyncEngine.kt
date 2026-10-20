@@ -148,6 +148,12 @@ class SyncEngine(
         email = address.trim()
     }
 
+    suspend fun signIn(address: String, password: String) {
+        client.signIn(address.trim(), password)
+        email = address.trim()
+        adoptAccount()
+    }
+
     suspend fun verify(code: String) {
         val address = email ?: throw SyncError.SignedOut
         client.verify(address, code.filter(Char::isDigit))

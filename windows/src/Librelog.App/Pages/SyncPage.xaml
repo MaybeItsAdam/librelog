@@ -38,6 +38,11 @@
                     <TextBlock Text="OR WITH EMAIL" Style="{StaticResource MicroLabel}" />
                     <TextBox x:Name="EmailBox" PlaceholderText="you@example.com" InputScope="EmailSmtpAddress" CornerRadius="6" />
                     <Button x:Name="SendButton" Style="{StaticResource PrimaryButton}" Content="Email me a sign-in link" Click="OnSendEmail" />
+                    <HyperlinkButton x:Name="PasswordToggle" Content="Use a password instead" Click="OnTogglePassword" Padding="0" />
+                    <StackPanel x:Name="PasswordPanel" Spacing="8" Visibility="Collapsed">
+                        <PasswordBox x:Name="PasswordBox" PlaceholderText="Password" CornerRadius="6" />
+                        <Button Style="{StaticResource PrimaryButton}" Content="Sign in" Click="OnPasswordSignIn" />
+                    </StackPanel>
                     <StackPanel x:Name="CodePanel" Spacing="8">
                         <TextBlock x:Name="SentText" Style="{StaticResource BodyText}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">

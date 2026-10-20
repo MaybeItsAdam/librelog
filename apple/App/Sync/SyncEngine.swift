@@ -120,6 +120,12 @@ final class SyncEngine {
         await adoptAccount()
     }
 
+    func signIn(email address: String, password: String) async throws {
+        try await client.signIn(email: address.trimmingCharacters(in: .whitespaces), password: password)
+        email = address
+        await adoptAccount()
+    }
+
     func signInWithApple(idToken: String, nonce: String) async throws {
         try await client.signInWithApple(idToken: idToken, nonce: nonce)
         await adoptAccount()

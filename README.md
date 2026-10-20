@@ -51,6 +51,16 @@ user must exist; sign in once first):
 select librelog.admin_set_sync_until('someone@example.com', now() + interval '1 year');
 ```
 
+### App review account
+
+Reviewers can't receive a sign-in code, so Settings → Sync also offers "Use a
+password instead", which works only for accounts given a password in the
+Supabase dashboard. To make one: Authentication → Users → Add user, email
+`appreview@maybeitssoftware.co.uk`, a password, and Auto Confirm User. Grant it
+sync as above, sign in once on any device to create its journal key, and put
+the email, password and recovery phrase in App Store Connect (App Review
+Information) and Play Console (App content → App access).
+
 ## Bringing in an Obsidian vault
 
 Settings → Import & export reads Librelog backups, Day One, Daylio and

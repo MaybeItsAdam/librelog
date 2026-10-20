@@ -11,6 +11,8 @@ struct SyncSettingsView: View {
     @State private var email = ""
     @State private var code = ""
     @State private var sentTo: String?
+    @State private var usePassword = false
+    @State private var password = ""
     @State private var busy = false
     @State private var message: String?
     @State private var nonce = ""
@@ -88,8 +90,19 @@ struct SyncSettingsView: View {
                     .textInputAutocapitalization(.never)
                     #endif
                     .autocorrectionDisabled()
-                Button("Email me a sign-in link") { Task { await sendEmail() } }
-                    .disabled(!email.contains("@") || busy)
+                if usePassword {
+                    SecureField("Password", text: $password)
+                        .textContentType(.password)
+                    Button("Sign in") { Task { await signInWithPassword() } }
+                        .disabled(!email.contains("@") || password.isEmpty || busy)
+                    Button("Email me a sign-in link instead") { usePassword = false; password = "" }
+                        .foregroundStyle(Color.muted)
+                } else {
+                    Button("Email me a sign-in link") { Task { await sendEmail() } }
+                        .disabled(!email.contains("@") || busy)
+                    Button("Use a password instead") { usePassword = true }
+                        .foregroundStyle(Color.muted)
+                }
             }
         } header: {
             Text("Or with email").microLabel()
@@ -170,6 +183,18 @@ struct SyncSettingsView: View {
         do {
             try await app.sync.sendSignInEmail(email)
             sentTo = email
+            message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func signInWithPassword() async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await app.sync.signIn(email: email, password: password)
+            password = ""
             message = nil
         } catch {
             message = error.localizedDescription

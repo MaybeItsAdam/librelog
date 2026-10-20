@@ -183,6 +183,13 @@ public sealed class SyncEngine(
         Email = address.Trim();
     }
 
+    public async Task SignIn(string address, string password)
+    {
+        await client.SignIn(address.Trim(), password);
+        Email = address.Trim();
+        await AdoptAccount();
+    }
+
     public async Task Verify(string code)
     {
         var email = Email ?? throw new SyncException(SyncProblem.SignedOut, "no email to verify");

@@ -141,6 +141,22 @@ public sealed class SyncEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task AReviewAccountSignsInWithItsPassword()
+    {
+        server.Passwords["appreview@example.com"] = "correct horse";
+        var (a, _) = Device("", "laptop");
+        await a.Start();
+        Assert.Equal(SyncPhase.Off, a.Phase);
+
+        await Assert.ThrowsAsync<SyncException>(() => a.SignIn("appreview@example.com", "wrong"));
+        Assert.Equal(SyncPhase.Off, a.Phase);
+
+        await a.SignIn(" appreview@example.com ", "correct horse");
+        Assert.Equal(SyncPhase.On, a.Phase);
+        Assert.Equal("appreview@example.com", a.Email);
+    }
+
+    [Fact]
     public async Task DeletingTheAccountEmptiesTheServerAndKeepsTheJournal()
     {
         var (a, aStore) = Device("u1", "laptop");
@@ -227,6 +243,9 @@ internal sealed class FakeSupabase : HttpMessageHandler
 
     public bool HasAccount(string user) => accounts.ContainsKey(user);
 
+    /// Accounts that can sign in with a password, by email.
+    public readonly Dictionary<string, string> Passwords = [];
+
     public IEnumerable<string> AllPayloads() => accounts.Values.SelectMany(a => a.Ops.Select(o => o.Payload));
 
     public void Compact(string user, long through, string snapshot)
@@ -241,6 +260,19 @@ internal sealed class FakeSupabase : HttpMessageHandler
     {
         lock (this) Requests++;
         var path = request.RequestUri!.AbsolutePath;
+        if (path == "/auth/v1/token" && request.RequestUri.Query.Contains("grant_type=password"))
+        {
+            var creds = JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject();
+            var email = creds["email"]!.GetValue<string>();
+            if (!Passwords.TryGetValue(email, out var pw) || pw != creds["password"]!.GetValue<string>())
+                return Reply(HttpStatusCode.BadRequest, """{"error":"invalid_grant","error_description":"Invalid login credentials"}""");
+            var user = email.Split('@')[0];
+            return Json(new JsonObject
+            {
+                ["access_token"] = Token(user), ["refresh_token"] = "refresh", ["expires_in"] = 3600,
+                ["user"] = new JsonObject { ["id"] = user, ["email"] = email },
+            });
+        }
         if (!path.StartsWith("/rest/v1/rpc/", StringComparison.Ordinal)) return Reply(HttpStatusCode.NotFound, "{}");
         Assert.Equal("librelog", request.Headers.GetValues("Content-Profile").Single());
         var user = SupabaseClient.JwtClaims(request.Headers.Authorization!.Parameter!)["sub"];

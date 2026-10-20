@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,6 +131,8 @@ private fun SignIn(app: AppModel) {
     var email by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var sentTo by remember { mutableStateOf<String?>(null) }
+    var usePassword by remember { mutableStateOf(false) }
+    var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -175,19 +179,38 @@ private fun SignIn(app: AppModel) {
             SecondaryButton("Use a different email", { sentTo = null; code = "" }, color = t.muted)
         } else {
             Field(email, { email = it }, "Email", keyboard = KeyboardType.Email)
-            PrimaryButton(
-                "Email me a sign-in link",
-                onClick = {
-                    scope.launch {
-                        busy = true
-                        val error = runCatching { app.sync.sendSignInEmail(email) }.exceptionOrNull()
-                        if (error == null) sentTo = email.trim()
-                        message = error?.message
-                        busy = false
-                    }
-                },
-                enabled = email.contains('@') && !busy,
-            )
+            if (usePassword) {
+                Field(password, { password = it }, "Password", keyboard = KeyboardType.Password, secret = true)
+                PrimaryButton(
+                    "Sign in",
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            val error = runCatching { app.sync.signIn(email, password) }.exceptionOrNull()
+                            if (error == null) password = ""
+                            message = error?.message
+                            busy = false
+                        }
+                    },
+                    enabled = email.contains('@') && password.isNotEmpty() && !busy,
+                )
+                SecondaryButton("Email me a sign-in link instead", { usePassword = false; password = "" }, color = t.muted)
+            } else {
+                PrimaryButton(
+                    "Email me a sign-in link",
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            val error = runCatching { app.sync.sendSignInEmail(email) }.exceptionOrNull()
+                            if (error == null) sentTo = email.trim()
+                            message = error?.message
+                            busy = false
+                        }
+                    },
+                    enabled = email.contains('@') && !busy,
+                )
+                SecondaryButton("Use a password instead", { usePassword = true }, color = t.muted)
+            }
         }
         message?.let { StatusBanner(it, t.danger) }
     }
@@ -475,6 +498,7 @@ private fun Field(
     keyboard: KeyboardType = KeyboardType.Text,
     mono: Boolean = false,
     minLines: Int = 1,
+    secret: Boolean = false,
 ) {
     val t = tokens
     val style = (if (mono) Typeface.mono(16) else Typeface.ui.copy(fontSize = 16.sp)).copy(color = t.ink)
@@ -485,6 +509,7 @@ private fun Field(
         minLines = minLines,
         singleLine = minLines == 1,
         cursorBrush = SolidColor(t.primary),
+        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboard,
             capitalization = KeyboardCapitalization.None,
