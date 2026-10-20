@@ -266,11 +266,11 @@ internal sealed class FakeSupabase : HttpMessageHandler
             var email = creds["email"]!.GetValue<string>();
             if (!Passwords.TryGetValue(email, out var pw) || pw != creds["password"]!.GetValue<string>())
                 return Reply(HttpStatusCode.BadRequest, """{"error":"invalid_grant","error_description":"Invalid login credentials"}""");
-            var user = email.Split('@')[0];
+            var reviewer = email.Split('@')[0];
             return Json(new JsonObject
             {
-                ["access_token"] = Token(user), ["refresh_token"] = "refresh", ["expires_in"] = 3600,
-                ["user"] = new JsonObject { ["id"] = user, ["email"] = email },
+                ["access_token"] = Token(reviewer), ["refresh_token"] = "refresh", ["expires_in"] = 3600,
+                ["user"] = new JsonObject { ["id"] = reviewer, ["email"] = email },
             });
         }
         if (!path.StartsWith("/rest/v1/rpc/", StringComparison.Ordinal)) return Reply(HttpStatusCode.NotFound, "{}");
