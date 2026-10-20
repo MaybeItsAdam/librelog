@@ -77,7 +77,24 @@ pub struct KeptEvent {
     /// Moved to a different day than `date` (`start` says which).
     pub moved_to_another_day: bool,
     pub note: Option<String>,
+    /// Added by hand rather than kept from a calendar (`own:` key): never
+    /// tracked, and editable in the app.
+    pub is_own: bool,
 }
+
+/// An event the user adds to a day by hand. Times are `HH:MM` on that day;
+/// no start time makes it an all-day event.
+#[derive(Debug, Clone, PartialEq, uniffi::Record, serde::Serialize, serde::Deserialize)]
+pub struct OwnEvent {
+    pub title: String,
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+    pub location: Option<String>,
+}
+
+/// Events the user adds by hand carry this key prefix. No calendar lookup
+/// ever matches it, so they are never moved or cancelled by a refresh.
+const OWN: &str = "own:";
 
 /// What to show for one day: the events kept there, and the calendar's
 /// other events that day to offer as suggestions.
@@ -153,6 +170,46 @@ impl Store {
         self.kept_row(&id)?.ok_or_else(|| CoreError::NotFound(format!("calendar event {id}")))
     }
 
+    /// Adds an event of the user's own to a day, past or future: something
+    /// that was never in a calendar, or a calendar this device can't read.
+    pub fn add_own_event(&self, journal_id: Option<String>, date: String, event: OwnEvent) -> Result<KeptEvent> {
+        check_day(&date)?;
+        let (start, end) = own_times(&date, &event)?;
+        let journal = journal_id.unwrap_or_else(|| DEFAULT_JOURNAL.to_string());
+        let key = format!("{OWN}{}", uuid::Uuid::now_v7());
+        let id = event_id(&journal, &key);
+        self.write(
+            "calendar_events",
+            &id,
+            json!({
+                "journal_id": journal, "date": date, "event_key": key, "title": event.title.trim(),
+                "location": tidy(event.location), "calendar": null, "start": start, "end_at": end,
+                "kept_start": start, "kept_end": end, "cancelled": false,
+                "origin_device_id": self.device_id(), "created_at": now_rfc3339(), "deleted_at": null,
+            }),
+        )?;
+        self.kept_row(&id)?.ok_or_else(|| CoreError::NotFound(format!("calendar event {id}")))
+    }
+
+    /// Changes an event the user added by hand. Kept calendar events follow
+    /// their calendar instead, so they can't be edited here.
+    pub fn update_own_event(&self, id: String, event: OwnEvent) -> Result<KeptEvent> {
+        let row = self.kept_row(&id)?.ok_or_else(|| CoreError::NotFound(format!("calendar event {id}")))?;
+        if !row.is_own {
+            return Err(CoreError::Invalid("only events added by hand can be edited".into()));
+        }
+        let (start, end) = own_times(&row.date, &event)?;
+        self.write(
+            "calendar_events",
+            &id,
+            json!({
+                "title": event.title.trim(), "location": tidy(event.location),
+                "start": start, "end_at": end, "kept_start": start, "kept_end": end,
+            }),
+        )?;
+        self.kept_row(&id)?.ok_or_else(|| CoreError::NotFound(format!("calendar event {id}")))
+    }
+
     /// Stops tracking a kept event and takes it off the day.
     pub fn remove_calendar_event(&self, id: String) -> Result<()> {
         self.kept_row(&id)?.ok_or_else(|| CoreError::NotFound(format!("calendar event {id}")))?;
@@ -187,7 +244,8 @@ impl Store {
     pub fn refresh_calendar_events(&self, lookups: Vec<CalendarLookup>) -> Result<u32> {
         let me = self.device_id();
         let mut writes = Vec::new();
-        for lookup in lookups {
+        // Own events have no calendar to follow, whatever an app passes in.
+        for lookup in lookups.into_iter().filter(|l| !key_is_own(&l.key)) {
             let rows = self.kept_rows_for_key(&lookup.key)?;
             for row in rows {
                 let f = match &lookup.event {
@@ -328,7 +386,41 @@ fn kept_from_row(r: &Row) -> rusqlite::Result<KeptEvent> {
         end,
         state,
         note: r.get(12)?,
+        is_own: key_is_own(&r.get::<_, String>(3)?),
     })
+}
+
+fn key_is_own(key: &str) -> bool {
+    key.starts_with(OWN)
+}
+
+/// Start and end in the stored forms, from an own event on `date`.
+fn own_times(date: &str, e: &OwnEvent) -> Result<(String, Option<String>)> {
+    if e.title.trim().is_empty() {
+        return Err(CoreError::Invalid("an event needs a title".into()));
+    }
+    let tidy = |t: &Option<String>| t.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string);
+    let (start, end) = (tidy(&e.start_time), tidy(&e.end_time));
+    let Some(start) = start else {
+        if end.is_some() {
+            return Err(CoreError::Invalid("an end time needs a start time".into()));
+        }
+        return Ok((date.to_string(), None));
+    };
+    let start = format!("{date}T{start}");
+    check_moment(&start)?;
+    let end = match end {
+        Some(end) => {
+            let end = format!("{date}T{end}");
+            check_moment(&end)?;
+            if end <= start {
+                return Err(CoreError::Invalid("the event ends before it starts".into()));
+            }
+            Some(end)
+        }
+        None => None,
+    };
+    Ok((start, end))
 }
 
 /// One row per journal and event, the same on every device.
@@ -421,6 +513,41 @@ mod tests {
 
     fn standup() -> CalendarEvent {
         ev("apple:abc", "Standup", "2026-10-17T09:30", Some("2026-10-17T09:45"))
+    }
+
+    fn own(title: &str, start: Option<&str>, end: Option<&str>) -> OwnEvent {
+        OwnEvent { title: title.into(), start_time: start.map(Into::into), end_time: end.map(Into::into), location: None }
+    }
+
+    #[test]
+    fn own_events_go_on_any_day_and_are_never_tracked() {
+        let s = store();
+        let past = "2019-06-01".to_string();
+        let e = s.add_own_event(None, past.clone(), own("Graduation", Some("14:00"), Some("16:30"))).unwrap();
+        assert!(e.is_own);
+        assert_eq!((e.start.as_str(), e.end.as_deref()), ("2019-06-01T14:00", Some("2019-06-01T16:30")));
+        assert_eq!(e.state, KeptEventState::Scheduled);
+
+        let all_day = s.add_own_event(None, past.clone(), own("Moving day", None, None)).unwrap();
+        assert!(all_day.all_day);
+
+        assert!(s.add_own_event(None, past.clone(), own("  ", None, None)).is_err());
+        assert!(s.add_own_event(None, past.clone(), own("Late", Some("16:00"), Some("15:00"))).is_err());
+        assert!(s.add_own_event(None, past.clone(), own("Odd", None, Some("15:00"))).is_err());
+
+        // A refresh from the calendar never touches them, and they're not offered as tracked.
+        assert_eq!(s.refresh_calendar_events(vec![CalendarLookup { key: e.key.clone(), event: None }]).unwrap(), 0);
+        assert!(s.tracked_calendar_events("apple:".into()).unwrap().is_empty());
+        let day = s.calendar_day(None, past.clone(), vec![]).unwrap();
+        assert_eq!(day.kept.len(), 2);
+        assert!(day.kept.iter().all(|k| k.state == KeptEventState::Scheduled));
+
+        let moved = s.update_own_event(e.id.clone(), own("Graduation day", Some("13:00"), None)).unwrap();
+        assert_eq!((moved.title.as_str(), moved.start.as_str(), moved.state), ("Graduation day", "2019-06-01T13:00", KeptEventState::Scheduled));
+
+        let kept = s.keep_calendar_event(None, "2026-10-03".into(), ev("apple:x", "Standup", "2026-10-03T09:30", None)).unwrap();
+        assert!(!kept.is_own);
+        assert!(s.update_own_event(kept.id, own("Nope", None, None)).is_err());
     }
 
     #[test]

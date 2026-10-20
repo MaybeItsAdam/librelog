@@ -76,6 +76,19 @@ The rules, all in the core:
 - Only fields that actually changed are written, so a refresh with nothing
   new queues no sync ops.
 
+## Events you add yourself
+
+Any day, past or future, can take an event that was never in a calendar, or
+was in one this device can't read: "Add event" under the day's calendar
+section. It takes a title, an optional start and end time (HH:MM, the end
+after the start; no times means all day) and an optional place.
+
+These rows live in the same `calendar_events` table with an `own:` key and
+`is_own` set (`Store::add_own_event`, `Store::update_own_event`). No
+calendar lookup ever matches them, so a refresh never moves or cancels
+them, and tapping one opens it for editing rather than showing a calendar's
+details. "Remove from this day" works as for kept events.
+
 ## Windows
 
 SPEC.md lists Microsoft Graph and the Google Calendar API for Windows. Both

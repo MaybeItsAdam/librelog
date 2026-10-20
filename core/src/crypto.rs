@@ -108,6 +108,56 @@ impl JournalKey {
     }
 }
 
+/// The key for locked notes (lock.rs), derived from the user's lock
+/// password with Argon2id. It is never stored: each unlock derives it again
+/// from the password typed, so a locked note can't be read without it.
+pub struct LockKey(Zeroizing<[u8; 32]>);
+
+/// Sealed under the lock key to check a password without opening a note.
+const LOCK_CHECK: &[u8] = b"librelog lock password";
+const LOCK_CONTEXT: &str = "librelog 2026-10 locked note";
+
+impl LockKey {
+    /// Argon2id at OWASP's minimum (19 MiB, 2 passes): around a tenth of a
+    /// second on a phone, which is fine for a prompt and slow for guessing.
+    pub fn derive(password: &str, salt: &[u8]) -> Result<Self> {
+        let params = argon2::Params::new(19 * 1024, 2, 1, Some(32)).map_err(|e| CoreError::Crypto(e.to_string()))?;
+        let argon = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+        let mut k = Zeroizing::new([0u8; 32]);
+        argon
+            .hash_password_into(password.as_bytes(), salt, k.as_mut())
+            .map_err(|e| CoreError::Crypto(e.to_string()))?;
+        Ok(LockKey(k))
+    }
+
+    pub fn new_salt() -> Result<[u8; 16]> {
+        let mut salt = [0u8; 16];
+        getrandom::fill(&mut salt).map_err(|e| CoreError::Crypto(e.to_string()))?;
+        Ok(salt)
+    }
+
+    fn cipher(&self) -> XChaCha20Poly1305 {
+        XChaCha20Poly1305::new_from_slice(self.0.as_ref()).expect("32-byte key")
+    }
+
+    pub fn seal_b64(&self, plaintext: &[u8]) -> Result<String> {
+        Ok(B64.encode(seal_with(&self.cipher(), LOCK_CONTEXT.as_bytes(), plaintext)?))
+    }
+
+    pub fn open_b64(&self, sealed: &str) -> Result<Vec<u8>> {
+        let bytes = B64.decode(sealed.trim()).map_err(|e| CoreError::Crypto(format!("base64: {e}")))?;
+        open_with(&self.cipher(), LOCK_CONTEXT.as_bytes(), &bytes)
+    }
+
+    pub fn check(&self) -> Result<String> {
+        self.seal_b64(LOCK_CHECK)
+    }
+
+    pub fn verifies(&self, check: &str) -> bool {
+        self.open_b64(check).is_ok_and(|p| p == LOCK_CHECK)
+    }
+}
+
 fn seal_with(cipher: &XChaCha20Poly1305, aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     let mut nonce = [0u8; 24];
     getrandom::fill(&mut nonce).map_err(|e| CoreError::Crypto(e.to_string()))?;

@@ -40,6 +40,7 @@ pub const SYNCED: &[(&str, &[&str])] = &[
     ),
     ("day_meta", &["journal_id", "date", "kept_items", "deleted_at"]),
     ("synced_settings", &["value", "deleted_at"]),
+    ("locked_notes", &["journal_id", "date", "sealed", "deleted_at"]),
     (
         "calendar_events",
         &[
@@ -332,6 +333,19 @@ const MIGRATIONS: &[&str] = &[
     create index attachments_entry on attachments (entry_id) where deleted_at is null;
     create index attachments_day on attachments (journal_id, date) where deleted_at is null;
     create index attachments_hash on attachments (content_hash) where deleted_at is null;
+    "#,
+    // 6: one locked note per journal day (lock.rs), sealed under a key from
+    // the lock password. Only ciphertext is stored, and nothing is indexed.
+    r#"
+    create table locked_notes (
+      id          text primary key,     -- name_id of "<journal_id>:<date>"
+      journal_id  text,
+      date        text,
+      sealed      text,                 -- base64, sealed under the lock key
+      updated_at  text not null,
+      deleted_at  text
+    );
+    create index locked_notes_day on locked_notes (journal_id, date) where deleted_at is null;
     "#,
 ];
 

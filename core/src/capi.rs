@@ -318,6 +318,41 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
             let lookups = args!(lookups: Vec<crate::CalendarLookup>);
             ok(json!(s.refresh_calendar_events(lookups)?))
         }
+        "add_own_event" => {
+            let (journal_id, date, event) = args!(journal_id: Option<String>, date: String, event: crate::OwnEvent);
+            ok(json!(s.add_own_event(journal_id, date, event)?))
+        }
+        "update_own_event" => {
+            let (id, event) = args!(id: String, event: crate::OwnEvent);
+            ok(json!(s.update_own_event(id, event)?))
+        }
+        "lock_status" => ok(json!(s.lock_status()?)),
+        "set_lock_password" => {
+            let (current, new_password) = args!(current: Option<String>, new_password: String);
+            ok(json!(s.set_lock_password(current, new_password)?))
+        }
+        "set_lock_enabled" => {
+            let enabled = args!(enabled: bool);
+            ok(json!(s.set_lock_enabled(enabled)?))
+        }
+        "reset_lock" => ok(json!(s.reset_lock()?)),
+        "check_lock_password" => {
+            let password = args!(password: String);
+            ok(json!(s.check_lock_password(password)?))
+        }
+        "has_locked_note" => {
+            let (journal_id, date) = args!(journal_id: Option<String>, date: String);
+            ok(json!(s.has_locked_note(journal_id, date)?))
+        }
+        "locked_note" => {
+            let (journal_id, date, password) = args!(journal_id: Option<String>, date: String, password: String);
+            ok(json!(s.locked_note(journal_id, date, password)?))
+        }
+        "set_locked_note" => {
+            let (journal_id, date, password, text) =
+                args!(journal_id: Option<String>, date: String, password: String, text: String);
+            ok(json!(s.set_locked_note(journal_id, date, password, text)?))
+        }
         "add_day_photo" => {
             // `photo.hash_rgba` travels as base64, like every byte string here.
             let (journal_id, date, mut photo) = args!(journal_id: Option<String>, date: String, photo: Value);
