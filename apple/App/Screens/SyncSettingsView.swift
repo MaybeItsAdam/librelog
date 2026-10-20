@@ -20,6 +20,7 @@ struct SyncSettingsView: View {
         let sync = app.sync
         Form {
             AppearanceSection()
+            PrivacySection()
             switch sync.phase {
             case .off: signIn
             case .needsKey: KeySetupView()

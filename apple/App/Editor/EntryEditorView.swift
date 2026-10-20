@@ -17,6 +17,7 @@ struct EntryEditorView: View {
     @State private var newTag = ""
     @State private var showConflicts = false
     @State private var confirmDelete = false
+    @State private var showDetails = false
     /// Set when leaving discarded the entry for being empty, so coming back
     /// to it (from a full-screen photo, say) can bring it back.
     @State private var discarded = false
@@ -29,7 +30,14 @@ struct EntryEditorView: View {
                     header(entry)
                     if entry.hasConflict { conflictBanner }
                     RichTextEditor(controller: controller)
-                        .padding(.top, 12)
+                        #if os(macOS)
+                        // AppKit's text view scrolls itself; give it room so the
+                        // day's sections below never crowd the writing.
+                        .frame(minHeight: 320)
+                        #endif
+                        .padding(.top, 8)
+                    DayExtras(date: entry.date)
+                        .padding(.top, 32)
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
                 }
@@ -52,6 +60,7 @@ struct EntryEditorView: View {
         .sheet(isPresented: $showConflicts) {
             if let entry { ConflictsView(entryID: entry.id) }
         }
+        .sheet(isPresented: $showDetails) { detailsSheet }
         .confirmationDialog("Delete this entry?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 let id = entryID
@@ -68,43 +77,205 @@ struct EntryEditorView: View {
 
     // MARK: Header
 
+    /// The title first, then one quiet line of what the entry is (day, time,
+    /// how many days) that opens Details, with the rating beside it. Tags
+    /// show only once there are some; everything else lives in Details.
     private func header(_ entry: Entry) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(entry.endDate == nil ? Day.title(entry.date) : Day.range(entry.date, entry.endDate))
-                    .microLabel()
-                    .contentTransition(.opacity)
-                if let time = entry.time {
-                    Text(time).font(Typeface.mono(11)).foregroundStyle(Color.muted)
-                }
-                Spacer()
-                RatingPicker(rating: entry.rating) { value in
-                    let id = entry.id
-                    self.entry?.rating = value
-                    Task { await app.write { try $0.setRating(id: id, rating: value) } }
-                }
-            }
-            .padding(.top, 12)
-
-            spanRow(entry)
-
+        VStack(alignment: .leading, spacing: 0) {
             TextField("Title", text: $title, axis: .vertical)
                 .font(Typeface.title)
                 .foregroundStyle(Color.ink)
                 .textFieldStyle(.plain)
                 .onSubmit(saveTitle)
                 .onChange(of: title) { scheduleSave() }
+                .padding(.top, 16)
 
-            tagRow(entry)
-            DayCalendarSection(date: entry.date)
-            DayPhotosSection(date: entry.date)
-            Divider().overlay(Color.hairline)
+            HStack(spacing: 8) {
+                Button { showDetails = true } label: {
+                    HStack(spacing: 6) {
+                        if entry.isFavorite {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Color.warning)
+                        }
+                        Text(metaLine(entry))
+                            .microLabel()
+                            .lineLimit(1)
+                            .contentTransition(.opacity)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Color.dim)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Details: \(metaLine(entry))")
+                .accessibilityHint("Change the day, time, length, rating and tags")
+                Spacer(minLength: 8)
+                RatingPicker(rating: entry.rating) { setRating($0) }
+                    .scaleEffect(0.85, anchor: .trailing)
+            }
+
+            if !entry.tags.isEmpty {
+                tagRow(entry, adding: false)
+                    .padding(.bottom, 4)
+            }
+        }
+    }
+
+    /// "TUESDAY 14 OCTOBER · 09:30" or "26 – 28 AUG · 3 DAYS" (cased by the micro-label).
+    private func metaLine(_ entry: Entry) -> String {
+        var parts = [entry.endDate == nil ? Day.title(entry.date) : Day.range(entry.date, entry.endDate)]
+        if let time = entry.time { parts.append(time) }
+        if let end = entry.endDate {
+            parts.append(String(localized: "\(Day.between(entry.date, end) + 1) days"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func setRating(_ value: Double?) {
+        guard let entry else { return }
+        let id = entry.id
+        self.entry?.rating = value
+        Task { await app.write { try $0.setRating(id: id, rating: value) } }
+    }
+
+    private func setFavorite(_ fav: Bool) {
+        guard let entry else { return }
+        let id = entry.id
+        self.entry?.isFavorite = fav
+        Task { await app.write { try $0.setFavorite(id: id, favorite: fav) } }
+    }
+
+    // MARK: Details
+
+    /// Everything about the entry that isn't the writing: when it was, how
+    /// many days it covers, rating, tags and favourite.
+    private var detailsSheet: some View {
+        NavigationStack {
+            Form {
+                if let entry {
+                    Section {
+                        DatePicker("Day", selection: dayBinding(entry), displayedComponents: .date)
+                            .listRowBackground(Color.raised)
+                        Toggle("Time", isOn: hasTimeBinding(entry))
+                            .tint(Color.primary)
+                            .listRowBackground(Color.raised)
+                        if entry.time != nil {
+                            DatePicker("At", selection: timeBinding(entry), displayedComponents: .hourAndMinute)
+                                .listRowBackground(Color.raised)
+                        }
+                    } header: {
+                        Text("When").microLabel()
+                    }
+
+                    Section {
+                        spanRows(entry)
+                    } header: {
+                        Text("Length").microLabel()
+                    } footer: {
+                        Text("For a trip or a festival, written up as one entry.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.muted)
+                    }
+
+                    Section {
+                        HStack {
+                            Text("Rating")
+                            Spacer()
+                            RatingPicker(rating: entry.rating) { setRating($0) }
+                        }
+                        .listRowBackground(Color.raised)
+                        Toggle("Favourite", isOn: Binding(get: { entry.isFavorite }, set: { setFavorite($0) }))
+                            .tint(Color.primary)
+                            .listRowBackground(Color.raised)
+                    } header: {
+                        Text("Mark").microLabel()
+                    }
+
+                    Section {
+                        tagRow(entry, adding: true)
+                            .padding(.vertical, 6)
+                            .listRowBackground(Color.raised)
+                    } header: {
+                        Text("Tags").microLabel()
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.paper)
+            .navigationTitle("Details")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showDetails = false }
+                }
+            }
+        }
+        .tint(Color.primary)
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        #else
+        .frame(minWidth: 440, minHeight: 520)
+        #endif
+    }
+
+    private func dayBinding(_ entry: Entry) -> Binding<Date> {
+        Binding(
+            get: { Day.date(entry.date) ?? Date() },
+            set: { setDateTime(date: Day.string($0), time: entry.time) }
+        )
+    }
+
+    private func hasTimeBinding(_ entry: Entry) -> Binding<Bool> {
+        Binding(
+            get: { entry.time != nil },
+            set: { on in setDateTime(date: entry.date, time: on ? Day.nowTime : nil) }
+        )
+    }
+
+    private func timeBinding(_ entry: Entry) -> Binding<Date> {
+        Binding(
+            get: {
+                let day = Day.date(entry.date) ?? Date()
+                let hm = (entry.time ?? "").split(separator: ":").compactMap { Int($0) }
+                guard hm.count == 2 else { return day }
+                return Calendar.current.date(bySettingHour: hm[0], minute: hm[1], second: 0, of: day) ?? day
+            },
+            set: {
+                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                setDateTime(date: entry.date, time: String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0))
+            }
+        )
+    }
+
+    /// Moves the entry; one covering several days keeps its length.
+    private func setDateTime(date: String, time: String?) {
+        guard let entry, entry.date != date || entry.time != time else { return }
+        let id = entry.id
+        if let end = entry.endDate {
+            self.entry?.endDate = Day.adding(Day.between(entry.date, end), to: date)
+        }
+        self.entry?.date = date
+        self.entry?.time = time
+        Task {
+            await app.write { try $0.setDateTime(id: id, date: date, time: time) }
+            if let e = try? await app.run({ try $0.entry(id: id) }) {
+                self.entry?.date = e.date
+                self.entry?.time = e.time
+                self.entry?.endDate = e.endDate
+            }
         }
     }
 
     /// "Several days": a trip or a festival, written up as one entry. Turning
     /// it on starts with the next day as the last; the picker allows a year.
-    private func spanRow(_ entry: Entry) -> some View {
+    @ViewBuilder
+    private func spanRows(_ entry: Entry) -> some View {
         let start = Day.date(entry.date) ?? Date()
         let cal = Calendar.current
         let earliest = cal.date(byAdding: .day, value: 1, to: start) ?? start
@@ -117,25 +288,14 @@ struct EntryEditorView: View {
             get: { entry.endDate.flatMap(Day.date) ?? earliest },
             set: { setEnd(Day.string($0)) }
         )
-        return HStack(spacing: 12) {
-            Toggle(isOn: several) {
-                Text("Several days").font(.system(size: 13)).foregroundStyle(Color.muted)
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
+        Toggle("Several days", isOn: several)
             .tint(Color.primary)
-            .fixedSize()
-            if entry.endDate != nil {
-                DatePicker("Last day", selection: last, in: earliest...latest, displayedComponents: .date)
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-                    .font(.system(size: 13))
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
-            }
-            Spacer(minLength: 0)
+            .sensoryFeedback(.selection, trigger: entry.endDate != nil)
+            .listRowBackground(Color.raised)
+        if entry.endDate != nil {
+            DatePicker("Last day", selection: last, in: earliest...latest, displayedComponents: .date)
+                .listRowBackground(Color.raised)
         }
-        .frame(minHeight: 44)
-        .sensoryFeedback(.selection, trigger: entry.endDate != nil)
     }
 
     private func setEnd(_ end: String?) {
@@ -145,7 +305,9 @@ struct EntryEditorView: View {
         Task { await app.write { try $0.setEndDate(id: id, endDate: end) } }
     }
 
-    private func tagRow(_ entry: Entry) -> some View {
+    /// The entry's tags, each with a menu to remove it; `adding` shows the
+    /// "+ Tag" control (Details) rather than leaving it to Details (header).
+    private func tagRow(_ entry: Entry, adding showAdd: Bool) -> some View {
         FlowLayout(spacing: 6) {
             ForEach(entry.tags, id: \.id) { tag in
                 Menu {
@@ -162,7 +324,9 @@ struct EntryEditorView: View {
                 .menuStyle(.button)
                 .buttonStyle(.plain)
             }
-            if addingTag {
+            if !showAdd {
+                EmptyView()
+            } else if addingTag {
                 TextField("Tag", text: $newTag)
                     .font(.system(size: 13))
                     .textFieldStyle(.plain)
@@ -184,6 +348,7 @@ struct EntryEditorView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -262,10 +427,11 @@ struct EntryEditorView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 if let entry {
+                    Button { showDetails = true } label: {
+                        Label("Details", systemImage: "slider.horizontal.3")
+                    }
                     Button {
-                        let (id, fav) = (entry.id, !entry.isFavorite)
-                        self.entry?.isFavorite = fav
-                        Task { await app.write { try $0.setFavorite(id: id, favorite: fav) } }
+                        setFavorite(!entry.isFavorite)
                     } label: {
                         Label(entry.isFavorite ? "Unfavourite" : "Favourite", systemImage: entry.isFavorite ? "star.slash" : "star")
                     }

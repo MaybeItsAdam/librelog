@@ -20,10 +20,12 @@ struct DayPhotosSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if photos.isEmpty {
+            HStack {
+                Text("Photos").microLabel()
+                Spacer()
                 addButton
-            } else {
-                Text("Photos").microLabel().padding(.top, 6).padding(.bottom, 8)
+            }
+            if !photos.isEmpty {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
                     ForEach(photos) { photo in
                         tile(photo).transition(.opacity)
@@ -52,8 +54,8 @@ struct DayPhotosSection: View {
 
     private var addButton: some View {
         Button { choosing = true } label: {
-            Label("Add photo", systemImage: "photo.badge.plus")
-                .font(.system(size: 13))
+            Label("Add photo", systemImage: "plus")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.muted)
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())

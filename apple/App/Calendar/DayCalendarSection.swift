@@ -3,22 +3,47 @@ import SwiftUI
 /// A day's calendar, in the editor and under a day in Calendar
 /// (docs/calendar.md). Kept events are part of the journal, each with room
 /// for a note; the calendar's other events that day are offered underneath
-/// as suggestions, one tap to keep. Nothing is stored until then.
+/// as suggestions, one tap to keep. Nothing is stored until then. "Add
+/// event" puts one of the user's own on any day, past or future, with or
+/// without calendar access.
 struct DayCalendarSection: View {
     @Environment(AppModel.self) private var app
     let date: String
 
     @State private var kept: [KeptEvent] = []
     @State private var suggestions: [CalendarEvent] = []
+    @State private var sheet: EventSheet?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The add-or-edit sheet: a new own event, or one to change.
+    private enum EventSheet: Identifiable {
+        case add
+        case edit(KeptEvent)
+        var id: String {
+            switch self {
+            case .add: "add"
+            case .edit(let e): e.id
+            }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !kept.isEmpty || !suggestions.isEmpty {
-                Text("Calendar").microLabel().padding(.top, 6).padding(.bottom, 4)
+            HStack {
+                Text("Calendar").microLabel()
+                Spacer()
+                Button { sheet = .add } label: {
+                    Label("Add event", systemImage: "plus")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.muted)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add an event to \(Day.title(date))")
             }
             ForEach(kept, id: \.id) { event in
-                KeptEventRow(event: event)
+                KeptEventRow(event: event) { sheet = .edit(event) }
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
             ForEach(suggestions, id: \.key) { event in
@@ -40,6 +65,12 @@ struct DayCalendarSection: View {
         }
         .sensoryFeedback(.success, trigger: kept.count) { old, new in new > old }
         .task(id: "\(date)|\(app.revision)|\(app.calendarAccess == .granted)") { await load() }
+        .sheet(item: $sheet) { s in
+            switch s {
+            case .add: OwnEventSheet(date: date)
+            case .edit(let e): OwnEventSheet(date: date, editing: e)
+            }
+        }
     }
 
     private func suggestionRow(_ event: CalendarEvent) -> some View {
@@ -94,23 +125,25 @@ struct DayCalendarSection: View {
 }
 
 /// One kept event: title, time, calendar, a quiet tag when it has moved or
-/// been cancelled, and the user's note, saved as they type.
+/// been cancelled, and the user's note, saved as they type. The user's own
+/// events open for editing when their title is tapped.
 private struct KeptEventRow: View {
     @Environment(AppModel.self) private var app
     let event: KeptEvent
+    let edit: () -> Void
     @State private var note = ""
     @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 12))
-                    .foregroundStyle(event.state == .cancelled ? Color.dim : Color.primary)
-                Text(event.title.isEmpty ? String(localized: "Untitled event") : event.title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(event.state == .cancelled ? Color.muted : Color.ink)
-                    .strikethrough(event.state == .cancelled, color: Color.muted)
+                if event.isOwn {
+                    Button(action: edit) { titleLabel }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Edit this event")
+                } else {
+                    titleLabel
+                }
                 Spacer(minLength: 8)
                 switch event.state {
                 case .moved: StatusTag(text: String(localized: "Moved"), hue: .warning)
@@ -118,6 +151,9 @@ private struct KeptEventRow: View {
                 case .scheduled: EmptyView()
                 }
                 Menu {
+                    if event.isOwn {
+                        Button("Edit event", action: edit)
+                    }
                     Button("Remove from this day", role: .destructive) {
                         let id = event.id
                         Task { await app.write { try $0.removeCalendarEvent(id: id) } }
@@ -151,6 +187,20 @@ private struct KeptEventRow: View {
             if saveTask == nil { note = new ?? "" }
         }
         .onDisappear { flush() }
+    }
+
+    private var titleLabel: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: event.isOwn ? "calendar.badge.clock" : "calendar")
+                .font(.system(size: 12))
+                .foregroundStyle(event.state == .cancelled ? Color.dim : Color.primary)
+            Text(event.title.isEmpty ? String(localized: "Untitled event") : event.title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(event.state == .cancelled ? Color.muted : Color.ink)
+                .strikethrough(event.state == .cancelled, color: Color.muted)
+                .multilineTextAlignment(.leading)
+        }
+        .contentShape(Rectangle())
     }
 
     /// "09:30–10:00 · Work · Room 2", with the new day first when it moved off this one.

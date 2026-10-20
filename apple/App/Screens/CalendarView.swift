@@ -43,9 +43,8 @@ struct CalendarView: View {
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    DayCalendarSection(date: selected)
-                        .padding(.top, 8)
-                    DayPhotosSection(date: selected)
+                    DayExtras(date: selected)
+                        .padding(.top, 16)
                 }
             }
             .padding(.horizontal, 20)
