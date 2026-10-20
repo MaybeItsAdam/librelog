@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
 import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
+import uk.co.maybeitssoftware.librelog.lock.LockedNoteSection
 import uk.co.maybeitssoftware.librelog.ui.EntryRow
 import uk.co.maybeitssoftware.librelog.ui.Hairline
 import uk.co.maybeitssoftware.librelog.ui.Haptics
@@ -140,6 +141,9 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
             dayGroup(today, days[today].orEmpty(), openEntry, m, stagger, onNewEntry = { newEntry() }, titled = false)
             item(key = "photos$today") {
                 DayPhotosSection(app, today, rowMotion(m).padding(top = 4.dp))
+            }
+            item(key = "locked$today") {
+                LockedNoteSection(app, today, rowMotion(m))
             }
 
             otherDays.forEach { date -> dayGroup(date, days.getValue(date), openEntry, m, stagger) }

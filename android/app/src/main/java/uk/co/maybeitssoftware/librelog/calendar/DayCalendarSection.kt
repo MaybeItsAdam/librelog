@@ -4,6 +4,7 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -74,6 +76,8 @@ fun DayCalendarSection(app: AppModel, date: String, modifier: Modifier = Modifie
     val haptics = LocalHapticFeedback.current
     var day by remember(date) { mutableStateOf(CalendarDay(emptyList(), emptyList())) }
     var declined by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<KeptEvent?>(null) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         declined = !granted
         app.calendarAccessChanged()
@@ -97,7 +101,7 @@ fun DayCalendarSection(app: AppModel, date: String, modifier: Modifier = Modifie
         if (day.kept.isNotEmpty() || day.suggestions.isNotEmpty()) {
             MicroLabel("Calendar", Modifier.padding(top = 6.dp, bottom = 2.dp))
         }
-        day.kept.forEach { event -> KeptEventRow(app, event) }
+        day.kept.forEach { event -> KeptEventRow(app, event, onEdit = { editing = event }) }
         day.suggestions.forEach { event ->
             SuggestionRow(event) {
                 Haptics.confirm(haptics)
@@ -105,18 +109,30 @@ fun DayCalendarSection(app: AppModel, date: String, modifier: Modifier = Modifie
                 scope.launch { app.write { it.keepCalendarEvent(null, date, event) } }
             }
         }
+        // Any day, past or future, with or without calendar access.
+        QuietAction(Icons.Filled.Add, "Add event") { adding = true }
         if (!app.calendarAccess && !declined) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp)
-                    .pressable { ask.launch(Manifest.permission.READ_CALENDAR) },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.DateRange, null, Modifier.size(16.dp), tint = t.muted)
-                Text("Show this day's calendar", style = Typeface.small, color = t.muted, modifier = Modifier.padding(start = 8.dp))
-            }
+            QuietAction(Icons.Filled.DateRange, "Show this day's calendar") { ask.launch(Manifest.permission.READ_CALENDAR) }
         }
+    }
+
+    if (adding) OwnEventSheet(app, date, editing = null) { adding = false }
+    editing?.let { event -> OwnEventSheet(app, date, editing = event) { editing = null } }
+}
+
+/** A muted icon-and-words row, 48dp tall: "Add event", "Show this day's calendar". */
+@Composable
+private fun QuietAction(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
+    val t = tokens
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .pressable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(16.dp), tint = t.muted)
+        Text(text, style = Typeface.small, color = t.muted, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -150,9 +166,12 @@ private fun SuggestionRow(event: CalendarEvent, onKeep: () -> Unit) {
     }
 }
 
-/** One kept event: title, time, a quiet tag when it moved or was cancelled, and the user's note. */
+/**
+ * One kept event: title, time, a quiet tag when it moved or was cancelled,
+ * and the user's note. One the user added by hand opens for editing.
+ */
 @Composable
-private fun KeptEventRow(app: AppModel, event: KeptEvent) {
+private fun KeptEventRow(app: AppModel, event: KeptEvent, onEdit: () -> Unit) {
     val t = tokens
     val scope = rememberCoroutineScope()
     var note by remember(event.id) { mutableStateOf(event.note.orEmpty()) }
@@ -171,8 +190,16 @@ private fun KeptEventRow(app: AppModel, event: KeptEvent) {
     DisposableEffect(event.id) { onDispose { if (saveJob != null) { saveJob?.cancel(); save() } } }
 
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.DateRange, null, Modifier.size(14.dp), tint = if (cancelled) t.dim else t.primary)
+        Row(
+            Modifier.then(if (event.isOwn) Modifier.pressable(onClick = onEdit) else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (event.isOwn) Icons.Filled.Edit else Icons.Filled.DateRange,
+                null,
+                Modifier.size(14.dp),
+                tint = if (cancelled) t.dim else t.primary,
+            )
             Text(
                 event.title.ifBlank { "Untitled event" },
                 style = Typeface.ui.copy(fontWeight = FontWeight.Medium, textDecoration = if (cancelled) TextDecoration.LineThrough else null),
@@ -196,7 +223,24 @@ private fun KeptEventRow(app: AppModel, event: KeptEvent) {
                 ) {
                     Icon(Icons.Filled.MoreVert, null, Modifier.size(18.dp), tint = t.muted)
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    shape = RoundedCornerShape(Radius.card),
+                    containerColor = t.raised,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp,
+                    border = BorderStroke(1.dp, t.hairline),
+                ) {
+                    if (event.isOwn) {
+                        DropdownMenuItem(
+                            text = { Text("Edit event") },
+                            onClick = {
+                                menuOpen = false
+                                onEdit()
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Remove from this day", color = t.danger) },
                         onClick = {

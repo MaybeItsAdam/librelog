@@ -95,7 +95,15 @@ import uk.co.maybeitssoftware.librelog.calendar.DayCalendarSection
 import uk.co.maybeitssoftware.librelog.editor.EditorController
 import uk.co.maybeitssoftware.librelog.editor.RichTextEditor
 import uk.co.maybeitssoftware.librelog.editor.editorStyle
+import uk.co.maybeitssoftware.librelog.lock.LockedNoteSection
 import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
+import uk.co.maybeitssoftware.librelog.ui.pressable
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import uk.co.maybeitssoftware.librelog.ui.Hairline
 import uk.co.maybeitssoftware.librelog.ui.LocalAppearance
 import uk.co.maybeitssoftware.librelog.ui.IconAction
@@ -132,6 +140,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
     var newTag by remember { mutableStateOf("") }
     var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
     var editorReady by remember(entryId) { mutableStateOf(false) }
     // Set once the entry is deleted from the menu, so leaving doesn't save it.
     var deleted by remember(entryId) { mutableStateOf(false) }
@@ -190,6 +199,19 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
         onClose()
     }
 
+    // Moves the entry; one covering several days keeps its length.
+    fun setDateTime(date: String, time: String?) {
+        val e = entry ?: return
+        if (e.date == date && e.time == time) return
+        entry = e.copy(date = date, time = time, endDate = EntryMeta.movedEnd(e.date, e.endDate, date))
+        scope.launch {
+            app.write { it.setDateTime(e.id, date, time) }
+            runCatching { app.run { it.entry(e.id) } }.getOrNull()?.let { fresh ->
+                entry = entry?.copy(date = fresh.date, time = fresh.time, endDate = fresh.endDate)
+            }
+        }
+    }
+
     suspend fun reloadTags() {
         val fresh = runCatching { app.run { it.entry(entryId) } }.getOrNull() ?: return
         entry = entry?.copy(tags = fresh.tags)
@@ -220,6 +242,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                 IconAction(Icons.Filled.MoreVert, "More", { menuOpen = true })
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     entry?.let { e ->
+                        DropdownMenuItem(text = { Text("Details") }, onClick = { menuOpen = false; showDetails = true })
                         DropdownMenuItem(
                             text = { Text(if (e.isFavorite) "Unfavourite" else "Favourite") },
                             onClick = {
@@ -256,31 +279,48 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
         ) {
             val e = entry
             if (e != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MicroLabel(if (e.endDate != null) Day.range(e.date, e.endDate) else Day.title(e.date))
-                    e.time?.let { Text(it, style = Typeface.mono(11), color = t.muted, modifier = Modifier.padding(start = 8.dp)) }
-                    Spacer(Modifier.weight(1f))
-                    RatingPicker(e.rating) { value ->
-                        entry = e.copy(rating = value)
-                        scope.launch { app.write { it.setRating(e.id, value) } }
-                    }
-                }
-                SpanControl(e.date, e.endDate) { end ->
-                    entry = entry?.copy(endDate = end)
-                    scope.launch { app.write { it.setEndDate(e.id, end) } }
-                }
+                // Title and body first; everything else is one quiet line
+                // that opens Details, then the day's own things under the body.
                 BasicTextField(
                     value = title,
                     onValueChange = { title = it; scheduleSave() },
                     textStyle = Typeface.title.copy(color = t.ink),
                     cursorBrush = SolidColor(t.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
                     decorationBox = { inner ->
                         if (title.isEmpty()) Text("Title", style = Typeface.title, color = t.dim)
                         inner()
                     },
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 44.dp)
+                            .pressable { showDetails = true }
+                            .semantics(mergeDescendants = true) {
+                                role = Role.Button
+                                contentDescription = "Details: ${EntryMeta.line(e.date, e.time, e.endDate)}"
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            EntryMeta.line(e.date, e.time, e.endDate).uppercase(),
+                            style = Typeface.micro,
+                            color = t.muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (e.isFavorite) Icon(Icons.Filled.Star, "Favourite", Modifier.padding(start = 6.dp).size(12.dp), tint = t.warning)
+                        Icon(Icons.Filled.ArrowDropDown, null, Modifier.size(16.dp), tint = t.muted)
+                    }
+                    RatingPicker(e.rating) { value ->
+                        entry = e.copy(rating = value)
+                        scope.launch { app.write { it.setRating(e.id, value) } }
+                    }
+                }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -289,7 +329,7 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                     e.tags.forEach { tag ->
                         TagChip(
                             tag.name,
-                            Modifier.clickable {
+                            Modifier.clickable(onClickLabel = "Remove tag ${tag.name}") {
                                 scope.launch {
                                     app.write { it.untagEntry(e.id, tag.id) }
                                     reloadTags()
@@ -332,8 +372,6 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                         }
                     }
                 }
-                DayCalendarSection(app, e.date, Modifier.padding(bottom = 6.dp))
-                DayPhotosSection(app, e.date, Modifier.padding(bottom = 6.dp))
                 Hairline()
                 if (e.hasConflict) {
                     StatusBanner("Edited on two devices — review", t.warning, Modifier.padding(top = 10.dp)) { onShowHistory(e.id) }
@@ -344,10 +382,37 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
                     placeholder = "Write about your day…",
                     onReady = { editorReady = true },
                 )
+                // The day's calendar, photos and locked note: the day's, not
+                // the entry's, so they sit below the writing.
+                Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
+                    MicroLabel(if (e.endDate != null) "First day" else "This day", Modifier.padding(bottom = 8.dp))
+                    Hairline()
+                    DayCalendarSection(app, e.date, Modifier.padding(top = 4.dp))
+                    DayPhotosSection(app, e.date, Modifier.padding(top = 2.dp))
+                    LockedNoteSection(app, e.date)
+                }
             }
         }
 
         FormatBar(controller, wordCount, toolbarTick)
+    }
+
+    if (showDetails) {
+        entry?.let { e ->
+            EntryDetailsSheet(
+                e,
+                onDismiss = { showDetails = false },
+                onDateTime = { date, time -> setDateTime(date, time) },
+                onEndDate = { end ->
+                    entry = entry?.copy(endDate = end)
+                    scope.launch { app.write { it.setEndDate(e.id, end) } }
+                },
+                onFavorite = { fav ->
+                    entry = entry?.copy(isFavorite = fav)
+                    scope.launch { app.write { it.setFavorite(e.id, fav) } }
+                },
+            )
+        }
     }
 
     if (confirmDelete) {
@@ -370,89 +435,6 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
             shape = RoundedCornerShape(Radius.card),
             containerColor = t.raised,
         )
-    }
-}
-
-/**
- * "Several days" for a trip or a festival (SPEC.md §4): when on, the entry
- * runs until the chosen last day, at least a day and at most a year on.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SpanControl(start: String, end: String?, onChange: (String?) -> Unit) {
-    val t = tokens
-    val m = motion
-    val haptics = LocalHapticFeedback.current
-    var picking by remember { mutableStateOf(false) }
-    val first = Day.date(start) ?: return
-    Row(
-        Modifier.padding(top = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        val on = end != null
-        val border by animateColorAsState(if (on) t.primary.copy(alpha = 0.4f) else t.hairline, m.quick(), label = "span")
-        Row(
-            Modifier
-                .border(1.dp, border, RoundedCornerShape(Radius.control))
-                .background(if (on) t.primary.copy(alpha = 0.08f) else Color.Transparent, RoundedCornerShape(Radius.control))
-                .toggleable(value = on, role = Role.Switch) { now ->
-                    Haptics.toggle(haptics, now)
-                    onChange(if (now) Day.string(first.plusDays(1)) else null)
-                }
-                .padding(horizontal = 8.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.DateRange, null, Modifier.size(14.dp), tint = if (on) t.primary else t.muted)
-            Text("Several days", style = Typeface.small, color = if (on) t.primary else t.muted, modifier = Modifier.padding(start = 4.dp))
-        }
-        AnimatedVisibility(
-            visible = on,
-            enter = expandHorizontally(m.glide()) + fadeIn(m.standard()),
-            exit = shrinkHorizontally(m.glide()) + fadeOut(m.quick()),
-        ) {
-            Text(
-                "Until ${end?.let(Day::short) ?: ""}",
-                style = Typeface.small,
-                color = t.ink,
-                modifier = Modifier
-                    .border(1.dp, t.input, RoundedCornerShape(Radius.control))
-                    .clickable(role = Role.Button) { picking = true }
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-            )
-        }
-    }
-
-    if (picking) {
-        // The picker speaks UTC midnight; a LocalDate is a calendar day either way.
-        val toMillis = { d: LocalDate -> d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
-        val min = toMillis(first.plusDays(1))
-        val max = toMillis(first.plusDays(365))
-        val state = rememberDatePickerState(
-            initialSelectedDateMillis = end?.let(Day::date)?.let(toMillis) ?: min,
-            yearRange = first.year..first.plusDays(365).year,
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis in min..max
-                override fun isSelectableYear(year: Int) = year in first.year..first.plusDays(365).year
-            },
-        )
-        DatePickerDialog(
-            onDismissRequest = { picking = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    picking = false
-                    state.selectedDateMillis?.let {
-                        Haptics.tick(haptics)
-                        onChange(Day.string(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()))
-                    }
-                }) { Text("Done") }
-            },
-            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
-            shape = RoundedCornerShape(Radius.card),
-            colors = DatePickerDefaults.colors(containerColor = t.raised),
-        ) {
-            DatePicker(state, title = { MicroLabel("Last day", Modifier.padding(start = 24.dp, top = 16.dp)) }, showModeToggle = false)
-        }
     }
 }
 

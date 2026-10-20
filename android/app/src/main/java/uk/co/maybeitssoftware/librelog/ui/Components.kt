@@ -44,6 +44,20 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import uk.co.maybeitssoftware.librelog.Day
 import uniffi.librelog_core.EntrySummary
 
@@ -283,4 +297,109 @@ fun NewEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         Icon(Icons.Filled.Add, "New entry", Modifier.size(26.dp), tint = tokens.onPrimary)
     }
+}
+
+/**
+ * A switch in the house colours: azure track when on, a well with an input
+ * border when off. The knob is round; that's the one thing that may be.
+ */
+@Composable
+fun Toggle(checked: Boolean, onChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val t = tokens
+    val haptics = LocalHapticFeedback.current
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onChange?.let { change ->
+            { now: Boolean ->
+                Haptics.toggle(haptics, now)
+                change(now)
+            }
+        },
+        enabled = enabled,
+        modifier = modifier,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = t.onPrimary,
+            checkedTrackColor = t.primary,
+            checkedBorderColor = t.primary,
+            uncheckedThumbColor = t.muted,
+            uncheckedTrackColor = t.well,
+            uncheckedBorderColor = t.input,
+            disabledCheckedTrackColor = t.dim,
+            disabledUncheckedTrackColor = t.well,
+            disabledUncheckedBorderColor = t.hairline,
+            disabledUncheckedThumbColor = t.dim,
+        ),
+    )
+}
+
+/** A labelled row with a [Toggle] at the end; the whole row is the 48dp target. */
+@Composable
+fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, detail: String? = null) {
+    val t = tokens
+    val haptics = LocalHapticFeedback.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(value = checked, role = Role.Switch) {
+                Haptics.toggle(haptics, it)
+                onChange(it)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = Typeface.ui, color = t.ink)
+            if (detail != null) Text(detail, style = Typeface.small.copy(fontSize = 12.sp), color = t.muted)
+        }
+        // The row handles the tap, so the switch is only a picture of it.
+        Toggle(checked, onChange = null, Modifier.padding(start = 12.dp).clearAndSetSemantics {})
+    }
+}
+
+/**
+ * A bordered single- or multi-line text field. 16sp, so phones don't zoom
+ * in on it; [secret] hides what's typed.
+ */
+@Composable
+fun InputField(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    secret: Boolean = false,
+    minLines: Int = 1,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.Sentences,
+    imeAction: ImeAction = ImeAction.Default,
+    onDone: (() -> Unit)? = null,
+    error: Boolean = false,
+) {
+    val t = tokens
+    val style = Typeface.ui.copy(fontSize = 16.sp, color = t.ink)
+    val shape = RoundedCornerShape(Radius.control)
+    BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        textStyle = style,
+        minLines = minLines,
+        singleLine = minLines == 1,
+        cursorBrush = SolidColor(t.primary),
+        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text,
+            capitalization = if (secret) KeyboardCapitalization.None else capitalization,
+            autoCorrectEnabled = !secret,
+            imeAction = imeAction,
+        ),
+        keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }, onGo = { onDone?.invoke() }),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .background(t.raised, shape)
+            .border(1.dp, if (error) t.danger.copy(alpha = 0.6f) else t.input, shape)
+            .padding(horizontal = 12.dp, vertical = 13.dp),
+        decorationBox = { inner ->
+            if (value.isEmpty()) Text(placeholder, style = style.copy(color = t.dim))
+            inner()
+        },
+    )
 }

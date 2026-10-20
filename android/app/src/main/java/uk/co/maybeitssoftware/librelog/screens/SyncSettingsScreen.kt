@@ -29,6 +29,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.SecureFlagPolicy
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
@@ -96,6 +98,7 @@ fun SettingsScreen(app: AppModel) {
     ) {
         Text("Settings", style = Typeface.title, color = t.ink, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
         AppearanceSection(app)
+        PrivacySection(app)
         when (sync.phase) {
             SyncEngine.Phase.Off -> SignIn(app)
             SyncEngine.Phase.NeedsKey -> KeySetup(app)
@@ -500,14 +503,18 @@ private fun Field(
     )
 }
 
-/** Dialogs are bottom sheets on phones (house touch rules). */
+/**
+ * Dialogs are bottom sheets on phones (house touch rules). A [secure] sheet
+ * is left out of screenshots, screen sharing and the recents thumbnail.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun Sheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun Sheet(onDismiss: () -> Unit, secure: Boolean = false, content: @Composable () -> Unit) {
     val t = tokens
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        properties = if (secure) ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn) else ModalBottomSheetProperties(),
         shape = RoundedCornerShape(topStart = Radius.card, topEnd = Radius.card),
         containerColor = t.raised,
         tonalElevation = 0.dp,

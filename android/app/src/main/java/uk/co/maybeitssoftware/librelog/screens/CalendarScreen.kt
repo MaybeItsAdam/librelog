@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.flow.drop
 import uk.co.maybeitssoftware.librelog.calendar.MonthPages
 import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
+import uk.co.maybeitssoftware.librelog.lock.LockedNoteSection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -233,6 +234,7 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
                 shownDay?.let {
                     DayCalendarSection(app, it, Modifier.padding(top = 8.dp))
                     DayPhotosSection(app, it, Modifier.padding(top = 4.dp))
+                    LockedNoteSection(app, it)
                 }
             }
         }
