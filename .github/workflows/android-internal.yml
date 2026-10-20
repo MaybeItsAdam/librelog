@@ -1,0 +1,145 @@
+name: Android · Play internal
+
+# Builds the signed release bundle and puts it on Play's internal testing
+# track. Run it from the Actions tab. Needs the signing secrets and
+# PLAY_STORE_SERVICE_ACCOUNT_JSON, the same Play service account key the
+# Takt repo uses (it has access to every app on the account).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "versionName, e.g. 0.2.0"
+        required: true
+      version_code:
+        description: "versionCode (blank: today's date and the run attempt, e.g. 2026102101)"
+        required: false
+        default: ""
+
+concurrency:
+  group: android-internal
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick version
+        id: version
+        env:
+          NAME: ${{ inputs.version_name }}
+          CODE: ${{ inputs.version_code }}
+        run: |
+          if [ -z "$CODE" ]; then CODE="$(date -u +%Y%m%d)$(printf '%02d' "$GITHUB_RUN_ATTEMPT")"; fi
+          if ! printf '%s' "$CODE" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "::error::version_code must be a positive integer (got '$CODE')"; exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Building $NAME ($CODE)"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      # android/key.properties is git-ignored; write it from secrets. Without
+      # it CI release builds come out unsigned, so fail here first.
+      - name: Write signing config
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for v in ANDROID_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::Secret $v is not set"; exit 1; fi
+          done
+          KEYSTORE_PATH="$RUNNER_TEMP/upload-keystore.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          {
+            echo "storeFile=$KEYSTORE_PATH"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: Build Rust core and Kotlin bindings
+        run: scripts/build-android.sh
+
+      - name: Build signed bundle
+        working-directory: android
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          # The Web OAuth client id for Sign in with Google; unset hides the
+          # button (docs/google-sign-in.md).
+          LIBRELOG_GOOGLE_WEB_CLIENT_ID: ${{ secrets.LIBRELOG_GOOGLE_WEB_CLIENT_ID }}
+        run: ./gradlew bundleRelease -PversionCode="$VERSION_CODE" -PversionName="$VERSION_NAME"
+
+      - name: Verify bundle is release-signed
+        run: |
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -f "$AAB" || { echo "::error::$AAB not found"; exit 1; }
+          # jarsigner exits 0 for an unsigned jar too, so check what it says.
+          if ! jarsigner -verify "$AAB" 2>&1 | grep -q "jar verified"; then
+            echo "::error::$AAB is not signed — refusing to upload an unsigned bundle"; exit 1
+          fi
+          if jarsigner -verify -verbose -certs "$AAB" | grep -q "CN=Android Debug"; then
+            echo "::error::$AAB is debug-signed"; exit 1
+          fi
+
+      - name: Keep the bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: librelog-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Upload to Play (internal)
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::error::Secret PLAY_STORE_SERVICE_ACCOUNT_JSON is not set"; exit 1; fi
+          KEY="$RUNNER_TEMP/play.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$KEY"
+          bundle exec fastlane run upload_to_play_store \
+            package_name:uk.co.maybeitssoftware.librelog track:internal release_status:completed \
+            aab:android/app/build/outputs/bundle/release/app-release.aab \
+            json_key:"$KEY" \
+            skip_upload_metadata:true skip_upload_images:true skip_upload_screenshots:true skip_upload_changelogs:true
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks" "$RUNNER_TEMP/play.json"

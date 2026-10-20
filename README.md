@@ -103,6 +103,10 @@ bundle exec fastlane android internal version_code:2 version_name:0.1.1  # Play 
 bundle exec fastlane ios internal                                        # TestFlight (next build number)
 ```
 
+Or from GitHub: Actions → **Android · Play internal** → Run workflow, with a
+versionName. It needs `PLAY_STORE_SERVICE_ACCOUNT_JSON`, the same Play key as
+the Takt repo.
+
 ## Open source and hosted sync
 
 LibreLog is free and open source: every app, the Rust core and the sync
