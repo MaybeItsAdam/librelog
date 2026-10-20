@@ -693,6 +693,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_pairingsession_receive(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_add_own_event(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_calendar_day(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_keep_calendar_event(
@@ -706,6 +708,24 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_librelog_core_checksum_method_store_set_calendar_event_note(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_tracked_calendar_events(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_update_own_event(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_check_lock_password(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_has_locked_note(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_lock_status(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_locked_note(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_reset_lock(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_lock_enabled(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_lock_password(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_locked_note(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_add_day_photo(
     ): Int
@@ -863,6 +883,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_librelog_core_fn_constructor_store_open(`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_librelog_core_fn_method_store_add_own_event(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`event`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_calendar_day(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`events`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_keep_calendar_event(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`event`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -877,6 +899,24 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_tracked_calendar_events(`ptr`: Long,`keyPrefix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_update_own_event(`ptr`: Long,`id`: RustBuffer.ByValue,`event`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_check_lock_password(`ptr`: Long,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
+    external fun uniffi_librelog_core_fn_method_store_has_locked_note(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
+    external fun uniffi_librelog_core_fn_method_store_lock_status(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_locked_note(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_reset_lock(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_lock_enabled(`ptr`: Long,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_lock_password(`ptr`: Long,`current`: RustBuffer.ByValue,`newPassword`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_locked_note(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_librelog_core_fn_method_store_add_day_photo(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`photo`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_day_photos(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1149,6 +1189,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_pairingsession_receive() and 0xFFFF) != 32456) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_method_store_add_own_event() and 0xFFFF) != 57297) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_method_store_calendar_day() and 0xFFFF) != 62542) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1168,6 +1211,33 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_tracked_calendar_events() and 0xFFFF) != 2002) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_update_own_event() and 0xFFFF) != 63057) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_check_lock_password() and 0xFFFF) != 3263) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_has_locked_note() and 0xFFFF) != 47425) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_lock_status() and 0xFFFF) != 18820) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_locked_note() and 0xFFFF) != 42868) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_reset_lock() and 0xFFFF) != 17844) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_lock_enabled() and 0xFFFF) != 23326) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_lock_password() and 0xFFFF) != 23402) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_locked_note() and 0xFFFF) != 14253) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_add_day_photo() and 0xFFFF) != 11669) {
@@ -2134,6 +2204,12 @@ public object FfiConverterTypePairingSession: FfiConverter<PairingSession, Long>
 public interface StoreInterface {
     
     /**
+     * Adds an event of the user's own to a day, past or future: something
+     * that was never in a calendar, or a calendar this device can't read.
+     */
+    fun `addOwnEvent`(`journalId`: kotlin.String?, `date`: kotlin.String, `event`: OwnEvent): KeptEvent
+    
+    /**
      * The day's kept events, and suggestions from `events` (the device's
      * calendar for that day, already fetched by the app). Kept events seen
      * in `events` are brought up to date on the way. Returns the kept ones
@@ -2177,6 +2253,53 @@ public interface StoreInterface {
      * `refresh_calendar_events`.
      */
     fun `trackedCalendarEvents`(`keyPrefix`: kotlin.String): List<KeptEvent>
+    
+    /**
+     * Changes an event the user added by hand. Kept calendar events follow
+     * their calendar instead, so they can't be edited here.
+     */
+    fun `updateOwnEvent`(`id`: kotlin.String, `event`: OwnEvent): KeptEvent
+    
+    /**
+     * Whether the password is right, without opening anything.
+     */
+    fun `checkLockPassword`(`password`: kotlin.String): kotlin.Boolean
+    
+    /**
+     * Whether the day has a locked note, for showing its tile.
+     */
+    fun `hasLockedNote`(`journalId`: kotlin.String?, `date`: kotlin.String): kotlin.Boolean
+    
+    fun `lockStatus`(): LockStatus
+    
+    /**
+     * The day's locked note, opened with `password`; none if the day has
+     * none. A wrong password is a crypto error ("wrong password").
+     */
+    fun `lockedNote`(`journalId`: kotlin.String?, `date`: kotlin.String, `password`: kotlin.String): kotlin.String?
+    
+    /**
+     * For a forgotten password: deletes every locked note and the password,
+     * and turns locked notes off. Nothing else in the journal changes.
+     */
+    fun `resetLock`()
+    
+    /**
+     * Shows or hides locked notes. Turning them on needs a password set.
+     */
+    fun `setLockEnabled`(`enabled`: kotlin.Boolean)
+    
+    /**
+     * Sets the lock password, or changes it (`current` is the old one).
+     * Changing it re-seals every locked note under the new password. Also
+     * turns locked notes on.
+     */
+    fun `setLockPassword`(`current`: kotlin.String?, `newPassword`: kotlin.String)
+    
+    /**
+     * Saves the day's locked note under `password`. Empty text removes it.
+     */
+    fun `setLockedNote`(`journalId`: kotlin.String?, `date`: kotlin.String, `password`: kotlin.String, `text`: kotlin.String)
     
     /**
      * Keeps a photo on a journal day. Keeping the same file on the same day
@@ -2541,6 +2664,27 @@ open class Store: Disposable, AutoCloseable, StoreInterface
 
     
     /**
+     * Adds an event of the user's own to a day, past or future: something
+     * that was never in a calendar, or a calendar this device can't read.
+     */
+    @Throws(CoreException::class)override fun `addOwnEvent`(`journalId`: kotlin.String?, `date`: kotlin.String, `event`: OwnEvent): KeptEvent {
+            return FfiConverterTypeKeptEvent.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_add_own_event(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterTypeOwnEvent.lower(`event`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * The day's kept events, and suggestions from `events` (the device's
      * calendar for that day, already fetched by the app). Kept events seen
      * in `events` are brought up to date on the way. Returns the kept ones
@@ -2677,6 +2821,172 @@ open class Store: Disposable, AutoCloseable, StoreInterface
     }
     )
     }
+    
+
+    
+    /**
+     * Changes an event the user added by hand. Kept calendar events follow
+     * their calendar instead, so they can't be edited here.
+     */
+    @Throws(CoreException::class)override fun `updateOwnEvent`(`id`: kotlin.String, `event`: OwnEvent): KeptEvent {
+            return FfiConverterTypeKeptEvent.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_update_own_event(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterTypeOwnEvent.lower(`event`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Whether the password is right, without opening anything.
+     */
+    @Throws(CoreException::class)override fun `checkLockPassword`(`password`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_check_lock_password(
+        it,
+        
+        FfiConverterString.lower(`password`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Whether the day has a locked note, for showing its tile.
+     */
+    @Throws(CoreException::class)override fun `hasLockedNote`(`journalId`: kotlin.String?, `date`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_has_locked_note(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CoreException::class)override fun `lockStatus`(): LockStatus {
+            return FfiConverterTypeLockStatus.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_lock_status(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The day's locked note, opened with `password`; none if the day has
+     * none. A wrong password is a crypto error ("wrong password").
+     */
+    @Throws(CoreException::class)override fun `lockedNote`(`journalId`: kotlin.String?, `date`: kotlin.String, `password`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_locked_note(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterString.lower(`password`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * For a forgotten password: deletes every locked note and the password,
+     * and turns locked notes off. Nothing else in the journal changes.
+     */
+    @Throws(CoreException::class)override fun `resetLock`()
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_reset_lock(
+        it,
+        _status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Shows or hides locked notes. Turning them on needs a password set.
+     */
+    @Throws(CoreException::class)override fun `setLockEnabled`(`enabled`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_lock_enabled(
+        it,
+        
+        FfiConverterBoolean.lower(`enabled`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Sets the lock password, or changes it (`current` is the old one).
+     * Changing it re-seals every locked note under the new password. Also
+     * turns locked notes on.
+     */
+    @Throws(CoreException::class)override fun `setLockPassword`(`current`: kotlin.String?, `newPassword`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_lock_password(
+        it,
+        
+        FfiConverterOptionalString.lower(`current`),
+        FfiConverterString.lower(`newPassword`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Saves the day's locked note under `password`. Empty text removes it.
+     */
+    @Throws(CoreException::class)override fun `setLockedNote`(`journalId`: kotlin.String?, `date`: kotlin.String, `password`: kotlin.String, `text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_locked_note(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterString.lower(`password`),
+        FfiConverterString.lower(`text`),_status)
+}
+    }
+    
     
 
     
@@ -4603,6 +4913,12 @@ data class KeptEvent (
     var `movedToAnotherDay`: kotlin.Boolean
     , 
     var `note`: kotlin.String?
+    , 
+    /**
+     * Added by hand rather than kept from a calendar (`own:` key): never
+     * tracked, and editable in the app.
+     */
+    var `isOwn`: kotlin.Boolean
     
 ){
     
@@ -4633,6 +4949,7 @@ public object FfiConverterTypeKeptEvent: FfiConverterRustBuffer<KeptEvent> {
             FfiConverterTypeKeptEventState.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -4650,7 +4967,8 @@ public object FfiConverterTypeKeptEvent: FfiConverterRustBuffer<KeptEvent> {
             FfiConverterString.allocationSize(value.`timeLabel`) +
             FfiConverterTypeKeptEventState.allocationSize(value.`state`) +
             FfiConverterBoolean.allocationSize(value.`movedToAnotherDay`) +
-            FfiConverterOptionalString.allocationSize(value.`note`)
+            FfiConverterOptionalString.allocationSize(value.`note`) +
+            FfiConverterBoolean.allocationSize(value.`isOwn`)
     )
 
     override fun write(value: KeptEvent, buf: ByteBuffer) {
@@ -4668,6 +4986,54 @@ public object FfiConverterTypeKeptEvent: FfiConverterRustBuffer<KeptEvent> {
             FfiConverterTypeKeptEventState.write(value.`state`, buf)
             FfiConverterBoolean.write(value.`movedToAnotherDay`, buf)
             FfiConverterOptionalString.write(value.`note`, buf)
+            FfiConverterBoolean.write(value.`isOwn`, buf)
+    }
+}
+
+
+
+/**
+ * Whether locked notes are on, and whether a password has been set.
+ */
+data class LockStatus (
+    /**
+     * Locked notes show on each day. Off hides them without deleting them.
+     */
+    var `enabled`: kotlin.Boolean
+    , 
+    /**
+     * A lock password exists (on this account, if syncing).
+     */
+    var `hasPassword`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLockStatus: FfiConverterRustBuffer<LockStatus> {
+    override fun read(buf: ByteBuffer): LockStatus {
+        return LockStatus(
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LockStatus) = (
+            FfiConverterBoolean.allocationSize(value.`enabled`) +
+            FfiConverterBoolean.allocationSize(value.`hasPassword`)
+    )
+
+    override fun write(value: LockStatus, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`enabled`, buf)
+            FfiConverterBoolean.write(value.`hasPassword`, buf)
     }
 }
 
@@ -4926,6 +5292,58 @@ public object FfiConverterTypeOutgoingSnapshot: FfiConverterRustBuffer<OutgoingS
     override fun write(value: OutgoingSnapshot, buf: ByteBuffer) {
             FfiConverterLong.write(value.`seq`, buf)
             FfiConverterString.write(value.`payload`, buf)
+    }
+}
+
+
+
+/**
+ * An event the user adds to a day by hand. Times are `HH:MM` on that day;
+ * no start time makes it an all-day event.
+ */
+data class OwnEvent (
+    var `title`: kotlin.String
+    , 
+    var `startTime`: kotlin.String?
+    , 
+    var `endTime`: kotlin.String?
+    , 
+    var `location`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOwnEvent: FfiConverterRustBuffer<OwnEvent> {
+    override fun read(buf: ByteBuffer): OwnEvent {
+        return OwnEvent(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: OwnEvent) = (
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterOptionalString.allocationSize(value.`startTime`) +
+            FfiConverterOptionalString.allocationSize(value.`endTime`) +
+            FfiConverterOptionalString.allocationSize(value.`location`)
+    )
+
+    override fun write(value: OwnEvent, buf: ByteBuffer) {
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterOptionalString.write(value.`startTime`, buf)
+            FfiConverterOptionalString.write(value.`endTime`, buf)
+            FfiConverterOptionalString.write(value.`location`, buf)
     }
 }
 

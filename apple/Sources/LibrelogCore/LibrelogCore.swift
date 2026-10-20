@@ -802,6 +802,12 @@ public func FfiConverterTypePairingSession_lower(_ value: PairingSession) -> UIn
 public protocol StoreProtocol: AnyObject, Sendable {
     
     /**
+     * Adds an event of the user's own to a day, past or future: something
+     * that was never in a calendar, or a calendar this device can't read.
+     */
+    func addOwnEvent(journalId: String?, date: String, event: OwnEvent) throws  -> KeptEvent
+    
+    /**
      * The day's kept events, and suggestions from `events` (the device's
      * calendar for that day, already fetched by the app). Kept events seen
      * in `events` are brought up to date on the way. Returns the kept ones
@@ -845,6 +851,53 @@ public protocol StoreProtocol: AnyObject, Sendable {
      * `refresh_calendar_events`.
      */
     func trackedCalendarEvents(keyPrefix: String) throws  -> [KeptEvent]
+    
+    /**
+     * Changes an event the user added by hand. Kept calendar events follow
+     * their calendar instead, so they can't be edited here.
+     */
+    func updateOwnEvent(id: String, event: OwnEvent) throws  -> KeptEvent
+    
+    /**
+     * Whether the password is right, without opening anything.
+     */
+    func checkLockPassword(password: String) throws  -> Bool
+    
+    /**
+     * Whether the day has a locked note, for showing its tile.
+     */
+    func hasLockedNote(journalId: String?, date: String) throws  -> Bool
+    
+    func lockStatus() throws  -> LockStatus
+    
+    /**
+     * The day's locked note, opened with `password`; none if the day has
+     * none. A wrong password is a crypto error ("wrong password").
+     */
+    func lockedNote(journalId: String?, date: String, password: String) throws  -> String?
+    
+    /**
+     * For a forgotten password: deletes every locked note and the password,
+     * and turns locked notes off. Nothing else in the journal changes.
+     */
+    func resetLock() throws 
+    
+    /**
+     * Shows or hides locked notes. Turning them on needs a password set.
+     */
+    func setLockEnabled(enabled: Bool) throws 
+    
+    /**
+     * Sets the lock password, or changes it (`current` is the old one).
+     * Changing it re-seals every locked note under the new password. Also
+     * turns locked notes on.
+     */
+    func setLockPassword(current: String?, newPassword: String) throws 
+    
+    /**
+     * Saves the day's locked note under `password`. Empty text removes it.
+     */
+    func setLockedNote(journalId: String?, date: String, password: String, text: String) throws 
     
     /**
      * Keeps a photo on a journal day. Keeping the same file on the same day
@@ -1170,6 +1223,22 @@ public static func `open`(path: String)throws  -> Store  {
 
     
     /**
+     * Adds an event of the user's own to a day, past or future: something
+     * that was never in a calendar, or a calendar this device can't read.
+     */
+open func addOwnEvent(journalId: String?, date: String, event: OwnEvent)throws  -> KeptEvent  {
+    return try  FfiConverterTypeKeptEvent_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_add_own_event(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterTypeOwnEvent_lower(event),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * The day's kept events, and suggestions from `events` (the device's
      * calendar for that day, already fetched by the app). Kept events seen
      * in `events` are brought up to date on the way. Returns the kept ones
@@ -1272,6 +1341,127 @@ open func trackedCalendarEvents(keyPrefix: String)throws  -> [KeptEvent]  {
         FfiConverterString.lower(keyPrefix),uniffiCallStatus
     )
 })
+}
+    
+    /**
+     * Changes an event the user added by hand. Kept calendar events follow
+     * their calendar instead, so they can't be edited here.
+     */
+open func updateOwnEvent(id: String, event: OwnEvent)throws  -> KeptEvent  {
+    return try  FfiConverterTypeKeptEvent_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_update_own_event(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterTypeOwnEvent_lower(event),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Whether the password is right, without opening anything.
+     */
+open func checkLockPassword(password: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_check_lock_password(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(password),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Whether the day has a locked note, for showing its tile.
+     */
+open func hasLockedNote(journalId: String?, date: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_has_locked_note(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),uniffiCallStatus
+    )
+})
+}
+    
+open func lockStatus()throws  -> LockStatus  {
+    return try  FfiConverterTypeLockStatus_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_lock_status(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The day's locked note, opened with `password`; none if the day has
+     * none. A wrong password is a crypto error ("wrong password").
+     */
+open func lockedNote(journalId: String?, date: String, password: String)throws  -> String?  {
+    return try  FfiConverterOptionString.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_locked_note(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterString.lower(password),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * For a forgotten password: deletes every locked note and the password,
+     * and turns locked notes off. Nothing else in the journal changes.
+     */
+open func resetLock()throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_reset_lock(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Shows or hides locked notes. Turning them on needs a password set.
+     */
+open func setLockEnabled(enabled: Bool)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_lock_enabled(
+            self.uniffiCloneHandle(),
+        FfiConverterBool.lower(enabled),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Sets the lock password, or changes it (`current` is the old one).
+     * Changing it re-seals every locked note under the new password. Also
+     * turns locked notes on.
+     */
+open func setLockPassword(current: String?, newPassword: String)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_lock_password(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(current),
+        FfiConverterString.lower(newPassword),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Saves the day's locked note under `password`. Empty text removes it.
+     */
+open func setLockedNote(journalId: String?, date: String, password: String, text: String)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_locked_note(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterString.lower(password),
+        FfiConverterString.lower(text),uniffiCallStatus
+    )
+}
 }
     
     /**
@@ -3117,6 +3307,11 @@ public struct KeptEvent: Equatable, Hashable {
      */
     public var movedToAnotherDay: Bool
     public var note: String?
+    /**
+     * Added by hand rather than kept from a calendar (`own:` key): never
+     * tracked, and editable in the app.
+     */
+    public var isOwn: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -3129,7 +3324,11 @@ public struct KeptEvent: Equatable, Hashable {
          */timeLabel: String, state: KeptEventState, 
         /**
          * Moved to a different day than `date` (`start` says which).
-         */movedToAnotherDay: Bool, note: String?) {
+         */movedToAnotherDay: Bool, note: String?, 
+        /**
+         * Added by hand rather than kept from a calendar (`own:` key): never
+         * tracked, and editable in the app.
+         */isOwn: Bool) {
         self.id = id
         self.journalId = journalId
         self.date = date
@@ -3144,6 +3343,7 @@ public struct KeptEvent: Equatable, Hashable {
         self.state = state
         self.movedToAnotherDay = movedToAnotherDay
         self.note = note
+        self.isOwn = isOwn
     }
 
     
@@ -3175,7 +3375,8 @@ public struct FfiConverterTypeKeptEvent: FfiConverterRustBuffer {
                 timeLabel: FfiConverterString.read(from: &buf), 
                 state: FfiConverterTypeKeptEventState.read(from: &buf), 
                 movedToAnotherDay: FfiConverterBool.read(from: &buf), 
-                note: FfiConverterOptionString.read(from: &buf)
+                note: FfiConverterOptionString.read(from: &buf), 
+                isOwn: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -3194,6 +3395,7 @@ public struct FfiConverterTypeKeptEvent: FfiConverterRustBuffer {
         FfiConverterTypeKeptEventState.write(value.state, into: &buf)
         FfiConverterBool.write(value.movedToAnotherDay, into: &buf)
         FfiConverterOptionString.write(value.note, into: &buf)
+        FfiConverterBool.write(value.isOwn, into: &buf)
     }
 }
 
@@ -3210,6 +3412,75 @@ public func FfiConverterTypeKeptEvent_lift(_ buf: RustBuffer) throws -> KeptEven
 #endif
 public func FfiConverterTypeKeptEvent_lower(_ value: KeptEvent) -> RustBuffer {
     return FfiConverterTypeKeptEvent.lower(value)
+}
+
+
+/**
+ * Whether locked notes are on, and whether a password has been set.
+ */
+public struct LockStatus: Equatable, Hashable {
+    /**
+     * Locked notes show on each day. Off hides them without deleting them.
+     */
+    public var enabled: Bool
+    /**
+     * A lock password exists (on this account, if syncing).
+     */
+    public var hasPassword: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Locked notes show on each day. Off hides them without deleting them.
+         */enabled: Bool, 
+        /**
+         * A lock password exists (on this account, if syncing).
+         */hasPassword: Bool) {
+        self.enabled = enabled
+        self.hasPassword = hasPassword
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LockStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLockStatus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LockStatus {
+        return
+            try LockStatus(
+                enabled: FfiConverterBool.read(from: &buf), 
+                hasPassword: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LockStatus, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.enabled, into: &buf)
+        FfiConverterBool.write(value.hasPassword, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLockStatus_lift(_ buf: RustBuffer) throws -> LockStatus {
+    return try FfiConverterTypeLockStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLockStatus_lower(_ value: LockStatus) -> RustBuffer {
+    return FfiConverterTypeLockStatus.lower(value)
 }
 
 
@@ -3546,6 +3817,72 @@ public func FfiConverterTypeOutgoingSnapshot_lift(_ buf: RustBuffer) throws -> O
 #endif
 public func FfiConverterTypeOutgoingSnapshot_lower(_ value: OutgoingSnapshot) -> RustBuffer {
     return FfiConverterTypeOutgoingSnapshot.lower(value)
+}
+
+
+/**
+ * An event the user adds to a day by hand. Times are `HH:MM` on that day;
+ * no start time makes it an all-day event.
+ */
+public struct OwnEvent: Equatable, Hashable {
+    public var title: String
+    public var startTime: String?
+    public var endTime: String?
+    public var location: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(title: String, startTime: String?, endTime: String?, location: String?) {
+        self.title = title
+        self.startTime = startTime
+        self.endTime = endTime
+        self.location = location
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension OwnEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOwnEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OwnEvent {
+        return
+            try OwnEvent(
+                title: FfiConverterString.read(from: &buf), 
+                startTime: FfiConverterOptionString.read(from: &buf), 
+                endTime: FfiConverterOptionString.read(from: &buf), 
+                location: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: OwnEvent, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.title, into: &buf)
+        FfiConverterOptionString.write(value.startTime, into: &buf)
+        FfiConverterOptionString.write(value.endTime, into: &buf)
+        FfiConverterOptionString.write(value.location, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOwnEvent_lift(_ buf: RustBuffer) throws -> OwnEvent {
+    return try FfiConverterTypeOwnEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOwnEvent_lower(_ value: OwnEvent) -> RustBuffer {
+    return FfiConverterTypeOwnEvent.lower(value)
 }
 
 
@@ -5513,6 +5850,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_pairingsession_receive() != 32456) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_librelog_core_checksum_method_store_add_own_event() != 57297) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_librelog_core_checksum_method_store_calendar_day() != 62542) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5532,6 +5872,33 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_tracked_calendar_events() != 2002) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_update_own_event() != 63057) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_check_lock_password() != 3263) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_has_locked_note() != 47425) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_lock_status() != 18820) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_locked_note() != 42868) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_reset_lock() != 17844) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_lock_enabled() != 23326) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_lock_password() != 23402) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_locked_note() != 14253) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_add_day_photo() != 11669) {
