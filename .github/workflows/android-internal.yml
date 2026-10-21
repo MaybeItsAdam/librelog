@@ -60,14 +60,18 @@ jobs:
             # in creation order, so counting the ones created earlier today
             # gives a suffix that only grows. A re-run keeps its number, and
             # so its code: Play refuses it only if that code was uploaded.
-            TODAY="$(date -u +%Y-%m-%d)"
+            # The day is the run's creation day, not now: a run queued
+            # before midnight and started after it still counts as its day.
+            TODAY="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.created_at[0:10]')" || {
+              echo "::error::Couldn't read this run; pass version_code instead"; exit 1
+            }
             EARLIER="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/android-internal.yml/runs?created=$TODAY&per_page=100" \
               --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID)] | length")" || {
               echo "::error::Couldn't count today's runs; pass version_code instead"; exit 1
             }
             N=$((EARLIER + 1))
             if [ "$N" -gt 99 ]; then echo "::error::Run $N today: past the two-digit limit, pass version_code"; exit 1; fi
-            CODE="$(date -u +%Y%m%d)$(printf '%02d' "$N")"
+            CODE="$(printf '%s' "$TODAY" | tr -d -)$(printf '%02d' "$N")"
           fi
           if ! printf '%s' "$CODE" | grep -Eq '^[1-9][0-9]{0,9}$' || [ "$CODE" -gt 2100000000 ]; then
             echo "::error::version_code must be a positive integer up to Play's 2100000000 (got '$CODE')"; exit 1
