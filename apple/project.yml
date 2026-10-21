@@ -95,6 +95,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: uk.co.maybeitssoftware.librelog.tests
         GENERATE_INFOPLIST_FILE: YES
+        # The app's executable sits at the bundle root on iOS but under
+        # Contents/MacOS on the Mac; XcodeGen's default only knows the first.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Librelog.app/Librelog
+        "TEST_HOST[sdk=macosx*]": $(BUILT_PRODUCTS_DIR)/Librelog.app/Contents/MacOS/Librelog
         BUNDLE_LOADER: $(TEST_HOST)
 
 schemes:
