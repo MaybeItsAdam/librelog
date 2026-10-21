@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,11 +60,14 @@ fun OwnEventSheet(app: AppModel, date: String, editing: KeptEvent?, onDismiss: (
     val t = tokens
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
-    var form by remember(editing?.id) { mutableStateOf(editing?.let(OwnEventForm::from) ?: OwnEventForm()) }
+    // What's typed survives rotation, dark mode and resizing.
+    var form by rememberSaveable(editing?.id, stateSaver = OwnEventForm.Saver) {
+        mutableStateOf(editing?.let(OwnEventForm::from) ?: OwnEventForm())
+    }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var tried by remember { mutableStateOf(false) }
-    var picking by remember { mutableStateOf<String?>(null) } // "start" or "end"
+    var tried by rememberSaveable { mutableStateOf(false) }
+    var picking by rememberSaveable { mutableStateOf<String?>(null) } // "start" or "end"
 
     fun commit(work: (uniffi.librelog_core.Store) -> Unit) {
         busy = true

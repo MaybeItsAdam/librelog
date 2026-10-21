@@ -2,9 +2,16 @@ name: Android · Play internal
 
 # Builds the signed release bundle and uploads it to Play's internal testing
 # track as a draft: nothing reaches testers until you roll it out in Play
-# Console (or run with release_status=completed). Run it from the Actions tab. Needs the signing secrets and
+# Console (or run with release_status=completed, once the app has been
+# published). Run it from the Actions tab. Needs the signing secrets and
 # PLAY_STORE_SERVICE_ACCOUNT_JSON, the same Play service account key the
 # Takt repo uses (it has access to every app on the account).
+#
+# Version codes are the UTC date and a two-digit count of this workflow's
+# runs that day: 2026102101, 2026102102, … They only ever go up, and stay
+# above the codes already uploaded (the last by hand was 2026102002). The
+# limit is 99 runs a day; past that, pass version_code yourself. Local
+# uploads (fastlane android internal) use the same scheme: see README.md.
 
 on:
   workflow_dispatch:
@@ -13,11 +20,11 @@ on:
         description: "versionName, e.g. 0.2.0"
         required: true
       version_code:
-        description: "versionCode (blank: today's date and the run attempt, e.g. 2026102101)"
+        description: "versionCode (blank: today's UTC date and this run's number that day, e.g. 2026102101)"
         required: false
         default: ""
       release_status:
-        description: "draft: upload only, roll out in Play Console. completed: straight to internal testers"
+        description: "draft: upload only, roll out in Play Console. completed: straight to internal testers (fails until the app has been published once; Play only takes drafts for a draft app)"
         type: choice
         options: [draft, completed]
         default: draft
@@ -28,6 +35,8 @@ concurrency:
 
 permissions:
   contents: read
+  # Counting today's earlier runs for the version code.
+  actions: read
 
 jobs:
   build:
@@ -41,10 +50,31 @@ jobs:
         env:
           NAME: ${{ inputs.version_name }}
           CODE: ${{ inputs.version_code }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "$CODE" ]; then CODE="$(date -u +%Y%m%d)$(printf '%02d' "$GITHUB_RUN_ATTEMPT")"; fi
-          if ! printf '%s' "$CODE" | grep -Eq '^[1-9][0-9]*$'; then
-            echo "::error::version_code must be a positive integer (got '$CODE')"; exit 1
+          if ! printf '%s' "$NAME" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'; then
+            echo "::error::version_name must look like 1.2.3 (got '$NAME')"; exit 1
+          fi
+          if [ -z "$CODE" ]; then
+            # Runs are queued one at a time (concurrency below) and numbered
+            # in creation order, so counting the ones created earlier today
+            # gives a suffix that only grows. A re-run keeps its number, and
+            # so its code: Play refuses it only if that code was uploaded.
+            # The day is the run's creation day, not now: a run queued
+            # before midnight and started after it still counts as its day.
+            TODAY="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.created_at[0:10]')" || {
+              echo "::error::Couldn't read this run; pass version_code instead"; exit 1
+            }
+            EARLIER="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/android-internal.yml/runs?created=$TODAY&per_page=100" \
+              --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID)] | length")" || {
+              echo "::error::Couldn't count today's runs; pass version_code instead"; exit 1
+            }
+            N=$((EARLIER + 1))
+            if [ "$N" -gt 99 ]; then echo "::error::Run $N today: past the two-digit limit, pass version_code"; exit 1; fi
+            CODE="$(printf '%s' "$TODAY" | tr -d -)$(printf '%02d' "$N")"
+          fi
+          if ! printf '%s' "$CODE" | grep -Eq '^[1-9][0-9]{0,9}$' || [ "$CODE" -gt 2100000000 ]; then
+            echo "::error::version_code must be a positive integer up to Play's 2100000000 (got '$CODE')"; exit 1
           fi
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
@@ -85,14 +115,34 @@ jobs:
           for v in ANDROID_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [ -z "${!v}" ]; then echo "::error::Secret $v is not set"; exit 1; fi
           done
-          KEYSTORE_PATH="$RUNNER_TEMP/upload-keystore.jks"
+          export KEYSTORE_PATH="$RUNNER_TEMP/upload-keystore.jks"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-          {
-            echo "storeFile=$KEYSTORE_PATH"
-            echo "storePassword=$KEYSTORE_PASSWORD"
-            echo "keyAlias=$KEY_ALIAS"
-            echo "keyPassword=$KEY_PASSWORD"
-          } > android/key.properties
+          # Gradle reads this with java.util.Properties: a backslash is an
+          # escape, leading spaces are dropped, and the file is Latin-1. So
+          # write each value escaped rather than echoing it raw, or a password
+          # with a backslash or an accent signs with the wrong one.
+          python3 - > android/key.properties <<'PY'
+          import os
+
+          def esc(value):
+              out = []
+              for c in value:
+                  if c == "\\":
+                      out.append("\\\\")
+                  elif c in "\n\r\t\f":
+                      out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t", "\f": "\\f"}[c])
+                  elif 0x20 <= ord(c) < 0x7F:
+                      out.append(c)
+                  else:
+                      units = c.encode("utf-16-be")
+                      out.extend("\\u%02x%02x" % (units[i], units[i + 1]) for i in range(0, len(units), 2))
+              text = "".join(out)
+              return "\\" + text if text.startswith(" ") else text
+
+          for key, var in [("storeFile", "KEYSTORE_PATH"), ("storePassword", "KEYSTORE_PASSWORD"),
+                           ("keyAlias", "KEY_ALIAS"), ("keyPassword", "KEY_PASSWORD")]:
+              print(f"{key}={esc(os.environ[var])}")
+          PY
 
       - name: Build Rust core and Kotlin bindings
         run: scripts/build-android.sh

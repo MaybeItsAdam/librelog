@@ -1,5 +1,6 @@
 package uk.co.maybeitssoftware.librelog
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.foundation.background
@@ -28,7 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -88,6 +92,27 @@ sealed interface Route {
     data class History(val entryId: String) : Route
     /** Opened from the bottom bar's left end. */
     data object OnThisDay : Route
+
+    companion object {
+        /** The stack as strings, so it survives rotation and process death. */
+        val StackSaver: Saver<SnapshotStateList<Route>, Any> = listSaver(
+            save = { stack -> stack.map(::encode) },
+            restore = { saved -> saved.mapNotNull(::decode).toMutableStateList() },
+        )
+
+        fun encode(route: Route): String = when (route) {
+            is Entry -> "entry:${route.id}"
+            is History -> "history:${route.entryId}"
+            OnThisDay -> "on-this-day"
+        }
+
+        fun decode(saved: String): Route? = when {
+            saved.startsWith("entry:") -> Entry(saved.removePrefix("entry:"))
+            saved.startsWith("history:") -> History(saved.removePrefix("history:"))
+            saved == "on-this-day" -> OnThisDay
+            else -> null
+        }
+    }
 }
 
 /**
@@ -109,7 +134,8 @@ fun RootScreen(app: AppModel) {
             else pager.animateScrollToPage(to.ordinal, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow))
         }
     }
-    val stack = remember { mutableStateListOf<Route>() }
+    // Saved too, so rotation, dark mode or a resize leaves the entry open.
+    val stack = rememberSaveable(saver = Route.StackSaver) { mutableStateListOf() }
     // Each tab keeps its saved state (scroll position, selected day, search)
     // while an entry is open over it and across tab switches, so Back
     // returns you to where you were.

@@ -1,7 +1,11 @@
 package uk.co.maybeitssoftware.librelog.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.text.format.DateUtils
+import android.view.WindowManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,9 +38,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -128,10 +134,12 @@ fun SettingsScreen(app: AppModel) {
 private fun SignIn(app: AppModel) {
     val t = tokens
     val scope = rememberCoroutineScope()
-    var email by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var sentTo by remember { mutableStateOf<String?>(null) }
-    var usePassword by remember { mutableStateOf(false) }
+    // Saved through rotation; the password isn't, as saved state can be
+    // written to disk.
+    var email by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
+    var usePassword by rememberSaveable { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -212,8 +220,17 @@ private fun SignIn(app: AppModel) {
                 SecondaryButton("Use a password instead", { usePassword = true }, color = t.muted)
             }
         }
-        message?.let { StatusBanner(it, t.danger) }
+        // Signing in can get a session and still fail setting up the account
+        // after it (offline, or the server refusing); and the email's link
+        // signs in from outside this screen. Those land in sync.problem.
+        (message ?: app.sync.problem?.let(::signInProblem))?.let { StatusBanner(it, t.danger) }
     }
+}
+
+private fun signInProblem(error: SyncError): String = when (error) {
+    SyncError.SignedOut -> "You were signed out. Sign in again to keep syncing."
+    SyncError.Offline -> "Couldn't reach the server. Check your connection and try again."
+    else -> error.message ?: "Couldn't finish signing in."
 }
 
 // MARK: Signed in without the key
@@ -284,9 +301,9 @@ private fun Status(app: AppModel) {
     val t = tokens
     val sync = app.sync
     val scope = rememberCoroutineScope()
-    var adding by remember { mutableStateOf(false) }
-    var revealing by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var revealing by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
 
@@ -412,7 +429,10 @@ private fun PairingApproveSheet(app: AppModel, onDismiss: () -> Unit) {
 private fun RecoveryPhraseSheet(phrase: String, reveal: Boolean = false, onDone: () -> Unit) {
     val t = tokens
     var confirmed by remember { mutableStateOf(reveal) }
-    Sheet(onDismiss = { if (confirmed) onDone() }) {
+    // The words are the journal key: kept out of screenshots, screen sharing
+    // and the recents thumbnail, as an open locked note is.
+    SecureWindow()
+    Sheet(onDismiss = { if (confirmed) onDone() }, secure = true) {
         Text(if (reveal) "Recovery phrase" else "Write these 24 words down", style = Typeface.title, color = t.ink)
         Text(
             if (reveal) "Anyone with these words and your account can read your journal. Keep them somewhere safe and offline."
@@ -526,6 +546,26 @@ private fun Field(
             inner()
         },
     )
+}
+
+/**
+ * Keeps the activity's window out of screenshots and the recents thumbnail
+ * while this is composed. A secure [Sheet] only covers the sheet's own window.
+ */
+@Composable
+internal fun SecureWindow() {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = context.activity()?.window
+        window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
+}
+
+internal tailrec fun Context.activity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.activity()
+    else -> null
 }
 
 /**

@@ -3,6 +3,7 @@ package uk.co.maybeitssoftware.librelog.sync
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import uniffi.librelog_core.CoreException
 import uniffi.librelog_core.IncomingOps
 import uniffi.librelog_core.PairingSession
 import uniffi.librelog_core.Store
@@ -84,18 +86,27 @@ class SyncEngine(
 
     // MARK: Lifecycle
 
-    /** Called at launch and on returning to the foreground. */
-    suspend fun start() {
+    /**
+     * Called at launch and on returning to the foreground, and by
+     * [SyncWorker] in the background with [realtime] off: a background run
+     * syncs once and has no one to tell, so it opens no channel.
+     */
+    suspend fun start(realtime: Boolean = true) {
         val session = client.session ?: run { phase = Phase.Off; return }
         email = session.email
         val key = secrets.read(SecretStore.Item.JournalKey)
         if (key != null) {
-            io { store.setJournalKey(key) }
+            try {
+                io { store.setJournalKey(key) }
+            } catch (e: CoreException) {
+                problem = syncError(e)
+                return
+            }
             phase = Phase.On
-            connectRealtime(session.userId)
+            if (realtime) connectRealtime(session.userId)
             syncNow()
         } else {
-            adoptAccount()
+            adoptAccount(realtime)
         }
     }
 
@@ -126,11 +137,15 @@ class SyncEngine(
                     lastSynced = System.currentTimeMillis()
                     if (merged) onChange?.invoke()
                     snapshotIfDue()
-                } catch (e: SyncError.SignedOut) {
-                    signOut()
-                    return
-                } catch (e: SyncError) {
-                    problem = e
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Nothing is acknowledged to the core until it has
+                    // succeeded, so a failure leaves the cursors where they
+                    // were and the next sync picks up from there.
+                    val error = syncError(e)
+                    if (error == SyncError.SignedOut) signOut()
+                    problem = error
                     return
                 }
             } while (syncAgain)
@@ -144,11 +159,13 @@ class SyncEngine(
     // MARK: Sign-in
 
     suspend fun sendSignInEmail(address: String) {
+        problem = null
         client.sendSignInEmail(address.trim())
         email = address.trim()
     }
 
     suspend fun signIn(address: String, password: String) {
+        problem = null
         client.signIn(address.trim(), password)
         email = address.trim()
         adoptAccount()
@@ -156,12 +173,14 @@ class SyncEngine(
 
     suspend fun verify(code: String) {
         val address = email ?: throw SyncError.SignedOut
+        problem = null
         client.verify(address, code.filter(Char::isDigit))
         adoptAccount()
     }
 
     /** Sign in with Google: the ID token from [GoogleSignIn] and its raw nonce. */
     suspend fun signInWithGoogle(idToken: String, nonce: String) {
+        problem = null
         client.signInWithIdToken("google", idToken, nonce)
         adoptAccount()
     }
@@ -169,12 +188,16 @@ class SyncEngine(
     /** The `librelog://auth…` link from the sign-in email. */
     suspend fun handle(uri: String) {
         if (!uri.startsWith("librelog://auth")) return
+        problem = null
         try {
             client.handleRedirect(uri)
-            adoptAccount()
-        } catch (e: SyncError) {
-            problem = e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            problem = syncError(e)
+            return
         }
+        adoptAccount()
     }
 
     suspend fun signOut() {
@@ -185,6 +208,7 @@ class SyncEngine(
         io { store.forgetJournalKey() }
         phase = Phase.Off
         email = null
+        problem = null
     }
 
     /**
@@ -203,8 +227,11 @@ class SyncEngine(
     /**
      * After sign-in: create the account's key if it has none, or use this
      * device's stored key if it matches; otherwise ask for it.
+     *
+     * Failures land in [problem], which the signed-out screen shows too, so
+     * a sign-in that got a session but couldn't finish says why.
      */
-    private suspend fun adoptAccount() {
+    private suspend fun adoptAccount(realtime: Boolean = true) {
         try {
             val reg = register(nameEnc = "")
             email = client.session?.email ?: email
@@ -212,7 +239,7 @@ class SyncEngine(
             val check = reg?.keyCheck
             if (check != null) {
                 val key = secrets.read(SecretStore.Item.JournalKey)
-                if (key != null && io { store.keyMatches(key, check) }) activate(key) else phase = Phase.NeedsKey
+                if (key != null && io { store.keyMatches(key, check) }) activate(key, realtime) else phase = Phase.NeedsKey
                 return
             }
 
@@ -223,15 +250,18 @@ class SyncEngine(
                 .jsonPrimitive.contentOrNull ?: ""
             if (io { store.keyMatches(key, stored) }) {
                 newRecoveryPhrase = io { store.recoveryPhrase() }
-                activate(key)
+                activate(key, realtime)
             } else {
                 // Another device set it first, a moment ago.
                 io { store.forgetJournalKey() }
                 phase = Phase.NeedsKey
             }
-        } catch (e: SyncError) {
-            problem = e
-            if (e == SyncError.SignedOut) phase = Phase.Off
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val error = syncError(e)
+            problem = error
+            if (error == SyncError.SignedOut) phase = Phase.Off
         }
     }
 
@@ -269,13 +299,13 @@ class SyncEngine(
         client.rpc("pairing_fulfil", buildJsonObject { put("p_id", code.id); put("p_payload", payload) })
     }
 
-    private suspend fun activate(key: ByteArray) {
+    private suspend fun activate(key: ByteArray, realtime: Boolean = true) {
         io { store.setJournalKey(key) }
         secrets.write(SecretStore.Item.JournalKey, key)
         // Register again, now with the device's name sealed.
         register(nameEnc = io { store.sealDeviceName(deviceName) })
         phase = Phase.On
-        client.session?.userId?.let(::connectRealtime)
+        if (realtime) client.session?.userId?.let(::connectRealtime)
         syncNow()
     }
 
@@ -350,12 +380,23 @@ class SyncEngine(
         pulledSinceSnapshot = 0
     }
 
+    /** Main thread only, like the rest of the engine, so the check can't race. */
     private fun connectRealtime(userId: String) {
         if (realtime != null) return
         realtime = realtimeFor?.invoke(userId) { scope.launch { syncNow() } }?.also { it.connect() }
     }
 
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
+
+    /** Anything a sync step threw, as a problem to show. */
+    private fun syncError(e: Exception): SyncError = when (e) {
+        is SyncError -> e
+        // SerializationException is an IllegalArgumentException; so is
+        // asking for jsonPrimitive on a reply of the wrong shape.
+        is IllegalArgumentException -> SyncError.Unexpected("The server's reply didn't make sense: ${e.message.orEmpty()}".trimEnd(' ', ':'))
+        is CoreException -> SyncError.Unexpected(e.message ?: "The journal couldn't apply what came from the server")
+        else -> SyncError.Unexpected(e.message ?: e.javaClass.simpleName)
+    }
 
     private companion object {
         const val BATCH = 500

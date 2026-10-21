@@ -1,5 +1,8 @@
 package uk.co.maybeitssoftware.librelog.calendar
 
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import java.util.Locale
 import uniffi.librelog_core.KeptEvent
 import uniffi.librelog_core.OwnEvent
 
@@ -36,6 +39,12 @@ data class OwnEventForm(
     )
 
     companion object {
+        /** For rememberSaveable: the fields as a list of plain values. */
+        val Saver: Saver<OwnEventForm, Any> = listSaver(
+            save = { listOf(it.title, it.allDay, it.start, it.end, it.place) },
+            restore = { OwnEventForm(it[0] as String, it[1] as Boolean, it[2] as String?, it[3] as String?, it[4] as String) },
+        )
+
         /** An own event, as it's shown for editing. */
         fun from(e: KeptEvent): OwnEventForm {
             val start = e.start.takeIf { !e.allDay && it.length == 16 }?.takeLast(5)
@@ -48,7 +57,8 @@ data class OwnEventForm(
             )
         }
 
-        fun hhmm(hour: Int, minute: Int): String = "%02d:%02d".format(hour, minute)
+        /** `HH:MM` with ASCII digits whatever the locale: the core refuses others. */
+        fun hhmm(hour: Int, minute: Int): String = "%02d:%02d".format(Locale.ROOT, hour, minute)
 
         /** (hour, minute) from `HH:MM`, or null. */
         fun parts(time: String?): Pair<Int, Int>? {
