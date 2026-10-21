@@ -12,7 +12,7 @@ file is the contract the Rust core's sync client codes against.
 | `migrations/20261003170000_sync_schema.sql` | Tables, RLS, every client function, the nightly `librelog.maintenance()` at 03:17 UTC, and the Realtime policy that lets a device receive on its own channel |
 | `templates/sign_in_code.html` | Sign-in code email, enabled once custom SMTP is set up |
 | `tests/` | `run.sh` tests the migrations on a throwaway local Postgres 17 |
-| `config.toml` | Pushed with `supabase config push` |
+| `config.toml` | Pushed with `supabase config push`; changes here do nothing to the live project until then |
 
 ## Calling it
 
@@ -55,13 +55,34 @@ librelog` header) read the user's own rows for the settings screen.
 | 404 | Device revoked/unknown, or pairing expired | re-register, or restart pairing |
 | 409 | Cursor is behind compaction | `get_snapshot`, apply it, then `pull_ops` from its `seq` |
 | 413 | Over quota, or more than 500 ops in one push | split the batch; or surface the quota |
-| 400 | Bad input | bug — log it |
+| 400 | `device belongs to another account` from `register_device` | the device id was registered by an account this device was signed in to before: reset sync state and register under a new id |
+| 400 | Other bad input | bug — log it |
+
+## Sessions
+
+Sign-in is by emailed code, Apple or Google, or a password for accounts an
+admin gave one (`scripts/review-account.sh`). Email confirmation is on
+(`config.toml`), so a password sign-up can't claim an address its owner
+hasn't confirmed.
+
+- Sign out with `POST /auth/v1/logout?scope=local`. The default scope is
+  global and signs the user out on every device.
+- A refresh answered with 400 (`invalid_grant`, "Refresh Token Not Found")
+  or 401 means the session is over: drop it and show sign-in. Keep the
+  journal key, so signing in to the same account again needs nothing else.
+- Device ids belong to the account that registered them. Signing in to a
+  different account means a fresh cursor, a full re-upload and a new id.
 
 ## Realtime
 
 Subscribe to the **private** broadcast channel `user:<auth uid>`, event
 `ops`, payload `{seq, device_id}`. When `seq` is higher than the local
 cursor and `device_id` isn't this device, pull.
+
+The channel is joined with the user's access token and closed by the server
+when that token expires. Send each refreshed token before then as an
+`access_token` event on the channel topic (payload `{access_token}`), and
+rejoin on `phx_close` or `phx_error`.
 
 ## Granting sync by hand
 
