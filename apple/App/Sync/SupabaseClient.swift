@@ -7,8 +7,6 @@ struct Session: Codable, Sendable {
     var expiresAt: Date
     var userID: String
     var email: String?
-
-    var needsRefresh: Bool { expiresAt.timeIntervalSinceNow < 60 }
 }
 
 /// What a sync RPC can fail with. The database raises `PTxxx` codes, which
