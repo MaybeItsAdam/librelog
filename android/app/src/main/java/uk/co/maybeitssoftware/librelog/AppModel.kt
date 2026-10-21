@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -23,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.co.maybeitssoftware.librelog.calendar.DeviceCalendar
+import uk.co.maybeitssoftware.librelog.lock.LockedNoteDraft
 import uk.co.maybeitssoftware.librelog.sync.KeystoreSecretStore
 import uk.co.maybeitssoftware.librelog.sync.RealtimeChannel
 import uk.co.maybeitssoftware.librelog.sync.SupabaseClient
@@ -68,6 +70,9 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
     var revision by mutableIntStateOf(0)
         private set
     var lastError by mutableStateOf<String?>(null)
+
+    /** Locked notes open or awaiting a save, by day: memory only (lock/LockedNoteSection.kt). */
+    val lockedNotes = mutableStateMapOf<String, LockedNoteDraft>()
 
     /** Whether the device calendar can be read; asked for on first use only. */
     var calendarAccess by mutableStateOf(calendar.hasAccess)
