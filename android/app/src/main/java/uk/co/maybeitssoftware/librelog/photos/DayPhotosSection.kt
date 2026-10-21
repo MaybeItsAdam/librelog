@@ -75,6 +75,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -374,7 +375,7 @@ private fun PhotoViewer(photo: DayPhoto, onClose: () -> Unit) {
 
 /** "09:41" from an RFC 3339 time, in the photo's own offset. */
 private fun takenLabel(rfc: String): String? =
-    runCatching { java.time.OffsetDateTime.parse(rfc).let { "%02d:%02d".format(it.hour, it.minute) } }.getOrNull()
+    runCatching { java.time.OffsetDateTime.parse(rfc).let { "%02d:%02d".format(Locale.ROOT, it.hour, it.minute) } }.getOrNull()
 
 @Composable
 private fun CaptionSheet(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {

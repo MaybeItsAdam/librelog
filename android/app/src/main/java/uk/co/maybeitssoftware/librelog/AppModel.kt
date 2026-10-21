@@ -207,7 +207,11 @@ object Day {
 
     val today: String get() = LocalDate.now().format(iso)
 
-    val nowTime: String get() = LocalTime.now().let { "%02d:%02d".format(it.hour, it.minute) }
+    /**
+     * `HH:MM` now. Formatted in [Locale.ROOT] so the digits stay ASCII: the
+     * default locale's (Persian, Arabic…) are refused by the core.
+     */
+    val nowTime: String get() = LocalTime.now().let { "%02d:%02d".format(Locale.ROOT, it.hour, it.minute) }
 
     fun date(s: String): LocalDate? = runCatching { LocalDate.parse(s, iso) }.getOrNull()
 

@@ -1,5 +1,6 @@
 package uk.co.maybeitssoftware.librelog.calendar
 
+import java.util.Locale
 import uniffi.librelog_core.KeptEvent
 import uniffi.librelog_core.OwnEvent
 
@@ -48,7 +49,8 @@ data class OwnEventForm(
             )
         }
 
-        fun hhmm(hour: Int, minute: Int): String = "%02d:%02d".format(hour, minute)
+        /** `HH:MM` with ASCII digits whatever the locale: the core refuses others. */
+        fun hhmm(hour: Int, minute: Int): String = "%02d:%02d".format(Locale.ROOT, hour, minute)
 
         /** (hour, minute) from `HH:MM`, or null. */
         fun parts(time: String?): Pair<Int, Int>? {

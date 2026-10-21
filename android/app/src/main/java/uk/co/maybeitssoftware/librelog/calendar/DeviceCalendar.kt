@@ -13,6 +13,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.librelog_core.CalendarEvent
@@ -212,7 +213,8 @@ object CalendarKeys {
         }
     }
 
-    private val minute = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+    // Locale.ROOT: these go to the core, which wants ISO digits and calendar.
+    private val minute = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm", Locale.ROOT)
 
     /**
      * The core's forms: `YYYY-MM-DDTHH:MM` local for a timed event; for an

@@ -11,6 +11,7 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Locale
 import uk.co.maybeitssoftware.librelog.BuildConfig
 
 /**
@@ -53,11 +54,11 @@ object GoogleSignIn {
 
     /** 32 random bytes as hex. */
     fun newNonce(random: SecureRandom = SecureRandom()): String =
-        ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(it) }
+        ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(Locale.ROOT, it) }
 
     /** What Google is given in place of the nonce: its SHA-256, as lowercase hex. */
     fun sha256Hex(text: String): String =
-        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(Locale.ROOT, it) }
 }
 
 /** Why Google's sheet gave no token, in words fit to show. */
