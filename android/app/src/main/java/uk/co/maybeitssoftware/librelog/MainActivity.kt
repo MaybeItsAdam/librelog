@@ -30,11 +30,17 @@ class MainActivity : ComponentActivity() {
             }
             LibrelogTheme(appearance) { RootScreen(model) }
         }
-        handle(intent)
+        // Only a fresh launch carries a new link. After rotation or process
+        // death the activity is recreated with the intent it started with,
+        // and reopening from Recents replays it too; handling it again would
+        // store the link's old tokens as a new session.
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (savedInstanceState == null && !fromHistory) handle(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handle(intent)
     }
 
@@ -51,6 +57,9 @@ class MainActivity : ComponentActivity() {
     /** The sign-in email's link: librelog://auth#access_token=… */
     private fun handle(intent: Intent?) {
         val uri = intent?.data?.toString() ?: return
-        if (uri.startsWith("librelog://auth")) model.scope.launch { model.sync.handle(uri) }
+        if (!uri.startsWith("librelog://auth")) return
+        // Consumed: the tokens are used once, and nothing later should find them.
+        intent.data = null
+        model.scope.launch { model.sync.handle(uri) }
     }
 }
