@@ -18,6 +18,12 @@ public sealed partial class SyncPage : Page
 {
     private CancellationTokenSource? pairing;
 
+    /// The error from the last thing tried on this page (a wrong password or
+    /// code, an email that didn't send). Shown ahead of the engine's own
+    /// problem, which would otherwise hide it on the next update.
+    private string? localProblem;
+    private SyncPhase? shownPhase;
+
     public SyncPage()
     {
         InitializeComponent();
@@ -39,13 +45,16 @@ public sealed partial class SyncPage : Page
     private void Update()
     {
         var phase = Sync.Phase;
+        // A new screen: the last attempt's error belonged to the old one.
+        if (shownPhase is { } was && was != phase) localProblem = null;
+        shownPhase = phase;
         SignInPanel.Visibility = Format.Shown(phase == SyncPhase.Off);
         KeyPanel.Visibility = Format.Shown(phase == SyncPhase.NeedsKey);
         OnPanel.Visibility = Format.Shown(phase == SyncPhase.On);
         PairingPanel.Visibility = Format.Shown(pairing is not null);
         PairButton.Visibility = Format.Shown(pairing is null);
-        CodePanel.Visibility = Format.Shown(Sync.Email is not null && phase == SyncPhase.Off);
-        SentText.Text = Sync.Email is { } sentTo
+        CodePanel.Visibility = Format.Shown(Sync.CodeSentTo is not null && phase == SyncPhase.Off);
+        SentText.Text = Sync.CodeSentTo is { } sentTo
             ? $"We sent a sign-in email to {sentTo}. Click its link on this PC, or type the code from it."
             : "";
 
@@ -56,8 +65,9 @@ public sealed partial class SyncPage : Page
         StatusText.Text = Sync.IsSyncing ? "Syncing…"
             : Sync.LastSynced is { } at ? $"Last synced {at:t} · {Sync.Pending} waiting to upload"
             : "Not synced yet";
-        ProblemText.Text = Sync.Problem?.Describe() ?? "";
-        ProblemText.Visibility = Format.Shown(Sync.Problem is not null);
+        var problem = localProblem ?? Sync.Problem?.Describe();
+        ProblemText.Text = problem ?? "";
+        ProblemText.Visibility = Format.Shown(problem is not null);
     }
 
     /// Four words to a line, numbered, so it's easy to copy onto paper.
@@ -69,17 +79,34 @@ public sealed partial class SyncPage : Page
             string.Join("   ", row.Select((w, i) => $"{r * 4 + i + 1,2}. {w}"))));
     }
 
-    private async Task Try(Func<Task> action, TextBlock? errorTarget = null)
+    /// Runs a button's action, showing what went wrong instead of letting
+    /// it out of an async void handler (which would end the app). `busy` is
+    /// disabled meanwhile, so a second click can't start it again.
+    private async Task Try(Func<Task> action, TextBlock? errorTarget = null, object? busy = null)
     {
+        var control = busy as Control;
+        if (control is not null) control.IsEnabled = false;
+        if (errorTarget is null) localProblem = null;
         try
         {
             await action();
         }
-        catch (Exception ex) when (ex is SyncException or CoreException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             var message = ex is SyncException s ? s.Describe() : ex.Message;
-            (errorTarget ?? ProblemText).Text = message;
-            (errorTarget ?? ProblemText).Visibility = Visibility.Visible;
+            if (errorTarget is null)
+            {
+                localProblem = message;
+            }
+            else
+            {
+                errorTarget.Text = message;
+                errorTarget.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            if (control is not null) control.IsEnabled = true;
         }
         Update();
     }
@@ -90,21 +117,18 @@ public sealed partial class SyncPage : Page
     {
         var email = EmailBox.Text.Trim();
         if (!email.Contains('@')) return;
-        SendButton.IsEnabled = false;
-        await Try(() => Sync.SendSignInEmail(email));
-        SendButton.IsEnabled = true;
+        await Try(() => Sync.SendSignInEmail(email), busy: SendButton);
     }
 
     /// Google in the default browser, through Supabase's web flow; it comes
     /// back as a `librelog://auth/callback?code=…` activation (App.HandleActivation).
-    private async void OnGoogle(object sender, RoutedEventArgs e)
+    private async void OnGoogle(object sender, RoutedEventArgs e) => await Try(async () =>
     {
-        if (await global::Windows.System.Launcher.LaunchUriAsync(Sync.BeginGoogleSignIn())) return;
-        ProblemText.Text = "Couldn't open the browser.";
-        ProblemText.Visibility = Visibility.Visible;
-    }
+        if (!await global::Windows.System.Launcher.LaunchUriAsync(Sync.BeginGoogleSignIn()))
+            throw new InvalidOperationException("Couldn't open the browser.");
+    });
 
-    private async void OnVerify(object sender, RoutedEventArgs e) => await Try(() => Sync.Verify(CodeBox.Text));
+    private async void OnVerify(object sender, RoutedEventArgs e) => await Try(() => Sync.Verify(CodeBox.Text), busy: sender);
 
     /// Swaps the emailed link for a password, for accounts that have one.
     private void OnTogglePassword(object sender, RoutedEventArgs e)
@@ -120,14 +144,15 @@ public sealed partial class SyncPage : Page
     {
         var email = EmailBox.Text.Trim();
         if (!email.Contains('@') || PasswordBox.Password.Length == 0) return;
-        await Try(() => Sync.SignIn(email, PasswordBox.Password));
+        var password = PasswordBox.Password;
+        await Try(() => Sync.SignIn(email, password), busy: sender);
         PasswordBox.Password = "";
     }
 
     private async void OnSignOut(object sender, RoutedEventArgs e)
     {
         pairing?.Cancel();
-        await Try(Sync.SignOut);
+        await Try(Sync.SignOut, busy: sender);
     }
 
     private async void OnDeleteAccount(object sender, RoutedEventArgs e)
@@ -141,14 +166,12 @@ public sealed partial class SyncPage : Page
         dialog.DefaultButton = ContentDialogButton.Close;
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         pairing?.Cancel();
-        DeleteAccountButton.IsEnabled = false;
-        await Try(Sync.DeleteAccount);
-        DeleteAccountButton.IsEnabled = true;
+        await Try(Sync.DeleteAccount, busy: DeleteAccountButton);
     }
 
     // --- Journal key --------------------------------------------------------------
 
-    private async void OnUsePhrase(object sender, RoutedEventArgs e) => await Try(() => Sync.UseRecoveryPhrase(PhraseBox.Text));
+    private async void OnUsePhrase(object sender, RoutedEventArgs e) => await Try(() => Sync.UseRecoveryPhrase(PhraseBox.Text), busy: sender);
 
     private async void OnPair(object sender, RoutedEventArgs e)
     {
@@ -184,7 +207,7 @@ public sealed partial class SyncPage : Page
             await Sync.ApprovePairing(ApproveBox.Text.Trim());
             ApproveText.Text = "Sent. The other device will finish in a few seconds.";
             ApproveBox.Text = "";
-        }, ApproveText);
+        }, ApproveText, busy: sender);
     }
 
     private void OnPhraseSaved(object sender, RoutedEventArgs e)
@@ -194,9 +217,9 @@ public sealed partial class SyncPage : Page
     }
 
     private async void OnShowPhrase(object sender, RoutedEventArgs e) =>
-        PhraseText.Text = Spaced(await AppServices.Run(s => s.RecoveryPhrase()));
+        await Try(async () => PhraseText.Text = Spaced(await AppServices.Run(s => s.RecoveryPhrase())));
 
-    private async void OnSyncNow(object sender, RoutedEventArgs e) => await Sync.SyncNow();
+    private async void OnSyncNow(object sender, RoutedEventArgs e) => await Try(Sync.SyncNow);
 
     // --- Helpers ------------------------------------------------------------------
 
@@ -313,7 +336,7 @@ public sealed partial class SyncPage : Page
             var summary = await AppServices.Run(s => s.Export(format, file.Path));
             ShowDone(summary.Entries, n => $"Exported {Entries(n)} to {file.Name}.");
         }
-        catch (CoreException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             ShowTransfer($"Couldn't export: {ex.Message}", error: true);
         }
@@ -345,7 +368,7 @@ public sealed partial class SyncPage : Page
             preview = await AppServices.Run(s => s.PreviewImport(path));
             ShowTransfer("");
         }
-        catch (CoreException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             ShowTransfer(ex.Message, error: true);
             return;
@@ -367,7 +390,7 @@ public sealed partial class SyncPage : Page
                 ? $"Imported {Entries(n)}."
                 : $"Imported {Entries(n)}; skipped {result.Skipped} already in your journal.");
         }
-        catch (CoreException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             ShowTransfer($"Couldn't import: {ex.Message}", error: true);
         }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -127,14 +128,11 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
     {
         var fragment = redirect.Fragment.TrimStart('#');
         if (fragment.Length == 0) fragment = redirect.Query.TrimStart('?');
-        var p = fragment.Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Select(pair => pair.Split('=', 2))
-            .Where(kv => kv.Length == 2)
-            .ToDictionary(kv => kv[0], kv => Uri.UnescapeDataString(kv[1].Replace('+', ' ')));
+        var p = FormParams(fragment);
         if (p.TryGetValue("error_description", out var error)) throw new SyncException(SyncProblem.Server, error, 400);
         if (!p.TryGetValue("access_token", out var access) || !p.TryGetValue("refresh_token", out var refresh))
             throw new SyncException(SyncProblem.SignedOut, "the sign-in link had no session");
-        var expiresIn = double.TryParse(p.GetValueOrDefault("expires_in"), out var e) ? e : 3600;
+        var expiresIn = double.TryParse(p.GetValueOrDefault("expires_in"), NumberStyles.Float, CultureInfo.InvariantCulture, out var e) ? e : 3600;
         var claims = JwtClaims(access);
         Save(new Session(access, refresh, DateTimeOffset.UtcNow.AddSeconds(expiresIn),
             claims.GetValueOrDefault("sub") ?? "", claims.GetValueOrDefault("email")));
@@ -146,14 +144,16 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
         {
             try
             {
-                using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(url, "auth/v1/logout"));
+                // `local`: end this device's session only. The default,
+                // `global`, would sign every other device out too.
+                using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(url, "auth/v1/logout?scope=local"));
                 req.Headers.Add("apikey", key);
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", s.AccessToken);
                 using var _ = await http.SendAsync(req);
             }
-            catch (HttpRequestException)
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
             {
-                // Signing out locally still counts.
+                // Offline or timed out: signing out locally still counts.
             }
         }
         Session = null;
@@ -165,14 +165,36 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
     {
         var s = Session ?? throw new SyncException(SyncProblem.SignedOut, "signed out");
         if (!s.NeedsRefresh) return s.AccessToken;
+        return await Refresh(rejected: null, ct);
+    }
+
+    /// Swaps the refresh token for a new session, once across concurrent
+    /// callers. With `rejected`, refreshes if the session still holds that
+    /// access token (the server turned it down); otherwise only if it's
+    /// about to expire.
+    private async Task<string> Refresh(string? rejected, CancellationToken ct)
+    {
         await refreshing.WaitAsync(ct);
         try
         {
-            s = Session ?? throw new SyncException(SyncProblem.SignedOut, "signed out");
-            if (s.NeedsRefresh)
-                StoreSession(await Post("auth/v1/token?grant_type=refresh_token",
-                    new JsonObject { ["refresh_token"] = s.RefreshToken }, auth: false, ct));
-            return Session!.AccessToken;
+            var s = Session ?? throw new SyncException(SyncProblem.SignedOut, "signed out");
+            if (rejected is null ? s.NeedsRefresh : s.AccessToken == rejected)
+            {
+                string json;
+                try
+                {
+                    json = await Post("auth/v1/token?grant_type=refresh_token",
+                        new JsonObject { ["refresh_token"] = s.RefreshToken }, auth: false, ct);
+                }
+                catch (SyncException e) when (e.Problem == SyncProblem.Server && e.Status is >= 400 and < 500 and not 408 and not 429)
+                {
+                    // invalid_grant, "Refresh Token Not Found", revoked: the
+                    // session is over, and no retry will bring it back.
+                    throw new SyncException(SyncProblem.SignedOut, e.Message, e.Status);
+                }
+                StoreSession(json);
+            }
+            return Session?.AccessToken ?? throw new SyncException(SyncProblem.SignedOut, "signed out");
         }
         finally
         {
@@ -191,16 +213,18 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
 
     // --- Plumbing ---------------------------------------------------------------
 
-    private async Task<string> Post(string path, JsonObject body, bool auth, CancellationToken ct)
+    private async Task<string> Post(string path, JsonObject body, bool auth, CancellationToken ct, bool retried = false)
     {
         using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(url, path))
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
         };
         req.Headers.Add("apikey", key);
+        string? token = null;
         if (auth)
         {
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await AccessToken(ct));
+            token = await AccessToken(ct);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             req.Headers.Add("Content-Profile", "librelog");
         }
 
@@ -222,6 +246,14 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
             var text = await response.Content.ReadAsStringAsync(ct);
             var status = (int)response.StatusCode;
             if (response.IsSuccessStatusCode) return text;
+            if (status == (int)HttpStatusCode.Unauthorized && token is not null && !retried)
+            {
+                // A token the server turned down before its time (revoked, a
+                // clock out of step): refresh and try once more before
+                // treating it as signed out, which forgets the journal key.
+                await Refresh(rejected: token, ct);
+                return await Post(path, body, auth, ct, retried: true);
+            }
             var message = ErrorMessage(text);
             throw status switch
             {
@@ -269,6 +301,19 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
         secrets.Write(SecretNames.Session, JsonSerializer.Serialize(s, SyncJson.Default.Session));
     }
 
+    /// `a=1&b=2` from a query or fragment. A key given twice keeps its first
+    /// value: the link comes from outside, so it mustn't be able to throw.
+    internal static Dictionary<string, string> FormParams(string s)
+    {
+        var p = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var pair in s.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var kv = pair.Split('=', 2);
+            if (kv.Length == 2) p.TryAdd(kv[0], Uri.UnescapeDataString(kv[1].Replace('+', ' ')));
+        }
+        return p;
+    }
+
     internal static Dictionary<string, string> JwtClaims(string jwt)
     {
         var parts = jwt.Split('.');
@@ -281,9 +326,9 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
             return o?.Where(kv => kv.Value is JsonValue v && v.TryGetValue<string>(out _))
                 .ToDictionary(kv => kv.Key, kv => kv.Value!.GetValue<string>()) ?? [];
         }
-        catch (Exception e) when (e is FormatException or JsonException)
+        catch (Exception e) when (e is FormatException or JsonException or ArgumentException or InvalidOperationException)
         {
-            return [];
+            return []; // not a JWT we can read, or one with a claim given twice
         }
     }
 }

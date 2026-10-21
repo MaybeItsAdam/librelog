@@ -61,7 +61,9 @@ public static class AppServices
         return gone;
     }
 
-    public static string Today => DateTime.Now.ToString("yyyy-MM-dd");
+    /// Always Gregorian digits: the core and the wire want `yyyy-MM-dd`,
+    /// whatever calendar the Windows region uses (Thai Buddhist, Hijri…).
+    public static string Today => Format.Ymd(DateOnly.FromDateTime(DateTime.Now));
 }
 
 /// The journal key and session, encrypted with DPAPI for the current Windows

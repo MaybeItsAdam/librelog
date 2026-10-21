@@ -26,6 +26,7 @@ public partial class App : Application
         AppServices.Start();
         AppearanceService.Load();
         window = new MainWindow();
+        WindowPrivacy.Install(window);
         AppearanceService.ApplyTheme();
         window.Activate();
         HandleActivation(launch);
