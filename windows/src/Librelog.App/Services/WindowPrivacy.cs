@@ -34,7 +34,8 @@ public static partial class WindowPrivacy
     {
         hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
         queue = window.DispatcherQueue;
-        SetWindowSubclass(hwnd, &SubclassProc, 1, 0);
+        delegate* unmanaged[Stdcall]<nint, uint, nint, nint, nuint, nuint, nint> proc = &SubclassProc;
+        SetWindowSubclass(hwnd, (nint)proc, 1, 0);
         WTSRegisterSessionNotification(hwnd, NotifyForThisSession);
     }
 
@@ -61,7 +62,7 @@ public static partial class WindowPrivacy
         }
     }
 
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })]
     private static nint SubclassProc(nint hWnd, uint msg, nint wParam, nint lParam, nuint id, nuint data)
     {
         if ((msg == WmSize && wParam == SizeMinimized) || (msg == WmWtsSessionChange && wParam == WtsSessionLock))
@@ -89,11 +90,7 @@ public static partial class WindowPrivacy
 
     [LibraryImport("comctl32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static unsafe partial bool SetWindowSubclass(
-        nint hWnd,
-        delegate* unmanaged[Stdcall]<nint, uint, nint, nint, nuint, nuint, nint> pfnSubclass,
-        nuint uIdSubclass,
-        nuint dwRefData);
+    private static partial bool SetWindowSubclass(nint hWnd, nint pfnSubclass, nuint uIdSubclass, nuint dwRefData);
 
     [LibraryImport("comctl32.dll")]
     private static partial nint DefSubclassProc(nint hWnd, uint uMsg, nint wParam, nint lParam);
