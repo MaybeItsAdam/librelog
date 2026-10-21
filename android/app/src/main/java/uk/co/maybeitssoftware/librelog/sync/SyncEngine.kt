@@ -86,8 +86,12 @@ class SyncEngine(
 
     // MARK: Lifecycle
 
-    /** Called at launch and on returning to the foreground. */
-    suspend fun start() {
+    /**
+     * Called at launch and on returning to the foreground, and by
+     * [SyncWorker] in the background with [realtime] off: a background run
+     * syncs once and has no one to tell, so it opens no channel.
+     */
+    suspend fun start(realtime: Boolean = true) {
         val session = client.session ?: run { phase = Phase.Off; return }
         email = session.email
         val key = secrets.read(SecretStore.Item.JournalKey)
@@ -99,10 +103,10 @@ class SyncEngine(
                 return
             }
             phase = Phase.On
-            connectRealtime(session.userId)
+            if (realtime) connectRealtime(session.userId)
             syncNow()
         } else {
-            adoptAccount()
+            adoptAccount(realtime)
         }
     }
 
@@ -227,7 +231,7 @@ class SyncEngine(
      * Failures land in [problem], which the signed-out screen shows too, so
      * a sign-in that got a session but couldn't finish says why.
      */
-    private suspend fun adoptAccount() {
+    private suspend fun adoptAccount(realtime: Boolean = true) {
         try {
             val reg = register(nameEnc = "")
             email = client.session?.email ?: email
@@ -235,7 +239,7 @@ class SyncEngine(
             val check = reg?.keyCheck
             if (check != null) {
                 val key = secrets.read(SecretStore.Item.JournalKey)
-                if (key != null && io { store.keyMatches(key, check) }) activate(key) else phase = Phase.NeedsKey
+                if (key != null && io { store.keyMatches(key, check) }) activate(key, realtime) else phase = Phase.NeedsKey
                 return
             }
 
@@ -246,7 +250,7 @@ class SyncEngine(
                 .jsonPrimitive.contentOrNull ?: ""
             if (io { store.keyMatches(key, stored) }) {
                 newRecoveryPhrase = io { store.recoveryPhrase() }
-                activate(key)
+                activate(key, realtime)
             } else {
                 // Another device set it first, a moment ago.
                 io { store.forgetJournalKey() }
@@ -295,13 +299,13 @@ class SyncEngine(
         client.rpc("pairing_fulfil", buildJsonObject { put("p_id", code.id); put("p_payload", payload) })
     }
 
-    private suspend fun activate(key: ByteArray) {
+    private suspend fun activate(key: ByteArray, realtime: Boolean = true) {
         io { store.setJournalKey(key) }
         secrets.write(SecretStore.Item.JournalKey, key)
         // Register again, now with the device's name sealed.
         register(nameEnc = io { store.sealDeviceName(deviceName) })
         phase = Phase.On
-        client.session?.userId?.let(::connectRealtime)
+        if (realtime) client.session?.userId?.let(::connectRealtime)
         syncNow()
     }
 
@@ -376,6 +380,7 @@ class SyncEngine(
         pulledSinceSnapshot = 0
     }
 
+    /** Main thread only, like the rest of the engine, so the check can't race. */
     private fun connectRealtime(userId: String) {
         if (realtime != null) return
         realtime = realtimeFor?.invoke(userId) { scope.launch { syncNow() } }?.also { it.connect() }

@@ -9,6 +9,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import uk.co.maybeitssoftware.librelog.LibrelogApplication
 
 /**
@@ -20,8 +22,14 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val app = applicationContext as LibrelogApplication
         val sync = app.model.sync
-        sync.start()
-        return if (sync.problem == SyncError.Offline) Result.retry() else Result.success()
+        // The engine's state is main-thread state (the screens read it), and
+        // workers run on a background dispatcher, so hop over. No Realtime
+        // channel: it would outlive this run with nothing to close it.
+        val problem = withContext(Dispatchers.Main) {
+            sync.start(realtime = false)
+            sync.problem
+        }
+        return if (problem == SyncError.Offline) Result.retry() else Result.success()
     }
 
     companion object {
