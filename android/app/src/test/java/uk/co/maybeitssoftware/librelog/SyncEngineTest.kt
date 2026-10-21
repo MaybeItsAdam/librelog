@@ -37,6 +37,7 @@ import uk.co.maybeitssoftware.librelog.sync.SecretStore
 import uk.co.maybeitssoftware.librelog.sync.Session
 import uk.co.maybeitssoftware.librelog.sync.SupabaseClient
 import uk.co.maybeitssoftware.librelog.sync.SyncEngine
+import uk.co.maybeitssoftware.librelog.sync.SyncError
 import uniffi.librelog_core.Block
 import uniffi.librelog_core.BlockKind
 import uniffi.librelog_core.Store
@@ -55,9 +56,14 @@ class SyncEngineTest {
         var snapshot: Pair<Long, String>? = null
         /** Ops at or below this seq have been compacted away. */
         var compactedThrough = 0L
+        /** RPCs that answer with something of the wrong shape, or fail outright. */
+        val garbled = mutableSetOf<String>()
+        val failing = mutableMapOf<String, Int>()
 
         override fun dispatch(request: RecordedRequest): MockResponse {
             val name = request.url.encodedPath.substringAfter("/rest/v1/rpc/")
+            if (name in garbled) return json(200, buildJsonObject { put("not", "a list") })
+            failing[name]?.let { return json(it, JsonPrimitive("broken"), message = true) }
             val args = SupabaseClient.json.parseToJsonElement(request.body!!.utf8()).jsonObject
             if (request.headers["Content-Profile"] != "librelog") return json(400, JsonPrimitive("wrong schema"))
             return synchronized(this) {
@@ -205,6 +211,34 @@ class SyncEngineTest {
         assertEquals(null, laptop.sync.problem)
         assertEquals(para("Before compaction"), laptop.store.entry(entry.id).body)
         assertFalse(laptop.store.pendingCount() > 1000u)
+    }
+
+    @Test
+    fun aReplyOfTheWrongShapeIsAProblemNotACrash() = runBlocking {
+        val phone = device("phone")
+        phone.sync.start()
+        val entry = phone.store.createEntry(null, "2026-10-03", null)
+        phone.store.saveBody(entry.id, para("Still here"))
+        val cursor = phone.store.syncCursor()
+
+        synchronized(fake) { fake.garbled += "pull_ops" }
+        phone.sync.syncNow()
+        assertTrue(phone.sync.problem is SyncError.Unexpected)
+        assertEquals(SyncEngine.Phase.On, phone.sync.phase)
+        assertEquals("the cursor didn't move", cursor, phone.store.syncCursor())
+
+        synchronized(fake) { fake.garbled.clear() }
+        phone.sync.syncNow()
+        assertEquals(null, phone.sync.problem)
+    }
+
+    @Test
+    fun aSignInThatCantSetUpTheAccountSaysWhy() = runBlocking {
+        synchronized(fake) { fake.failing["register_device"] = 500 }
+        val phone = device("phone")
+        phone.sync.start()
+        assertEquals(SyncEngine.Phase.Off, phone.sync.phase)
+        assertEquals(SyncError.Server(500, "broken"), phone.sync.problem)
     }
 }
 

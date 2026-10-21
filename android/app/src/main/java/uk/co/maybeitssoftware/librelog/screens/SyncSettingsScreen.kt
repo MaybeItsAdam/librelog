@@ -212,8 +212,17 @@ private fun SignIn(app: AppModel) {
                 SecondaryButton("Use a password instead", { usePassword = true }, color = t.muted)
             }
         }
-        message?.let { StatusBanner(it, t.danger) }
+        // Signing in can get a session and still fail setting up the account
+        // after it (offline, or the server refusing); and the email's link
+        // signs in from outside this screen. Those land in sync.problem.
+        (message ?: app.sync.problem?.let(::signInProblem))?.let { StatusBanner(it, t.danger) }
     }
+}
+
+private fun signInProblem(error: SyncError): String = when (error) {
+    SyncError.SignedOut -> "You were signed out. Sign in again to keep syncing."
+    SyncError.Offline -> "Couldn't reach the server. Check your connection and try again."
+    else -> error.message ?: "Couldn't finish signing in."
 }
 
 // MARK: Signed in without the key

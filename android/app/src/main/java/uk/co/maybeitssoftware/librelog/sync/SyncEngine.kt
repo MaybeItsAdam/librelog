@@ -3,6 +3,7 @@ package uk.co.maybeitssoftware.librelog.sync
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import uniffi.librelog_core.CoreException
 import uniffi.librelog_core.IncomingOps
 import uniffi.librelog_core.PairingSession
 import uniffi.librelog_core.Store
@@ -90,7 +92,12 @@ class SyncEngine(
         email = session.email
         val key = secrets.read(SecretStore.Item.JournalKey)
         if (key != null) {
-            io { store.setJournalKey(key) }
+            try {
+                io { store.setJournalKey(key) }
+            } catch (e: CoreException) {
+                problem = syncError(e)
+                return
+            }
             phase = Phase.On
             connectRealtime(session.userId)
             syncNow()
@@ -126,11 +133,15 @@ class SyncEngine(
                     lastSynced = System.currentTimeMillis()
                     if (merged) onChange?.invoke()
                     snapshotIfDue()
-                } catch (e: SyncError.SignedOut) {
-                    signOut()
-                    return
-                } catch (e: SyncError) {
-                    problem = e
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Nothing is acknowledged to the core until it has
+                    // succeeded, so a failure leaves the cursors where they
+                    // were and the next sync picks up from there.
+                    val error = syncError(e)
+                    if (error == SyncError.SignedOut) signOut()
+                    problem = error
                     return
                 }
             } while (syncAgain)
@@ -144,11 +155,13 @@ class SyncEngine(
     // MARK: Sign-in
 
     suspend fun sendSignInEmail(address: String) {
+        problem = null
         client.sendSignInEmail(address.trim())
         email = address.trim()
     }
 
     suspend fun signIn(address: String, password: String) {
+        problem = null
         client.signIn(address.trim(), password)
         email = address.trim()
         adoptAccount()
@@ -156,12 +169,14 @@ class SyncEngine(
 
     suspend fun verify(code: String) {
         val address = email ?: throw SyncError.SignedOut
+        problem = null
         client.verify(address, code.filter(Char::isDigit))
         adoptAccount()
     }
 
     /** Sign in with Google: the ID token from [GoogleSignIn] and its raw nonce. */
     suspend fun signInWithGoogle(idToken: String, nonce: String) {
+        problem = null
         client.signInWithIdToken("google", idToken, nonce)
         adoptAccount()
     }
@@ -169,12 +184,16 @@ class SyncEngine(
     /** The `librelog://auth…` link from the sign-in email. */
     suspend fun handle(uri: String) {
         if (!uri.startsWith("librelog://auth")) return
+        problem = null
         try {
             client.handleRedirect(uri)
-            adoptAccount()
-        } catch (e: SyncError) {
-            problem = e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            problem = syncError(e)
+            return
         }
+        adoptAccount()
     }
 
     suspend fun signOut() {
@@ -185,6 +204,7 @@ class SyncEngine(
         io { store.forgetJournalKey() }
         phase = Phase.Off
         email = null
+        problem = null
     }
 
     /**
@@ -203,6 +223,9 @@ class SyncEngine(
     /**
      * After sign-in: create the account's key if it has none, or use this
      * device's stored key if it matches; otherwise ask for it.
+     *
+     * Failures land in [problem], which the signed-out screen shows too, so
+     * a sign-in that got a session but couldn't finish says why.
      */
     private suspend fun adoptAccount() {
         try {
@@ -229,9 +252,12 @@ class SyncEngine(
                 io { store.forgetJournalKey() }
                 phase = Phase.NeedsKey
             }
-        } catch (e: SyncError) {
-            problem = e
-            if (e == SyncError.SignedOut) phase = Phase.Off
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val error = syncError(e)
+            problem = error
+            if (error == SyncError.SignedOut) phase = Phase.Off
         }
     }
 
@@ -356,6 +382,16 @@ class SyncEngine(
     }
 
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
+
+    /** Anything a sync step threw, as a problem to show. */
+    private fun syncError(e: Exception): SyncError = when (e) {
+        is SyncError -> e
+        // SerializationException is an IllegalArgumentException; so is
+        // asking for jsonPrimitive on a reply of the wrong shape.
+        is IllegalArgumentException -> SyncError.Unexpected("The server's reply didn't make sense: ${e.message.orEmpty()}".trimEnd(' ', ':'))
+        is CoreException -> SyncError.Unexpected(e.message ?: "The journal couldn't apply what came from the server")
+        else -> SyncError.Unexpected(e.message ?: e.javaClass.simpleName)
+    }
 
     private companion object {
         const val BATCH = 500

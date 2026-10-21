@@ -49,6 +49,12 @@ sealed class SyncError(message: String) : Exception(message) {
     data object OverQuota : SyncError("Sync storage is full")
     data object Offline : SyncError("Offline")
     data class Server(val code: Int, val detail: String) : SyncError("$code: $detail")
+    /**
+     * Not the network or the server refusing: a reply that didn't decode, or
+     * the core refusing what came back. Shown like any other problem rather
+     * than crashing the app.
+     */
+    data class Unexpected(val detail: String) : SyncError(detail)
 }
 
 /**
