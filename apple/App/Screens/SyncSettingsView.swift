@@ -16,7 +16,6 @@ struct SyncSettingsView: View {
     @State private var busy = false
     @State private var message: String?
     @State private var nonce = ""
-    @State private var confirmDelete = false
 
     var body: some View {
         let sync = app.sync
@@ -27,6 +26,11 @@ struct SyncSettingsView: View {
             case .off: signIn
             case .needsKey: KeySetupView()
             case .on: status(sync)
+            }
+            // What went wrong after sign-in itself succeeded (setting up the
+            // key, say). Signed in, it shows with the sync status instead.
+            if sync.phase != .on, let problem = sync.problem {
+                Section { Text(problem.localizedDescription).font(.system(size: 13)).foregroundStyle(Color.danger) }
             }
             if let message {
                 Section { Text(message).font(.system(size: 13)).foregroundStyle(Color.danger) }
@@ -148,41 +152,18 @@ struct SyncSettingsView: View {
                 Text("Devices").microLabel()
             }
 
-            Section {
-                Button("Sign out", role: .destructive) { Task { await sync.signOut() } }
-                Button("Delete account", role: .destructive) { confirmDelete = true }
-                    .disabled(busy)
-            } footer: {
-                Text("Signing out keeps everything on this device. It stops syncing until you sign in again. Deleting the account also removes everything synced to it from the server.")
-                    .font(.system(size: 12))
-            }
-            .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Delete account", role: .destructive) { Task { await deleteAccount() } }
-            } message: {
-                Text("Your account and everything synced to it are removed from the server for good, and your other devices stop syncing. The journal on each device stays where it is.")
-            }
+            AccountSection()
         }
     }
 
     // MARK: Actions
-
-    private func deleteAccount() async {
-        busy = true
-        defer { busy = false }
-        do {
-            try await app.sync.deleteAccount()
-            message = nil
-        } catch {
-            message = String(localized: "Couldn't delete the account: \(error.localizedDescription)")
-        }
-    }
 
     private func sendEmail() async {
         busy = true
         defer { busy = false }
         do {
             try await app.sync.sendSignInEmail(email)
-            sentTo = email
+            sentTo = app.sync.email
             message = nil
         } catch {
             message = error.localizedDescription
@@ -309,6 +290,8 @@ private struct KeySetupView: View {
         } header: {
             Text("Recovery phrase").microLabel()
         }
+
+        AccountSection()
     }
 
     private func startPairing() {
@@ -331,6 +314,46 @@ private struct KeySetupView: View {
             try await app.sync.useRecoveryPhrase(phrase)
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+}
+
+/// Sign out and Delete account, for any signed-in state: a device waiting
+/// for the journal key may belong to someone who wants out, not in.
+private struct AccountSection: View {
+    @Environment(AppModel.self) private var app
+    @State private var confirmDelete = false
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        Section {
+            Button("Sign out", role: .destructive) { Task { await app.sync.signOut() } }
+                .disabled(busy)
+            Button("Delete account", role: .destructive) { confirmDelete = true }
+                .disabled(busy)
+            if let error {
+                Text(error).font(.system(size: 13)).foregroundStyle(Color.danger)
+            }
+        } footer: {
+            Text("Signing out keeps everything on this device. It stops syncing until you sign in again. Deleting the account also removes everything synced to it from the server.")
+                .font(.system(size: 12))
+        }
+        .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete account", role: .destructive) { Task { await deleteAccount() } }
+        } message: {
+            Text("Your account and everything synced to it are removed from the server for good, and your other devices stop syncing. The journal on each device stays where it is.")
+        }
+    }
+
+    private func deleteAccount() async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await app.sync.deleteAccount()
+            error = nil
+        } catch {
+            self.error = String(localized: "Couldn't delete the account: \(error.localizedDescription)")
         }
     }
 }

@@ -22,9 +22,12 @@ final class SyncEngine {
     private(set) var lastSynced: Date?
     private(set) var problem: SyncError?
     private(set) var pending: UInt32 = 0
-    /// Set once, right after the first device creates the key, so the
-    /// recovery phrase can be shown before the user moves on.
-    var newRecoveryPhrase: String?
+    /// Set right after this device creates the key, so the recovery phrase
+    /// can be shown before the user moves on. Shown again on the next
+    /// activation if it was never dismissed (the app quit, say).
+    var newRecoveryPhrase: String? {
+        didSet { if newRecoveryPhrase == nil { phraseUnconfirmed = false } }
+    }
 
     @ObservationIgnored var onChange: (() -> Void)?
 
@@ -33,11 +36,44 @@ final class SyncEngine {
     private var realtime: RealtimeChannel?
     private var pushTask: Task<Void, Never>?
     private var syncAgain = false
+    private var adoption: Task<Void, Never>?
+    /// The user signed out, so calls still in flight failing for want of a
+    /// session aren't news.
+    private var signedOutHere = false
 
     /// Ops pulled since this device last uploaded a snapshot.
     private var pulledSinceSnapshot: Int {
         get { UserDefaults.standard.integer(forKey: "sync.pulledSinceSnapshot") }
         set { UserDefaults.standard.set(newValue, forKey: "sync.pulledSinceSnapshot") }
+    }
+
+    /// The account whose sync state (cursor, upload queue, server device id,
+    /// journal key) this device holds. Kept through sign-out, so signing in
+    /// to the same account again carries on where it left off, and signing
+    /// in to a different one knows to start afresh.
+    private var syncedUserID: String? {
+        get { UserDefaults.standard.string(forKey: "sync.userID") }
+        set { UserDefaults.standard.set(newValue, forKey: "sync.userID") }
+    }
+
+    /// The id this device registers with the server. The store's own id at
+    /// first; replaced when the device moves to another account, because the
+    /// server keeps each id to the account that registered it.
+    private var deviceID: String {
+        UserDefaults.standard.string(forKey: "sync.deviceID") ?? store.deviceId()
+    }
+
+    /// This device saved a key it made before the server confirmed it as the
+    /// account's, so the key mustn't be used until `adoptAccount` has.
+    private var keyUnconfirmed: Bool {
+        get { UserDefaults.standard.bool(forKey: "sync.keyUnconfirmed") }
+        set { UserDefaults.standard.set(newValue, forKey: "sync.keyUnconfirmed") }
+    }
+
+    /// This device made the key and the recovery phrase hasn't been shown.
+    private var phraseUnconfirmed: Bool {
+        get { UserDefaults.standard.bool(forKey: "sync.phraseUnconfirmed") }
+        set { UserDefaults.standard.set(newValue, forKey: "sync.phraseUnconfirmed") }
     }
 
     private static let snapshotEvery = 5_000
@@ -55,7 +91,9 @@ final class SyncEngine {
             return
         }
         email = session.email
-        if let key = Keychain.read(.journalKey) {
+        // Installs from before syncedUserID only kept a key while signed in.
+        if syncedUserID == nil, Keychain.read(.journalKey) != nil { syncedUserID = session.userID }
+        if syncedUserID == session.userID, !keyUnconfirmed, let key = Keychain.read(.journalKey) {
             try? store.setJournalKey(key: key)
             phase = .on
             connectRealtime(userID: session.userID)
@@ -87,14 +125,22 @@ final class SyncEngine {
         repeat {
             syncAgain = false
             do {
-                try await push()
+                // A lapsed account can't push, but can still pull for 30 days
+                // (the server's grace period), so a refused push doesn't stop
+                // this device catching up.
+                var refused: SyncError?
+                do {
+                    try await push()
+                } catch SyncError.notActive {
+                    refused = .notActive
+                }
                 let merged = try await pull()
-                problem = nil
+                problem = refused
                 lastSynced = Date()
                 if merged { onChange?() }
-                try await snapshotIfDue()
+                if refused == nil { try await snapshotIfDue() }
             } catch SyncError.signedOut {
-                await signOut()
+                await sessionEnded()
                 return
             } catch let e as SyncError {
                 problem = e
@@ -110,8 +156,14 @@ final class SyncEngine {
     // MARK: Sign-in
 
     func sendSignInEmail(_ address: String) async throws {
-        try await client.sendSignInEmail(to: address.trimmingCharacters(in: .whitespaces))
+        let address = Self.normalisedEmail(address)
+        try await client.sendSignInEmail(to: address)
         email = address
+    }
+
+    /// The address as typed, without the spaces or newline a paste can bring.
+    nonisolated static func normalisedEmail(_ address: String) -> String {
+        address.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func verify(code: String) async throws {
@@ -121,7 +173,8 @@ final class SyncEngine {
     }
 
     func signIn(email address: String, password: String) async throws {
-        try await client.signIn(email: address.trimmingCharacters(in: .whitespaces), password: password)
+        let address = Self.normalisedEmail(address)
+        try await client.signIn(email: address, password: password)
         email = address
         await adoptAccount()
     }
@@ -159,14 +212,46 @@ final class SyncEngine {
         }
     }
 
+    /// Signs this device out: it leaves the account's device list and
+    /// forgets the journal key, but keeps its place in the account's log, so
+    /// signing in to the same account again only needs the key back.
     func signOut() async {
-        realtime?.close()
-        realtime = nil
+        await signOut(revoke: true)
+    }
+
+    private func signOut(revoke: Bool) async {
+        signedOutHere = true
+        stopSyncing()
+        if revoke, await client.session != nil {
+            // Best effort: a revoked device doesn't hold back compaction.
+            let _: SupabaseClient.Empty? = try? await client.rpc("revoke_device", ["p_device_id": deviceID])
+        }
         await client.signOut()
         Keychain.delete(.journalKey)
+        keyUnconfirmed = false
         store.forgetJournalKey()
         phase = .off
         email = nil
+        problem = nil
+        newRecoveryPhrase = nil
+    }
+
+    /// The server ended the session (it was revoked, or the refresh token
+    /// expired). Unlike signing out this keeps the journal key, so signing in
+    /// to the same account again picks up without the recovery phrase.
+    private func sessionEnded() async {
+        stopSyncing()
+        await client.forgetSession()
+        store.forgetJournalKey()
+        phase = .off
+        problem = signedOutHere ? nil : .sessionEnded
+    }
+
+    private func stopSyncing() {
+        pushTask?.cancel()
+        realtime?.close()
+        realtime = nil
+        lastSynced = nil
     }
 
     /// Deletes the account and everything synced to it, then forgets it
@@ -174,19 +259,54 @@ final class SyncEngine {
     /// in full if the user signs in to a new account later.
     func deleteAccount() async throws {
         let _: SupabaseClient.Empty = try await client.rpc("delete_account", [:])
-        await signOut()
+        await signOut(revoke: false)
+        try forgetAccountState()
+        syncedUserID = nil
+    }
+
+    /// Starts sync state afresh for another account: a new server device id,
+    /// no cursor, and the whole journal queued to upload.
+    private func forgetAccountState() throws {
         try store.resetSync()
+        UserDefaults.standard.set(UUID().uuidString.lowercased(), forKey: "sync.deviceID")
+        pulledSinceSnapshot = 0
     }
 
     // MARK: Journal key
 
     /// After sign-in: create the account's key if it has none, or use this
-    /// device's stored key if it matches; otherwise ask for it.
+    /// device's stored key if it matches; otherwise ask for it. Runs one at a
+    /// time: launch and a sign-in link can both get here at once, and two
+    /// runs for a new account would each make a key.
     private func adoptAccount() async {
+        signedOutHere = false
+        let previous = adoption
+        let run = Task {
+            await previous?.value
+            await adopt()
+        }
+        adoption = run
+        await run.value
+    }
+
+    private func adopt() async {
+        guard let session = await client.session else { return }
+        // Already done by a run that was waiting ahead of this one.
+        if phase == .on, syncedUserID == session.userID { return }
+        problem = nil
         do {
-            let reg: [Registration] = try await client.rpc("register_device",
-                ["p_device_id": store.deviceId(), "p_name_enc": ""])
-            email = await client.session?.email ?? email
+            if let previous = syncedUserID, previous != session.userID {
+                // Another account was synced here: its key and place in its
+                // log mean nothing to this one.
+                Keychain.delete(.journalKey)
+                keyUnconfirmed = false
+                phraseUnconfirmed = false
+                store.forgetJournalKey()
+                try forgetAccountState()
+            }
+            syncedUserID = session.userID
+            email = session.email ?? email
+            let reg = try await registerDevice(name: "")
 
             if let check = reg.first?.keyCheck {
                 if let key = Keychain.read(.journalKey), (try? store.keyMatches(key: key, keyCheck: check)) == true {
@@ -197,31 +317,57 @@ final class SyncEngine {
                 return
             }
 
-            // A brand-new account: this device makes the key.
-            let key = try store.generateJournalKey()
+            // A brand-new account: this device makes the key. It's saved
+            // before the server hears of it, so if the reply to set_key_check
+            // is lost, the next try finds the same key here and the account
+            // isn't left with a key check nobody holds the key for.
+            let key: Data
+            if let kept = Keychain.read(.journalKey) {
+                key = kept
+            } else {
+                key = try store.generateJournalKey()
+                keyUnconfirmed = true
+                guard Keychain.write(.journalKey, key) else { throw Keychain.WriteError() }
+                phraseUnconfirmed = true
+            }
             try store.setJournalKey(key: key)
-            let stored: String = try await client.rpc("set_key_check", ["p_key_check": try store.keyCheck()])
+            let check = try store.keyCheck()
+            let stored: String = try await client.rpc("set_key_check", ["p_key_check": check])
             if try store.keyMatches(key: key, keyCheck: stored) {
-                newRecoveryPhrase = try store.recoveryPhrase()
                 try await activate(key: key)
             } else {
                 // Another device set it first, a moment ago.
+                Keychain.delete(.journalKey)
+                keyUnconfirmed = false
+                phraseUnconfirmed = false
                 store.forgetJournalKey()
                 phase = .needsKey
             }
+        } catch SyncError.signedOut {
+            await sessionEnded()
         } catch let e as SyncError {
             problem = e
-            if e == .signedOut { phase = .off }
         } catch {
             problem = .server(0, error.localizedDescription)
+        }
+    }
+
+    /// Registers (or renames) this device. If its id still belongs to an
+    /// account it was signed in to before this device kept track of which,
+    /// starts afresh under a new id.
+    private func registerDevice(name: String) async throws -> [Registration] {
+        do {
+            return try await client.rpc("register_device", ["p_device_id": deviceID, "p_name_enc": name])
+        } catch SyncError.deviceTaken {
+            try forgetAccountState()
+            return try await client.rpc("register_device", ["p_device_id": deviceID, "p_name_enc": name])
         }
     }
 
     /// Restores the key from the 24 words. Throws if they're not this account's.
     func useRecoveryPhrase(_ phrase: String) async throws {
         let key = try store.keyFromRecoveryPhrase(phrase: phrase)
-        let reg: [Registration] = try await client.rpc("register_device",
-            ["p_device_id": store.deviceId(), "p_name_enc": ""])
+        let reg = try await registerDevice(name: "")
         guard let check = reg.first?.keyCheck, try store.keyMatches(key: key, keyCheck: check) else {
             throw RecoveryError.wrongPhrase
         }
@@ -259,11 +405,17 @@ final class SyncEngine {
 
     private func activate(key: Data) async throws {
         try store.setJournalKey(key: key)
-        Keychain.write(.journalKey, key)
+        guard Keychain.write(.journalKey, key) else {
+            store.forgetJournalKey()
+            throw Keychain.WriteError()
+        }
+        keyUnconfirmed = false
+        // Taken from the key just set, with no suspension in between, so it
+        // can't be another run's phrase.
+        if phraseUnconfirmed { newRecoveryPhrase = try store.recoveryPhrase() }
         // Register again, now with the device's name sealed.
         let name = try store.sealDeviceName(name: DeviceInfo.name)
-        let _: [Registration] = try await client.rpc("register_device",
-            ["p_device_id": store.deviceId(), "p_name_enc": name])
+        _ = try await registerDevice(name: name)
         phase = .on
         if let user = await client.session?.userID { connectRealtime(userID: user) }
         await syncNow()
@@ -274,7 +426,7 @@ final class SyncEngine {
     private func push() async throws {
         while let batch = try store.outgoingBatch(maxOps: 500) {
             let _: Int64 = try await client.rpc("push_ops", [
-                "p_device_id": store.deviceId(),
+                "p_device_id": deviceID,
                 "p_batch_id": batch.batchId,
                 "p_payloads": [batch.payload],
             ])
@@ -290,7 +442,7 @@ final class SyncEngine {
             let rows: [PulledRow]
             do {
                 rows = try await client.rpc("pull_ops", [
-                    "p_device_id": store.deviceId(),
+                    "p_device_id": deviceID,
                     "p_after": try store.syncCursor(),
                     "p_limit": 500,
                 ])
@@ -300,8 +452,12 @@ final class SyncEngine {
                 continue
             }
             if rows.isEmpty { return merged }
+            // The core skips its own ops by the store's device id, which the
+            // server id stops matching once the device has changed accounts.
+            let ownID = deviceID
             let result = try store.applyIncoming(rows: rows.map {
-                IncomingOps(seq: $0.seq, deviceId: $0.deviceId, payload: $0.payload)
+                IncomingOps(seq: $0.seq, deviceId: $0.deviceId == ownID ? store.deviceId() : $0.deviceId,
+                            payload: $0.payload)
             })
             pulledSinceSnapshot += rows.count
             merged = merged || result.changed > 0
@@ -310,7 +466,7 @@ final class SyncEngine {
     }
 
     private func loadSnapshot() async throws {
-        let snaps: [SnapshotRow] = try await client.rpc("get_snapshot", ["p_device_id": store.deviceId()])
+        let snaps: [SnapshotRow] = try await client.rpc("get_snapshot", ["p_device_id": deviceID])
         guard let snap = snaps.first else { throw SyncError.server(404, "no snapshot to catch up from") }
         _ = try store.applySnapshot(seq: snap.seq, payload: snap.payload)
         pulledSinceSnapshot = 0
@@ -320,7 +476,7 @@ final class SyncEngine {
         guard pulledSinceSnapshot >= Self.snapshotEvery else { return }
         let snap = try store.snapshot()
         let _: SupabaseClient.Empty = try await client.rpc("put_snapshot", [
-            "p_device_id": store.deviceId(), "p_seq": snap.seq, "p_payload": snap.payload,
+            "p_device_id": deviceID, "p_seq": snap.seq, "p_payload": snap.payload,
         ])
         pulledSinceSnapshot = 0
     }

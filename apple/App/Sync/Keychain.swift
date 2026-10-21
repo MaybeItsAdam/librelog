@@ -12,6 +12,14 @@ enum Keychain {
 
     private static let service = "uk.co.maybeitssoftware.librelog"
 
+    /// A write the Keychain refused. Losing the journal key silently would
+    /// leave sync set up on the server with no key on any device.
+    struct WriteError: LocalizedError {
+        var errorDescription: String? {
+            String(localized: "Couldn't save the journal key to the Keychain. Try again.")
+        }
+    }
+
     static func read(_ item: Item) -> Data? {
         var query = base(item)
         query[kSecReturnData as String] = true

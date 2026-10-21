@@ -15,6 +15,12 @@ struct Session: Codable, Sendable {
 /// PostgREST returns as HTTP status `xxx` (supabase/README.md).
 enum SyncError: Error, LocalizedError, Equatable {
     case signedOut
+    /// The session was ended by the server (revoked, or the refresh token
+    /// expired). Shown on the sign-in screen; nothing on the device is lost.
+    case sessionEnded
+    /// PT400 from `register_device`: this device id is still registered to
+    /// an account the device was signed in to before.
+    case deviceTaken
     case notActive          // PT402: no paid-through date
     case unknownDevice      // PT404 from a device-scoped call
     case behindCompaction   // PT409: load the snapshot first
@@ -25,6 +31,8 @@ enum SyncError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .signedOut: String(localized: "Signed out")
+        case .sessionEnded: String(localized: "You were signed out. Sign in again to carry on syncing; nothing on this device was lost.")
+        case .deviceTaken: String(localized: "This device is still linked to another account")
         case .notActive: String(localized: "Sync isn't active for this account")
         case .unknownDevice: String(localized: "This device was removed from sync")
         case .behindCompaction: String(localized: "Catching up from a snapshot")
@@ -42,6 +50,10 @@ actor SupabaseClient {
     private let key: String
     private let http: URLSession
     private(set) var session: Session?
+    /// Bumped whenever the session is replaced or dropped, so a refresh that
+    /// was in flight at the time can't write the old session back.
+    private var generation = 0
+    private var refreshing: (generation: Int, task: Task<Session, Error>)?
 
     init(url: URL = Backend.url, key: String = Backend.publishableKey) {
         self.url = url
@@ -71,8 +83,10 @@ actor SupabaseClient {
         try store(sessionJSON: data)
     }
 
-    /// Email and password, for accounts made with one in the dashboard (the
-    /// App Review account). Everyone else signs in with a code or a provider.
+    /// Email and password. The apps offer no way to set a password, so in
+    /// practice this is for accounts given one by an admin (the App Review
+    /// account, scripts/review-account.sh); everyone else uses a code or a
+    /// provider.
     func signIn(email: String, password: String) async throws {
         let data = try await post(tokenURL("password"), body: ["email": email, "password": password], auth: false)
         try store(sessionJSON: data)
@@ -122,40 +136,95 @@ actor SupabaseClient {
         }
         let expiresIn = Double(params["expires_in"] ?? "3600") ?? 3600
         let claims = Self.jwtClaims(access)
-        try save(Session(accessToken: access, refreshToken: refresh,
-                         expiresAt: Date().addingTimeInterval(expiresIn),
-                         userID: claims["sub"] as? String ?? "",
-                         email: claims["email"] as? String))
+        try begin(Session(accessToken: access, refreshToken: refresh,
+                          expiresAt: Date().addingTimeInterval(expiresIn),
+                          userID: claims["sub"] as? String ?? "",
+                          email: claims["email"] as? String))
     }
 
+    /// Ends this device's session only. Supabase's default scope is global,
+    /// which would sign the user out on every other device too.
     func signOut() async {
-        if let s = session {
-            var req = URLRequest(url: url.appending(path: "auth/v1/logout"))
-            req.httpMethod = "POST"
-            req.setValue(key, forHTTPHeaderField: "apikey")
-            req.setValue("Bearer \(s.accessToken)", forHTTPHeaderField: "Authorization")
-            _ = try? await http.data(for: req)
-        }
+        let ended = session
+        forgetSession()
+        guard let ended else { return }
+        var c = URLComponents(url: url.appending(path: "auth/v1/logout"), resolvingAgainstBaseURL: false)!
+        c.queryItems = [URLQueryItem(name: "scope", value: "local")]
+        var req = URLRequest(url: c.url!)
+        req.httpMethod = "POST"
+        req.setValue(key, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(ended.accessToken)", forHTTPHeaderField: "Authorization")
+        _ = try? await http.data(for: req)
+    }
+
+    /// Drops the session here without telling the server, for when the
+    /// server has already ended it.
+    func forgetSession() {
+        generation += 1
         session = nil
         Keychain.delete(.session)
     }
 
-    /// A current access token, refreshing first if it's about to expire.
-    func accessToken() async throws -> String {
-        guard var s = session else { throw SyncError.signedOut }
-        if s.needsRefresh {
-            let data = try await post(tokenURL("refresh_token"), body: ["refresh_token": s.refreshToken], auth: false)
-            try store(sessionJSON: data)
-            s = session!
+    /// A current access token, refreshing first if it has less than
+    /// `validFor` seconds left. Throws `.signedOut` if the server won't
+    /// refresh the session any more, having dropped it here.
+    func accessToken(validFor: TimeInterval = 60) async throws -> String {
+        guard let s = session else { throw SyncError.signedOut }
+        if s.expiresAt.timeIntervalSinceNow >= validFor { return s.accessToken }
+        return try await refresh().accessToken
+    }
+
+    /// Refreshes the session, once however many callers ask at the same time.
+    private func refresh() async throws -> Session {
+        if let refreshing, refreshing.generation == generation { return try await refreshing.task.value }
+        guard let s = session else { throw SyncError.signedOut }
+        let gen = generation
+        let task = Task<Session, Error> {
+            defer { if refreshing?.generation == gen { refreshing = nil } }
+            let data: Data
+            do {
+                data = try await post(tokenURL("refresh_token"), body: ["refresh_token": s.refreshToken], auth: false)
+            } catch SyncError.server(let status, _) where Self.refreshRejected(status: status) {
+                // The refresh token was revoked, reused or has expired: this
+                // session is over, and retrying would only fail again.
+                if gen == generation { forgetSession() }
+                throw SyncError.signedOut
+            }
+            // Signed out, or in again, while this was in flight.
+            guard gen == generation else { throw SyncError.signedOut }
+            let fresh = try Self.session(from: data)
+            try save(fresh)
+            return fresh
         }
-        return s.accessToken
+        refreshing = (gen, task)
+        return try await task.value
+    }
+
+    /// True if a failed refresh means the session is gone for good (Auth
+    /// answers 400 `invalid_grant` or 401), rather than a passing problem
+    /// worth retrying later.
+    static func refreshRejected(status: Int) -> Bool {
+        (400..<500).contains(status) && status != 408 && status != 429
     }
 
     // MARK: RPC
 
     /// Calls `librelog.<name>` and decodes its JSON result.
     func rpc<T: Decodable>(_ name: String, _ args: [String: any Sendable], as: T.Type = T.self) async throws -> T {
-        let data = try await post(url.appending(path: "rest/v1/rpc/\(name)"), body: args, auth: true)
+        let endpoint = url.appending(path: "rest/v1/rpc/\(name)")
+        let data: Data
+        do {
+            data = try await post(endpoint, body: args, auth: true)
+        } catch Unauthorised.token(let rejected) {
+            // The token can be revoked or expire early (a clock out of step,
+            // say): refresh once and try again before giving up on the session.
+            if session?.accessToken == rejected { _ = try await refresh() }
+            do {
+                data = try await post(endpoint, body: args, auth: true)
+            } catch Unauthorised.token {
+                throw SyncError.signedOut
+            }
+        }
         if T.self == Empty.self { return Empty() as! T }
         return try JSONDecoder.supabase.decode(T.self, from: data)
     }
@@ -170,13 +239,18 @@ actor SupabaseClient {
         return c.url!
     }
 
+    /// A 401 from an authenticated call, with the token it rejected.
+    private enum Unauthorised: Error { case token(String) }
+
     private func post(_ endpoint: URL, body: [String: any Sendable], auth: Bool) async throws -> Data {
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(key, forHTTPHeaderField: "apikey")
+        var token = ""
         if auth {
-            req.setValue("Bearer \(try await accessToken())", forHTTPHeaderField: "Authorization")
+            token = try await accessToken()
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             req.setValue("librelog", forHTTPHeaderField: "Content-Profile")
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -193,7 +267,8 @@ actor SupabaseClient {
                 .flatMap { $0["message"] as? String ?? $0["msg"] as? String ?? $0["error_description"] as? String }
                 ?? String(decoding: data, as: UTF8.self)
             switch status {
-            case 401 where auth: throw SyncError.signedOut
+            case 401 where auth: throw Unauthorised.token(token)
+            case 400 where message.contains("device belongs to another account"): throw SyncError.deviceTaken
             case 402: throw SyncError.notActive
             case 404 where message.contains("unknown device"): throw SyncError.unknownDevice
             case 409: throw SyncError.behindCompaction
@@ -204,7 +279,12 @@ actor SupabaseClient {
         return data
     }
 
+    /// A session from a sign-in, replacing any other.
     private func store(sessionJSON data: Data) throws {
+        try begin(Self.session(from: data))
+    }
+
+    private static func session(from data: Data) throws -> Session {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = json["access_token"] as? String,
               let refresh = json["refresh_token"] as? String else {
@@ -212,10 +292,15 @@ actor SupabaseClient {
         }
         let user = json["user"] as? [String: Any]
         let expiresIn = json["expires_in"] as? Double ?? 3600
-        try save(Session(accessToken: access, refreshToken: refresh,
-                         expiresAt: Date().addingTimeInterval(expiresIn),
-                         userID: user?["id"] as? String ?? (Self.jwtClaims(access)["sub"] as? String ?? ""),
-                         email: user?["email"] as? String))
+        return Session(accessToken: access, refreshToken: refresh,
+                       expiresAt: Date().addingTimeInterval(expiresIn),
+                       userID: user?["id"] as? String ?? (jwtClaims(access)["sub"] as? String ?? ""),
+                       email: user?["email"] as? String)
+    }
+
+    private func begin(_ s: Session) throws {
+        generation += 1
+        try save(s)
     }
 
     private func save(_ s: Session) throws {
