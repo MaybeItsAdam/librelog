@@ -76,6 +76,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -136,11 +137,11 @@ fun EntryEditorScreen(app: AppModel, entryId: String, onClose: () -> Unit, onSho
     var wordCount by remember(entryId) { mutableStateOf(0u) }
     var toolbarTick by remember { mutableIntStateOf(0) }
     var saveJob by remember { mutableStateOf<Job?>(null) }
-    var addingTag by remember { mutableStateOf(false) }
-    var newTag by remember { mutableStateOf("") }
+    var addingTag by rememberSaveable { mutableStateOf(false) }
+    var newTag by rememberSaveable { mutableStateOf("") }
     var menuOpen by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var showDetails by remember { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
     var editorReady by remember(entryId) { mutableStateOf(false) }
     // Set once the entry is deleted from the menu, so leaving doesn't save it.
     var deleted by remember(entryId) { mutableStateOf(false) }

@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,8 +77,11 @@ fun DayCalendarSection(app: AppModel, date: String, modifier: Modifier = Modifie
     val haptics = LocalHapticFeedback.current
     var day by remember(date) { mutableStateOf(CalendarDay(emptyList(), emptyList())) }
     var declined by remember { mutableStateOf(false) }
-    var adding by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<KeptEvent?>(null) }
+    // Which sheet is open is saved (the event by id), so rotation or a theme
+    // change doesn't close it.
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    val editing = editingId?.let { id -> day.kept.firstOrNull { it.id == id } }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         declined = !granted
         app.calendarAccessChanged()
@@ -101,7 +105,7 @@ fun DayCalendarSection(app: AppModel, date: String, modifier: Modifier = Modifie
         if (day.kept.isNotEmpty() || day.suggestions.isNotEmpty()) {
             MicroLabel("Calendar", Modifier.padding(top = 6.dp, bottom = 2.dp))
         }
-        day.kept.forEach { event -> KeptEventRow(app, event, onEdit = { editing = event }) }
+        day.kept.forEach { event -> KeptEventRow(app, event, onEdit = { editingId = event.id }) }
         day.suggestions.forEach { event ->
             SuggestionRow(event) {
                 Haptics.confirm(haptics)
@@ -117,7 +121,7 @@ fun DayCalendarSection(app: AppModel, date: String, modifier: Modifier = Modifie
     }
 
     if (adding) OwnEventSheet(app, date, editing = null) { adding = false }
-    editing?.let { event -> OwnEventSheet(app, date, editing = event) { editing = null } }
+    editing?.let { event -> OwnEventSheet(app, date, editing = event) { editingId = null } }
 }
 
 /** A muted icon-and-words row, 48dp tall: "Add event", "Show this day's calendar". */

@@ -42,6 +42,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -133,10 +134,12 @@ fun SettingsScreen(app: AppModel) {
 private fun SignIn(app: AppModel) {
     val t = tokens
     val scope = rememberCoroutineScope()
-    var email by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var sentTo by remember { mutableStateOf<String?>(null) }
-    var usePassword by remember { mutableStateOf(false) }
+    // Saved through rotation; the password isn't, as saved state can be
+    // written to disk.
+    var email by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
+    var usePassword by rememberSaveable { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -298,9 +301,9 @@ private fun Status(app: AppModel) {
     val t = tokens
     val sync = app.sync
     val scope = rememberCoroutineScope()
-    var adding by remember { mutableStateOf(false) }
-    var revealing by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var revealing by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
 

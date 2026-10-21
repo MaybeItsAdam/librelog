@@ -123,7 +123,9 @@ fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier)
     var photos by remember(date) { mutableStateOf<List<DayPhoto>>(emptyList()) }
     var choosing by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<DayPhoto?>(null) }
-    var captioning by remember { mutableStateOf<DayPhoto?>(null) }
+    // Saved by id, so the caption sheet stays open through rotation.
+    var captioningId by rememberSaveable { mutableStateOf<String?>(null) }
+    val captioning = captioningId?.let { id -> photos.firstOrNull { it.id == id } }
     var adding by remember { mutableIntStateOf(0) }
     // Where the camera writes; saved so it survives the camera app's turn.
     var cameraFile by rememberSaveable { mutableStateOf<String?>(null) }
@@ -187,7 +189,7 @@ fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier)
                         photo,
                         Modifier.weight(1f),
                         onOpen = { viewing = photo },
-                        onCaption = { captioning = photo },
+                        onCaption = { captioningId = photo.id },
                         onRemove = {
                             Haptics.confirm(haptics)
                             photos = photos.filterNot { it.id == photo.id }
@@ -240,8 +242,8 @@ fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier)
     }
     viewing?.let { PhotoViewer(it) { viewing = null } }
     captioning?.let { photo ->
-        CaptionSheet(photo.caption.orEmpty(), onDismiss = { captioning = null }) { text ->
-            captioning = null
+        CaptionSheet(photo.caption.orEmpty(), onDismiss = { captioningId = null }) { text ->
+            captioningId = null
             val caption = text.trim().ifEmpty { null }
             photos = photos.map { if (it.id == photo.id) it.copy(caption = caption) else it }
             app.scope.launch { app.write { it.setPhotoCaption(photo.id, caption) } }
@@ -380,7 +382,7 @@ private fun takenLabel(rfc: String): String? =
 @Composable
 private fun CaptionSheet(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     val t = tokens
-    var text by remember { mutableStateOf(initial) }
+    var text by rememberSaveable { mutableStateOf(initial) }
     Sheet(onDismiss) {
         MicroLabel("Caption")
         BasicTextField(
