@@ -28,7 +28,10 @@ public interface IRealtime : IDisposable
 /// Supabase.
 ///
 /// Call it from one thread (the UI thread): awaits resume there in WinUI, and
-/// PropertyChanged is raised on the calling thread.
+/// PropertyChanged is raised on the calling thread. The core's heavier work
+/// (sealing and merging batches, snapshots, key derivation) runs on the
+/// thread pool (SPEC.md §3.2); state changes only after the await, back on
+/// the calling thread.
 public sealed class SyncEngine(
     CoreStore store,
     SupabaseClient client,
@@ -60,6 +63,7 @@ public sealed class SyncEngine(
     private SyncException? problem;
     private uint pending;
     private string? newRecoveryPhrase;
+    private string? codeSentTo;
 
     public SyncPhase Phase { get => phase; private set => Set(ref phase, value); }
     public string? Email { get => email; private set => Set(ref email, value); }
@@ -67,6 +71,10 @@ public sealed class SyncEngine(
     public DateTimeOffset? LastSynced { get => lastSynced; private set => Set(ref lastSynced, value); }
     public SyncException? Problem { get => problem; private set => Set(ref problem, value); }
     public uint Pending { get => pending; private set => Set(ref pending, value); }
+
+    /// Where the last sign-in email went, while its code may still be typed.
+    /// Null after a password sign-in, which sends no email.
+    public string? CodeSentTo { get => codeSentTo; private set => Set(ref codeSentTo, value); }
 
     /// Set once, right after the first device creates the key, so the
     /// recovery phrase can be shown before the user moves on.
@@ -94,7 +102,7 @@ public sealed class SyncEngine(
         Email = session.Email;
         if (secrets.Read(SecretNames.JournalKey) is { } key)
         {
-            store.SetJournalKey(key);
+            await Task.Run(() => store.SetJournalKey(key));
             Phase = SyncPhase.On;
             ConnectRealtime(session.UserId);
             await SyncNow();
@@ -109,7 +117,6 @@ public sealed class SyncEngine(
     public void SchedulePush()
     {
         if (Phase != SyncPhase.On) return;
-        Pending = store.PendingCount();
         pushDelay?.Cancel();
         pushDelay = new CancellationTokenSource();
         _ = SyncAfterPause(pushDelay.Token);
@@ -117,6 +124,7 @@ public sealed class SyncEngine(
 
     private async Task SyncAfterPause(CancellationToken ct)
     {
+        Pending = await Task.Run(() => store.PendingCount());
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(1), ct); // resumes on the caller's context
@@ -167,7 +175,7 @@ public sealed class SyncEngine(
                     return;
                 }
             } while (syncAgain);
-            Pending = store.PendingCount();
+            Pending = await Task.Run(() => store.PendingCount());
         }
         finally
         {
@@ -180,13 +188,14 @@ public sealed class SyncEngine(
     public async Task SendSignInEmail(string address)
     {
         await client.SendSignInEmail(address.Trim());
-        Email = address.Trim();
+        Email = CodeSentTo = address.Trim();
     }
 
     public async Task SignIn(string address, string password)
     {
         await client.SignIn(address.Trim(), password);
         Email = address.Trim();
+        CodeSentTo = null;
         await AdoptAccount();
     }
 
@@ -218,10 +227,7 @@ public sealed class SyncEngine(
         if (uri.Scheme != "librelog" || uri.Host != "auth") return;
         try
         {
-            var query = uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
-                .Select(pair => pair.Split('=', 2))
-                .Where(kv => kv.Length == 2)
-                .ToDictionary(kv => kv[0], kv => Uri.UnescapeDataString(kv[1].Replace('+', ' ')));
+            var query = SupabaseClient.FormParams(uri.Query.TrimStart('?'));
             if (query.TryGetValue("code", out var code))
             {
                 var verifier = oauthVerifier ?? throw new SyncException(SyncProblem.SignedOut, "no sign-in in progress");
@@ -238,6 +244,12 @@ public sealed class SyncEngine(
         {
             Problem = e;
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // The link comes from outside the app: whatever it holds, report
+            // it rather than let it take the app down.
+            Problem = new SyncException(SyncProblem.Server, e.Message);
+        }
     }
 
     public async Task SignOut()
@@ -246,9 +258,10 @@ public sealed class SyncEngine(
         channel = null;
         await client.SignOut();
         secrets.Delete(SecretNames.JournalKey);
-        store.ForgetJournalKey();
+        await Task.Run(() => store.ForgetJournalKey());
         Phase = SyncPhase.Off;
         Email = null;
+        CodeSentTo = null;
     }
 
     /// Deletes the account and everything synced to it, then forgets it
@@ -258,15 +271,28 @@ public sealed class SyncEngine(
     {
         await client.Rpc("delete_account", []);
         await SignOut();
-        store.ResetSync();
-        Pending = store.PendingCount();
+        Pending = await Task.Run(() =>
+        {
+            store.ResetSync();
+            return store.PendingCount();
+        });
     }
 
     // --- Journal key ------------------------------------------------------------
 
+    private Task? adopting;
+
     /// After sign-in: create the account's key if it has none, or use this
-    /// device's stored key if it matches; otherwise ask for it.
-    private async Task AdoptAccount()
+    /// device's stored key if it matches; otherwise ask for it. One at a
+    /// time: a second call while one runs (a double click, a redirect during
+    /// launch) waits for the first rather than racing it to make a key.
+    private Task AdoptAccount()
+    {
+        if (adopting is { IsCompleted: false } running) return running;
+        return adopting = AdoptAccountOnce();
+    }
+
+    private async Task AdoptAccountOnce()
     {
         try
         {
@@ -275,7 +301,8 @@ public sealed class SyncEngine(
 
             if (reg.KeyCheck is { } check)
             {
-                if (secrets.Read(SecretNames.JournalKey) is { } stored && store.KeyMatches(stored, check))
+                var stored = secrets.Read(SecretNames.JournalKey);
+                if (stored is not null && await Task.Run(() => store.KeyMatches(stored, check)))
                     await Activate(stored);
                 else
                     Phase = SyncPhase.NeedsKey;
@@ -283,18 +310,22 @@ public sealed class SyncEngine(
             }
 
             // A brand-new account: this device makes the key.
-            var key = store.GenerateJournalKey();
-            store.SetJournalKey(key);
-            var saved = (await client.Rpc("set_key_check", new JsonObject { ["p_key_check"] = store.KeyCheck() }))?.GetValue<string>();
-            if (saved is not null && store.KeyMatches(key, saved))
+            var (key, keyCheck) = await Task.Run(() =>
             {
-                NewRecoveryPhrase = store.RecoveryPhrase();
+                var k = store.GenerateJournalKey();
+                store.SetJournalKey(k);
+                return (k, store.KeyCheck());
+            });
+            var saved = (await client.Rpc("set_key_check", new JsonObject { ["p_key_check"] = keyCheck }))?.GetValue<string>();
+            if (saved is not null && await Task.Run(() => store.KeyMatches(key, saved)))
+            {
+                NewRecoveryPhrase = await Task.Run(() => store.RecoveryPhrase());
                 await Activate(key);
             }
             else
             {
                 // Another device set it first, a moment ago.
-                store.ForgetJournalKey();
+                await Task.Run(() => store.ForgetJournalKey());
                 Phase = SyncPhase.NeedsKey;
             }
         }
@@ -308,9 +339,9 @@ public sealed class SyncEngine(
     /// Restores the key from the 24 words. Throws if they're not this account's.
     public async Task UseRecoveryPhrase(string phrase)
     {
-        var key = store.KeyFromRecoveryPhrase(phrase);
+        var key = await Task.Run(() => store.KeyFromRecoveryPhrase(phrase));
         var reg = await Register("");
-        if (reg.KeyCheck is not { } check || !store.KeyMatches(key, check))
+        if (reg.KeyCheck is not { } check || !await Task.Run(() => store.KeyMatches(key, check)))
             throw new SyncException(SyncProblem.Server, "Those words don't match this account's journal key.");
         await Activate(key);
     }
@@ -326,7 +357,7 @@ public sealed class SyncEngine(
             var payload = await client.Rpc("pairing_take", new JsonObject { ["p_id"] = session.Id }, ct);
             if (payload?.GetValue<string>() is { } p)
             {
-                await Activate(session.Receive(p));
+                await Activate(await Task.Run(() => session.Receive(p)));
                 return;
             }
         }
@@ -336,17 +367,24 @@ public sealed class SyncEngine(
     /// Existing device: answers a pasted (or scanned) pairing code.
     public async Task ApprovePairing(string code)
     {
-        var parsed = CoreFunctions.ParsePairingCode(code);
-        var payload = store.SealKeyForPairing(parsed.PublicKey);
+        var (parsed, payload) = await Task.Run(() =>
+        {
+            var c = CoreFunctions.ParsePairingCode(code);
+            return (c, store.SealKeyForPairing(c.PublicKey));
+        });
         await client.Rpc("pairing_fulfil", new JsonObject { ["p_id"] = parsed.Id, ["p_payload"] = payload });
     }
 
     private async Task Activate(string key)
     {
-        store.SetJournalKey(key);
+        var sealedName = await Task.Run(() =>
+        {
+            store.SetJournalKey(key);
+            return store.SealDeviceName(deviceName);
+        });
         secrets.Write(SecretNames.JournalKey, key);
         // Register again, now with the device's name sealed.
-        await Register(store.SealDeviceName(deviceName));
+        await Register(sealedName);
         Phase = SyncPhase.On;
         if (client.Session?.UserId is { Length: > 0 } user) ConnectRealtime(user);
         await SyncNow();
@@ -354,8 +392,9 @@ public sealed class SyncEngine(
 
     private async Task<Registration> Register(string sealedName)
     {
+        var deviceId = await Task.Run(() => store.DeviceId());
         var node = await client.Rpc("register_device",
-            new JsonObject { ["p_device_id"] = store.DeviceId(), ["p_name_enc"] = sealedName });
+            new JsonObject { ["p_device_id"] = deviceId, ["p_name_enc"] = sealedName });
         var rows = node?.Deserialize(SyncJson.Default.ListRegistration) ?? [];
         return rows.FirstOrDefault() ?? new Registration(0, null, null, 0, 0);
     }
@@ -364,16 +403,20 @@ public sealed class SyncEngine(
 
     private async Task Push()
     {
-        while (store.OutgoingBatch(BatchSize) is { } batch)
+        var deviceId = await Task.Run(() => store.DeviceId());
+        while (await Task.Run(() => store.OutgoingBatch(BatchSize)) is { } batch)
         {
             await client.Rpc("push_ops", new JsonObject
             {
-                ["p_device_id"] = store.DeviceId(),
+                ["p_device_id"] = deviceId,
                 ["p_batch_id"] = batch.BatchId,
                 ["p_payloads"] = new JsonArray(batch.Payload),
             });
-            store.PushSucceeded(batch.BatchId);
-            Pending = store.PendingCount();
+            Pending = await Task.Run(() =>
+            {
+                store.PushSucceeded(batch.BatchId);
+                return store.PendingCount();
+            });
         }
     }
 
@@ -381,15 +424,17 @@ public sealed class SyncEngine(
     private async Task<bool> Pull()
     {
         var merged = false;
+        var deviceId = await Task.Run(() => store.DeviceId());
         while (true)
         {
             List<PulledRow> rows;
             try
             {
+                var cursor = await Task.Run(() => store.SyncCursor());
                 var node = await client.Rpc("pull_ops", new JsonObject
                 {
-                    ["p_device_id"] = store.DeviceId(),
-                    ["p_after"] = store.SyncCursor(),
+                    ["p_device_id"] = deviceId,
+                    ["p_after"] = cursor,
                     ["p_limit"] = BatchSize,
                 });
                 rows = node?.Deserialize(SyncJson.Default.ListPulledRow) ?? [];
@@ -401,7 +446,7 @@ public sealed class SyncEngine(
                 continue;
             }
             if (rows.Count == 0) return merged;
-            var result = store.ApplyIncoming([.. rows.Select(r => new IncomingOps(r.Seq, r.DeviceId, r.Payload))]);
+            var result = await Task.Run(() => store.ApplyIncoming([.. rows.Select(r => new IncomingOps(r.Seq, r.DeviceId, r.Payload))]));
             PulledSinceSnapshot += rows.Count;
             merged |= result.Changed > 0;
             if (rows.Count < BatchSize) return merged;
@@ -410,20 +455,21 @@ public sealed class SyncEngine(
 
     private async Task LoadSnapshot()
     {
-        var node = await client.Rpc("get_snapshot", new JsonObject { ["p_device_id"] = store.DeviceId() });
+        var deviceId = await Task.Run(() => store.DeviceId());
+        var node = await client.Rpc("get_snapshot", new JsonObject { ["p_device_id"] = deviceId });
         var snap = (node?.Deserialize(SyncJson.Default.ListSnapshotRow) ?? []).FirstOrDefault()
             ?? throw new SyncException(SyncProblem.Server, "no snapshot to catch up from", 404);
-        store.ApplySnapshot(snap.Seq, snap.Payload);
+        await Task.Run(() => store.ApplySnapshot(snap.Seq, snap.Payload));
         PulledSinceSnapshot = 0;
     }
 
     private async Task SnapshotIfDue()
     {
         if (PulledSinceSnapshot < SnapshotEvery) return;
-        var snap = store.Snapshot();
+        var (deviceId, snap) = await Task.Run(() => (store.DeviceId(), store.Snapshot()));
         await client.Rpc("put_snapshot", new JsonObject
         {
-            ["p_device_id"] = store.DeviceId(),
+            ["p_device_id"] = deviceId,
             ["p_seq"] = snap.Seq,
             ["p_payload"] = snap.Payload,
         });

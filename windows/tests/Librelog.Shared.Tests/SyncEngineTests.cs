@@ -28,14 +28,14 @@ public sealed class SyncEngineTests : IDisposable
         public void Dispose() { }
     }
 
-    private (SyncEngine Engine, CoreStore Store) Device(string user, string name)
+    private (SyncEngine Engine, CoreStore Store) Device(string user, string name, DateTimeOffset? expires = null)
     {
         var store = CoreStore.Open(Path.Combine(dir, $"{name}.sqlite"));
         cleanup.Add(store);
         var secrets = new MemorySecrets();
         if (user.Length > 0)
         {
-            var session = new Session(FakeSupabase.Token(user), "refresh", DateTimeOffset.UtcNow.AddHours(1), user, $"{user}@example.com");
+            var session = new Session(FakeSupabase.Token(user), $"refresh:{user}", expires ?? DateTimeOffset.UtcNow.AddHours(1), user, $"{user}@example.com");
             secrets.Write(SecretNames.Session, JsonSerializer.Serialize(session, SyncJson.Default.Session));
         }
         var client = new SupabaseClient(new HttpClient(server), secrets, new Uri("http://fake/"), "key");
@@ -195,6 +195,55 @@ public sealed class SyncEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task ALinkWithARepeatedParameterIsReportedNotThrown()
+    {
+        var secrets = new MemorySecrets();
+        var client = new SupabaseClient(new HttpClient(server), secrets, new Uri("http://fake/"), "key");
+        client.HandleRedirect(new Uri($"librelog://auth#access_token={FakeSupabase.Token("u9")}&access_token=x&refresh_token=r&refresh_token=s"));
+        Assert.Equal("u9", client.Session?.UserId);
+
+        var (a, _) = Device("", "laptop");
+        await a.HandleRedirect(new Uri("librelog://auth?a=1&a=2"));
+        Assert.NotNull(a.Problem);
+        Assert.Equal(SyncPhase.Off, a.Phase);
+    }
+
+    [Fact]
+    public async Task ASessionThatCanNoLongerRefreshIsSignedOut()
+    {
+        server.RefreshFails = true;
+        var (a, _) = Device("u1", "laptop", expires: DateTimeOffset.UtcNow.AddMinutes(-5));
+        await a.Start();
+        Assert.Equal(SyncPhase.Off, a.Phase);
+        Assert.Equal(SyncProblem.SignedOut, a.Problem?.Problem);
+    }
+
+    [Fact]
+    public async Task ARejectedTokenIsRefreshedBeforeSigningOut()
+    {
+        var (a, aStore) = Device("u1", "laptop");
+        await a.Start();
+        Assert.Equal(SyncPhase.On, a.Phase);
+
+        server.Rejected.Add(FakeSupabase.Token("u1"));
+        Write(aStore, "Coffee by the canal");
+        await a.SyncNow();
+        Assert.Equal(SyncPhase.On, a.Phase);
+        Assert.Null(a.Problem);
+        Assert.Equal(0u, a.Pending);
+    }
+
+    [Fact]
+    public async Task SigningOutEndsOnlyThisDevicesSession()
+    {
+        var (a, _) = Device("u1", "laptop");
+        await a.Start();
+        await a.SignOut();
+        Assert.Equal("?scope=local", server.LogoutQuery);
+        Assert.Equal(SyncPhase.Off, a.Phase);
+    }
+
+    [Fact]
     public void RealtimeMessages()
     {
         var join = RealtimeChannel.JoinMessage("user:u1", "tok", "1");
@@ -235,10 +284,21 @@ internal sealed class FakeSupabase : HttpMessageHandler
     public readonly HashSet<string> Inactive = [];
     public int Requests;
 
-    public static string Token(string user)
+    /// Refreshing a session fails as Supabase does once the refresh token
+    /// is gone (400 invalid_grant).
+    public bool RefreshFails;
+
+    /// Access tokens answered with 401, as if revoked before they expire.
+    public readonly HashSet<string> Rejected = [];
+
+    /// The query of the last logout call.
+    public string? LogoutQuery;
+
+    public static string Token(string user, string? generation = null)
     {
         static string B64(string s) => Convert.ToBase64String(Encoding.UTF8.GetBytes(s)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        return $"{B64("{}")}.{B64($$"""{"sub":"{{user}}"}""")}.sig";
+        var claims = generation is null ? $$"""{"sub":"{{user}}"}""" : $$"""{"sub":"{{user}}","gen":"{{generation}}"}""";
+        return $"{B64("{}")}.{B64(claims)}.sig";
     }
 
     public bool HasAccount(string user) => accounts.ContainsKey(user);
@@ -269,12 +329,31 @@ internal sealed class FakeSupabase : HttpMessageHandler
             var reviewer = email.Split('@')[0];
             return Json(new JsonObject
             {
-                ["access_token"] = Token(reviewer), ["refresh_token"] = "refresh", ["expires_in"] = 3600,
+                ["access_token"] = Token(reviewer), ["refresh_token"] = $"refresh:{reviewer}", ["expires_in"] = 3600,
                 ["user"] = new JsonObject { ["id"] = reviewer, ["email"] = email },
             });
         }
+        if (path == "/auth/v1/token" && request.RequestUri.Query.Contains("grant_type=refresh_token"))
+        {
+            if (RefreshFails)
+                return Reply(HttpStatusCode.BadRequest, """{"error":"invalid_grant","error_description":"Invalid Refresh Token: Refresh Token Not Found"}""");
+            var refresh = JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!["refresh_token"]!.GetValue<string>();
+            var owner = refresh["refresh:".Length..];
+            return Json(new JsonObject
+            {
+                ["access_token"] = Token(owner, "refreshed"), ["refresh_token"] = refresh, ["expires_in"] = 3600,
+                ["user"] = new JsonObject { ["id"] = owner, ["email"] = $"{owner}@example.com" },
+            });
+        }
+        if (path == "/auth/v1/logout")
+        {
+            LogoutQuery = request.RequestUri.Query;
+            return Reply(HttpStatusCode.NoContent, "");
+        }
         if (!path.StartsWith("/rest/v1/rpc/", StringComparison.Ordinal)) return Reply(HttpStatusCode.NotFound, "{}");
         Assert.Equal("librelog", request.Headers.GetValues("Content-Profile").Single());
+        if (Rejected.Contains(request.Headers.Authorization!.Parameter!))
+            return Reply(HttpStatusCode.Unauthorized, """{"message":"JWT expired"}""");
         var user = SupabaseClient.JwtClaims(request.Headers.Authorization!.Parameter!)["sub"];
         var args = JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject();
         lock (this) return Handle(path["/rest/v1/rpc/".Length..], user, args);
