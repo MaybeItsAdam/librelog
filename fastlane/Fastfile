@@ -15,15 +15,26 @@ def asc_key
 end
 
 platform :android do
-  desc "Build a signed bundle and put it on the Play internal track"
+  # Version codes follow the Actions workflow's scheme (android-internal.yml):
+  # the UTC date and a two-digit number, e.g. 2026102105, higher than any
+  # upload that day. Anything below today's date would sit under codes
+  # already on Play.
+  desc "Build a signed bundle and put it on the Play internal track as a draft"
   lane :internal do |opts|
-    code = opts[:version_code] || raise("version_code: is required (higher than the last upload)")
-    name = opts[:version_name] || "0.1.0"
+    name = opts[:version_name].to_s
+    code = opts[:version_code].to_s
+    UI.user_error!("version_name: must look like 1.2.3 (got #{name.inspect})") unless name.match?(/\A\d+(\.\d+){0,2}\z/)
+    UI.user_error!("version_code: must be a positive integer (got #{code.inspect})") unless code.match?(/\A[1-9]\d{0,9}\z/)
+    floor = Time.now.utc.strftime("%Y%m%d00").to_i
+    UI.user_error!("version_code: use today's UTC date and a two-digit number, at least #{floor + 1}") if code.to_i <= floor
+    UI.user_error!("version_code: Play's limit is 2100000000") if code.to_i > 2_100_000_000
     sh("cd #{ROOT} && scripts/build-android.sh")
     sh("cd #{ROOT}/android && ./gradlew -q bundleRelease -PversionCode=#{code} -PversionName=#{name}")
     upload_to_play_store(
       track: "internal",
-      release_status: opts[:release_status] || "completed",
+      # A draft until rolled out in Play Console; "completed" fails while the
+      # Play app itself is still a draft (never published).
+      release_status: opts[:release_status] || "draft",
       aab: "#{ROOT}/android/app/build/outputs/bundle/release/app-release.aab",
       json_key_data: ENV["PLAY_SERVICE_ACCOUNT_JSON"],
       skip_upload_metadata: true, skip_upload_images: true, skip_upload_screenshots: true,
