@@ -54,8 +54,10 @@ select librelog.admin_set_sync_until('someone@example.com', now() + interval '1 
 ### App review account
 
 Reviewers can't receive a sign-in code, so Settings → Sync also offers "Use a
-password instead", which works only for accounts given a password in the
-Supabase dashboard. `scripts/review-account.sh` makes the one for App Review
+password instead". It works for any account with a password, but the apps
+never set one, so in practice that's accounts given one by an admin (and
+email confirmation is on, so nobody can sign up someone else's address with
+a password of their own). `scripts/review-account.sh` makes the one for App Review
 (`appreview@maybeitssoftware.co.uk`, confirmed, sync on) and prints its
 password. Sign in to it once on any device to create its journal key, then put
 the email, password and recovery phrase in App Store Connect (App Review
