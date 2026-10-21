@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Librelog.App.Services;
 using Librelog.Core;
@@ -192,7 +193,7 @@ public sealed partial class DayPhotosView : UserControl
         if (photo.Caption is { Length: > 0 } caption)
             body.Children.Add(new TextBlock { Text = caption, Style = Res<Style>("BodyText") });
         var meta = new List<string>();
-        if (photo.TakenAt is { } taken && DateTimeOffset.TryParse(taken, out var at))
+        if (photo.TakenAt is { } taken && DateTimeOffset.TryParse(taken, CultureInfo.InvariantCulture, DateTimeStyles.None, out var at))
             meta.Add($"{at.ToLocalTime():dddd d MMMM yyyy}, {at.ToLocalTime():t}");
         if (photo.PreviewPath is null || !File.Exists(photo.PreviewPath)) meta.Add("On another device");
         if (meta.Count > 0) body.Children.Add(new TextBlock { Text = string.Join(" · ", meta), Style = Res<Style>("MonoText") });

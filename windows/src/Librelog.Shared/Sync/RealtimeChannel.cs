@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -135,5 +136,5 @@ public sealed class RealtimeChannel(string topic, SupabaseClient client, Action 
     private static Task Send(ClientWebSocket ws, JsonObject o, CancellationToken ct) =>
         ws.SendAsync(Encoding.UTF8.GetBytes(o.ToJsonString()), WebSocketMessageType.Text, true, ct);
 
-    private string NextRef() => Interlocked.Increment(ref reference).ToString();
+    private string NextRef() => Interlocked.Increment(ref reference).ToString(CultureInfo.InvariantCulture);
 }

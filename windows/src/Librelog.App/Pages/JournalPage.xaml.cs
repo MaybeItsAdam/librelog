@@ -66,7 +66,7 @@ public sealed partial class JournalPage : Page
     /// Creates an entry for `day` at the current time and opens it.
     public static async Task NewEntry(string day)
     {
-        var time = DateTime.Now.ToString("HH:mm");
+        var time = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
         var entry = await AppServices.Write(s => s.CreateEntry(day, time));
         Shell.Window.OpenEntry(entry.Id);
     }

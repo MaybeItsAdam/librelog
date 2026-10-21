@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -134,7 +135,7 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
         if (p.TryGetValue("error_description", out var error)) throw new SyncException(SyncProblem.Server, error, 400);
         if (!p.TryGetValue("access_token", out var access) || !p.TryGetValue("refresh_token", out var refresh))
             throw new SyncException(SyncProblem.SignedOut, "the sign-in link had no session");
-        var expiresIn = double.TryParse(p.GetValueOrDefault("expires_in"), out var e) ? e : 3600;
+        var expiresIn = double.TryParse(p.GetValueOrDefault("expires_in"), NumberStyles.Float, CultureInfo.InvariantCulture, out var e) ? e : 3600;
         var claims = JwtClaims(access);
         Save(new Session(access, refresh, DateTimeOffset.UtcNow.AddSeconds(expiresIn),
             claims.GetValueOrDefault("sub") ?? "", claims.GetValueOrDefault("email")));
