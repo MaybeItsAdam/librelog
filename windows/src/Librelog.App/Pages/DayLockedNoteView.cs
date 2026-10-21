@@ -161,8 +161,10 @@ public sealed partial class DayLockedNoteView : UserControl
         if (await askDialog.ShowAsync() != ContentDialogResult.Primary || password is null || text is null) return;
 
         // A plain editor. Whatever it holds when it closes is saved under the
-        // same password; emptied, the note goes.
-        var original = text;
+        // same password; emptied, the note goes. The TextBox hands back `\r`
+        // for every line break, so both sides are compared, and saved, with
+        // `\n`: opening a note and closing it untouched mustn't rewrite it.
+        var original = Newlines(text);
         var editor = new TextBox
         {
             Text = text,
@@ -181,7 +183,7 @@ public sealed partial class DayLockedNoteView : UserControl
         noteDialog.CloseButtonText = "Done";
         await noteDialog.ShowAsync();
 
-        var edited = editor.Text;
+        var edited = Newlines(editor.Text);
         editor.Text = "";
         text = null;
         try
@@ -204,4 +206,7 @@ public sealed partial class DayLockedNoteView : UserControl
         }
         Reload();
     }
+
+    /// `\r\n` and lone `\r` (what a TextBox returns) as `\n`, the core's line break.
+    private static string Newlines(string s) => s.Replace("\r\n", "\n").Replace('\r', '\n');
 }
