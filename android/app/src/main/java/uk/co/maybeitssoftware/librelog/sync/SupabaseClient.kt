@@ -129,12 +129,16 @@ class SupabaseClient(
         )
     }
 
+    /**
+     * Ends this device's session only (`scope=local`). Supabase's default is
+     * `global`, which would sign every other device out too.
+     */
     suspend fun signOut() {
         session?.let { s ->
             runCatching {
                 withContext(Dispatchers.IO) {
                     http.newCall(
-                        Request.Builder().url("$baseUrl/auth/v1/logout")
+                        Request.Builder().url("$baseUrl/auth/v1/logout?scope=local")
                             .header("apikey", apiKey)
                             .header("Authorization", "Bearer ${s.accessToken}")
                             .post(ByteArray(0).toRequestBody())

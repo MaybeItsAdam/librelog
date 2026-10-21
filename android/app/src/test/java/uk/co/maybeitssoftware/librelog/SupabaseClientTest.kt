@@ -20,7 +20,7 @@ import uk.co.maybeitssoftware.librelog.sync.Session
 import uk.co.maybeitssoftware.librelog.sync.SupabaseClient
 import uk.co.maybeitssoftware.librelog.sync.SyncError
 
-/** Sessions: refreshing, a refused refresh, and a stray 401. */
+/** Sessions: refreshing, a refused refresh, a stray 401, and signing out. */
 class SupabaseClientTest {
     /** Auth and one RPC, `ping`, scripted per test. */
     private class FakeAuth : Dispatcher() {
@@ -116,5 +116,12 @@ class SupabaseClientTest {
         val client = client()
         assertEquals(SyncError.SignedOut, runCatching { client.ping() }.exceptionOrNull())
         assertEquals("only one refresh", 1, fake.issued)
+    }
+
+    @Test fun signingOutOnlyEndsThisDevicesSession() = runBlocking {
+        val client = client()
+        client.signOut()
+        assertEquals(listOf("/auth/v1/logout?scope=local Bearer token"), fake.seen)
+        assertNull(client.session)
     }
 }
