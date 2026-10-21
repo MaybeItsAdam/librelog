@@ -143,18 +143,40 @@ class SupabaseClient(
                 }
             }
         }
-        session = null
-        secrets.delete(SecretStore.Item.Session)
+        forget()
     }
 
     /** A current access token, refreshing first if it's about to expire. */
     suspend fun accessToken(): String = refreshLock.withLock {
         val s = session ?: throw SyncError.SignedOut
-        if (s.needsRefresh()) {
-            val url = "$baseUrl/auth/v1/token".toHttpUrl().newBuilder().addQueryParameter("grant_type", "refresh_token").build()
-            storeSession(post(url.toString(), buildJsonObject { put("refresh_token", s.refreshToken) }, auth = false, token = null))
+        if (s.needsRefresh()) refresh(s)
+        session?.accessToken ?: throw SyncError.SignedOut
+    }
+
+    /**
+     * After the server refused [rejected]: refreshes, unless another call
+     * already has since that token was handed out.
+     */
+    private suspend fun refreshAfterRejection(rejected: String) = refreshLock.withLock {
+        val s = session ?: throw SyncError.SignedOut
+        if (s.accessToken == rejected) refresh(s)
+    }
+
+    /**
+     * Swaps the refresh token for a new session. If Auth refuses it (revoked,
+     * already used, the user deleted: a 4xx such as `invalid_grant` or
+     * "Refresh Token Not Found"), the session is over and this is signed out;
+     * that never fixes itself by retrying. Offline and 5xx stay as they are.
+     */
+    private suspend fun refresh(s: Session) {
+        val url = "$baseUrl/auth/v1/token".toHttpUrl().newBuilder().addQueryParameter("grant_type", "refresh_token").build()
+        try {
+            storeSession(post(url.toString(), buildJsonObject { put("refresh_token", s.refreshToken) }, auth = false))
+        } catch (e: SyncError.Server) {
+            if (!refreshRefused(e.code)) throw e
+            forget()
+            throw SyncError.SignedOut
         }
-        session!!.accessToken
     }
 
     // MARK: RPC
@@ -167,8 +189,8 @@ class SupabaseClient(
 
     // MARK: Plumbing
 
-    private suspend fun post(url: String, body: JsonObject, auth: Boolean, token: String? = null): String {
-        val bearer = if (auth) token ?: accessToken() else null
+    private suspend fun post(url: String, body: JsonObject, auth: Boolean, retried: Boolean = false): String {
+        val bearer = if (auth) accessToken() else null
         val request = Request.Builder().url(url)
             .header("apikey", apiKey)
             .post(body.toString().toRequestBody(JSON))
@@ -179,17 +201,22 @@ class SupabaseClient(
                 }
             }
             .build()
-        return withContext(Dispatchers.IO) {
+        val (status, text) = withContext(Dispatchers.IO) {
             try {
-                http.newCall(request).execute().use { response ->
-                    val text = response.body.string()
-                    if (!response.isSuccessful) throw errorFor(response.code, text, auth)
-                    text
-                }
+                http.newCall(request).execute().use { response -> response.code to response.body.string() }
             } catch (e: IOException) {
                 throw SyncError.Offline
             }
         }
+        if (status in 200..299) return text
+        // A 401 can be a token revoked or expired early (clock skew, a
+        // refresh elsewhere): refresh once and retry before calling it signed
+        // out, since signing out forgets the journal key.
+        if (status == 401 && bearer != null && !retried) {
+            refreshAfterRejection(bearer)
+            return post(url, body, auth, retried = true)
+        }
+        throw errorFor(status, text, auth)
     }
 
     private fun errorFor(status: Int, text: String, auth: Boolean): SyncError {
@@ -226,6 +253,11 @@ class SupabaseClient(
         )
     }
 
+    private fun forget() {
+        session = null
+        secrets.delete(SecretStore.Item.Session)
+    }
+
     private fun save(s: Session) {
         session = s
         secrets.write(SecretStore.Item.Session, json.encodeToString(Session.serializer(), s).encodeToByteArray())
@@ -234,6 +266,9 @@ class SupabaseClient(
     companion object {
         val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
         private val JSON = "application/json".toMediaType()
+
+        /** Whether Auth refusing a refresh with [status] means the session is gone. */
+        fun refreshRefused(status: Int) = status in 400..499 && status != 408 && status != 429
 
         fun jwtClaims(jwt: String): JsonObject {
             val parts = jwt.split('.')
