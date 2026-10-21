@@ -158,7 +158,19 @@ public sealed partial class DayLockedNoteView : UserControl
             }
         };
         askDialog.Closed += (_, _) => box.Password = "";
-        if (await askDialog.ShowAsync() != ContentDialogResult.Primary || password is null || text is null) return;
+        // Minimised or locked away mid-question: put the question away too.
+        void ConcealAsk() => askDialog.Hide();
+        WindowPrivacy.Concealed += ConcealAsk;
+        ContentDialogResult asked;
+        try
+        {
+            asked = await askDialog.ShowAsync();
+        }
+        finally
+        {
+            WindowPrivacy.Concealed -= ConcealAsk;
+        }
+        if (asked != ContentDialogResult.Primary || password is null || text is null) return;
 
         // A plain editor. Whatever it holds when it closes is saved under the
         // same password; emptied, the note goes. The TextBox hands back `\r`
@@ -181,7 +193,20 @@ public sealed partial class DayLockedNoteView : UserControl
         ScrollViewer.SetVerticalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
         var noteDialog = Make(this, Format.LongDate(day), editor, null);
         noteDialog.CloseButtonText = "Done";
-        await noteDialog.ShowAsync();
+        // While it's open: out of screen capture, and closed (so saved) if
+        // the window is minimised or the session locks, as on Android.
+        void ConcealNote() => noteDialog.Hide();
+        WindowPrivacy.Concealed += ConcealNote;
+        var shielded = WindowPrivacy.ExcludeFromCapture();
+        try
+        {
+            await noteDialog.ShowAsync();
+        }
+        finally
+        {
+            shielded.Dispose();
+            WindowPrivacy.Concealed -= ConcealNote;
+        }
 
         var edited = Newlines(editor.Text);
         editor.Text = "";
