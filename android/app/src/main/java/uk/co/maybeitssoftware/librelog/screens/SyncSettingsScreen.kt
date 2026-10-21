@@ -1,7 +1,11 @@
 package uk.co.maybeitssoftware.librelog.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.text.format.DateUtils
+import android.view.WindowManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -421,7 +426,10 @@ private fun PairingApproveSheet(app: AppModel, onDismiss: () -> Unit) {
 private fun RecoveryPhraseSheet(phrase: String, reveal: Boolean = false, onDone: () -> Unit) {
     val t = tokens
     var confirmed by remember { mutableStateOf(reveal) }
-    Sheet(onDismiss = { if (confirmed) onDone() }) {
+    // The words are the journal key: kept out of screenshots, screen sharing
+    // and the recents thumbnail, as an open locked note is.
+    SecureWindow()
+    Sheet(onDismiss = { if (confirmed) onDone() }, secure = true) {
         Text(if (reveal) "Recovery phrase" else "Write these 24 words down", style = Typeface.title, color = t.ink)
         Text(
             if (reveal) "Anyone with these words and your account can read your journal. Keep them somewhere safe and offline."
@@ -535,6 +543,26 @@ private fun Field(
             inner()
         },
     )
+}
+
+/**
+ * Keeps the activity's window out of screenshots and the recents thumbnail
+ * while this is composed. A secure [Sheet] only covers the sheet's own window.
+ */
+@Composable
+internal fun SecureWindow() {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = context.activity()?.window
+        window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
+}
+
+private tailrec fun Context.activity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.activity()
+    else -> null
 }
 
 /**

@@ -1,9 +1,5 @@
 package uk.co.maybeitssoftware.librelog.lock
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -49,6 +44,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
+import uk.co.maybeitssoftware.librelog.screens.SecureWindow
 import uk.co.maybeitssoftware.librelog.screens.Sheet
 import uk.co.maybeitssoftware.librelog.ui.Haptics
 import uk.co.maybeitssoftware.librelog.ui.InputField
@@ -118,7 +114,6 @@ private fun LockedNoteSheet(app: AppModel, date: String, onDismiss: () -> Unit) 
     val t = tokens
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
-    val context = LocalContext.current
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -179,13 +174,7 @@ private fun LockedNoteSheet(app: AppModel, date: String, onDismiss: () -> Unit) 
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { onDismiss() }
 
     // No screenshots or recents preview of the open note.
-    if (opened) {
-        DisposableEffect(Unit) {
-            val window = context.activity()?.window
-            window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
-        }
-    }
+    if (opened) SecureWindow()
 
     Sheet(onDismiss, secure = true) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -235,10 +224,4 @@ private fun LockedNoteSheet(app: AppModel, date: String, onDismiss: () -> Unit) 
             PrimaryButton("Done", onDismiss)
         }
     }
-}
-
-private tailrec fun Context.activity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.activity()
-    else -> null
 }
