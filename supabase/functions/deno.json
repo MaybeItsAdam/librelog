@@ -1,0 +1,7 @@
+{
+  "fmt": { "lineWidth": 120 },
+  "tasks": {
+    "test": "deno test --allow-read tests/",
+    "check": "deno check */index.ts tests/*.ts"
+  }
+}
