@@ -106,6 +106,16 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Sync is bought in the phone, tablet or Mac app; this only shows it. -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="SUBSCRIPTION" Style="{StaticResource MicroLabel}" />
+                        <TextBlock x:Name="SubscriptionText" Style="{StaticResource HeadlineText}" />
+                        <TextBlock x:Name="SubscriptionDetail" Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" />
+                        <TextBlock x:Name="SubscribeHintText" Style="{StaticResource BodyText}" />
+                    </StackPanel>
+                </Border>
+
                 <Border Style="{StaticResource Card}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="ADD A DEVICE" Style="{StaticResource MicroLabel}" />

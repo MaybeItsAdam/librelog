@@ -38,7 +38,11 @@ public sealed partial class SyncPage : Page
 
     private static SyncEngine Sync => AppServices.Sync;
 
-    protected override void OnNavigatedTo(NavigationEventArgs e) => Update();
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        Update();
+        if (Sync.Phase == SyncPhase.On) _ = Sync.RefreshSubscription();
+    }
 
     private void OnSyncChanged(object? sender, PropertyChangedEventArgs e) => Update();
 
@@ -46,7 +50,12 @@ public sealed partial class SyncPage : Page
     {
         var phase = Sync.Phase;
         // A new screen: the last attempt's error belonged to the old one.
-        if (shownPhase is { } was && was != phase) localProblem = null;
+        if (shownPhase is { } was && was != phase)
+        {
+            localProblem = null;
+            // Just signed in (or unlocked): find out what the account has.
+            if (phase == SyncPhase.On) _ = Sync.RefreshSubscription();
+        }
         shownPhase = phase;
         SignInPanel.Visibility = Format.Shown(phase == SyncPhase.Off);
         KeyPanel.Visibility = Format.Shown(phase == SyncPhase.NeedsKey);
@@ -65,6 +74,17 @@ public sealed partial class SyncPage : Page
         StatusText.Text = Sync.IsSyncing ? "Syncing…"
             : Sync.LastSynced is { } at ? $"Last synced {at:t} · {Sync.Pending} waiting to upload"
             : "Not synced yet";
+        // Sync is bought on the phone, tablet or Mac (docs/billing.md); here it's
+        // only shown, along with where to subscribe when it isn't active.
+        var notActive = Sync.Problem?.Problem == SyncProblem.NotActive;
+        var (headline, detail, needsSubscription) = Sync.Subscription?.Describe(DateTimeOffset.Now)
+            ?? (notActive ? ("Not active", "", true) : ("—", "", false));
+        SubscriptionText.Text = headline;
+        SubscriptionDetail.Text = detail;
+        SubscriptionDetail.Visibility = Format.Shown(detail.Length > 0);
+        SubscribeHintText.Text = SubscriptionStatus.SubscribeHint;
+        SubscribeHintText.Visibility = Format.Shown(needsSubscription || notActive);
+
         var problem = localProblem ?? Sync.Problem?.Describe();
         ProblemText.Text = problem ?? "";
         ProblemText.Visibility = Format.Shown(problem is not null);
@@ -219,7 +239,11 @@ public sealed partial class SyncPage : Page
     private async void OnShowPhrase(object sender, RoutedEventArgs e) =>
         await Try(async () => PhraseText.Text = Spaced(await AppServices.Run(s => s.RecoveryPhrase())));
 
-    private async void OnSyncNow(object sender, RoutedEventArgs e) => await Try(Sync.SyncNow);
+    private async void OnSyncNow(object sender, RoutedEventArgs e) => await Try(async () =>
+    {
+        await Sync.SyncNow();
+        await Sync.RefreshSubscription();
+    });
 
     // --- Helpers ------------------------------------------------------------------
 
