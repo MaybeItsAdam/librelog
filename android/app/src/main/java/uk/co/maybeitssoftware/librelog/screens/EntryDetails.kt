@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,6 +142,49 @@ internal fun EntryDetailsSheet(
             picking = null
             Haptics.tick(haptics)
             onEndDate(Day.string(day))
+        }
+    }
+}
+
+/**
+ * "New entry on another day": any day, with or without a time, for writing
+ * up one that was missed. A past day starts untimed ([Day.defaultTime]).
+ */
+@Composable
+internal fun NewEntrySheet(initial: String, onDismiss: () -> Unit, onCreate: (date: String, time: String?) -> Unit) {
+    val t = tokens
+    val haptics = LocalHapticFeedback.current
+    var date by rememberSaveable { mutableStateOf(initial) }
+    var time by rememberSaveable { mutableStateOf(Day.defaultTime(initial)) }
+    var picking by remember { mutableStateOf<String?>(null) } // "day", "time"
+
+    Sheet(onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            MicroLabel("New entry")
+            Text("Without a time, the entry covers the whole day.", style = Typeface.small, color = t.muted)
+        }
+        Column {
+            Hairline()
+            ValueRow("Day", Day.longDate(date)) { picking = "day" }
+            Hairline()
+            ToggleRow("Time", time != null, { on -> time = if (on) Day.nowTime else null })
+            time?.let { ValueRow("At", it, mono = true) { picking = "time" } }
+            Hairline()
+        }
+        PrimaryButton("Create", { onCreate(date, time) })
+    }
+
+    when (picking) {
+        "time" -> TimePickDialog("Time", time, onDismiss = { picking = null }) {
+            picking = null
+            Haptics.tick(haptics)
+            time = it
+        }
+        "day" -> DayPickDialog("Day", Day.date(date) ?: java.time.LocalDate.now(), null, onDismiss = { picking = null }) { day ->
+            picking = null
+            Haptics.tick(haptics)
+            date = Day.string(day)
+            time = Day.defaultTime(date)
         }
     }
 }
