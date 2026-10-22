@@ -4,6 +4,14 @@
 #
 #   scripts/review-account.sh                        # new random password
 #   REVIEW_PASSWORD='…' scripts/review-account.sh    # a password of your own
+#   REVIEW_SYNC_YEARS=0 scripts/review-account.sh    # the second account, for buying
+#
+# REVIEW_SYNC_YEARS=0 makes the second review account, with no sync granted,
+# so App Review can buy the subscription in the sandbox (docs/billing.md). It
+# defaults to its own address, appreview-buy@…, so it can't take the grant
+# off the first account by mistake. Run again on an existing account, it
+# switches sync off again (clearing any grant and any sync bought since), so
+# the next review can buy from scratch.
 #
 # Needs the Supabase CLI, logged in (`supabase login`). Running it again keeps
 # the same account and sets the password again, so without REVIEW_PASSWORD
@@ -16,12 +24,16 @@
 set -euo pipefail
 
 REF="${LIBRELOG_PROJECT_REF:-wzkhuilypzapqkrjxeku}"
-EMAIL="${REVIEW_EMAIL:-appreview@maybeitssoftware.co.uk}"
 YEARS="${REVIEW_SYNC_YEARS:-10}"
 URL="https://$REF.supabase.co"
 
-if ! [[ "$YEARS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "REVIEW_SYNC_YEARS must be a whole number of years, not '$YEARS'." >&2; exit 1
+if ! [[ "$YEARS" =~ ^(0|[1-9][0-9]*)$ ]]; then
+  echo "REVIEW_SYNC_YEARS must be a whole number of years (0 for no sync), not '$YEARS'." >&2; exit 1
+fi
+if [ "$YEARS" = 0 ]; then
+  EMAIL="${REVIEW_EMAIL:-appreview-buy@maybeitssoftware.co.uk}"
+else
+  EMAIL="${REVIEW_EMAIL:-appreview@maybeitssoftware.co.uk}"
 fi
 
 generated=""
@@ -91,15 +103,25 @@ else
   echo "Created $EMAIL (confirmed, so it never needs to receive mail)."
 fi
 
-until=$(python3 -c '
+set_sync_until() { # an ISO date, or empty for none
+  UNTIL=$1 python3 -c '
+import json, os
+print(json.dumps({"p_email": os.environ["EMAIL"], "p_until": os.environ["UNTIL"] or None}))' \
+    | api -X POST -H "Content-Profile: librelog" "$URL/rest/v1/rpc/admin_set_sync_until" --data-binary @- >/dev/null
+}
+
+if [ "$YEARS" = 0 ]; then
+  # A new account has no sync to begin with; an old one is switched off again.
+  [ -n "$id" ] && set_sync_until ""
+  echo "Sync is off, so App Review can buy it (in the sandbox)."
+else
+  until=$(python3 -c '
 import datetime, os
 years = int(os.environ["YEARS"])
 print((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365 * years)).isoformat())')
-UNTIL=$until python3 -c '
-import json, os
-print(json.dumps({"p_email": os.environ["EMAIL"], "p_until": os.environ["UNTIL"]}))' \
-  | api -X POST -H "Content-Profile: librelog" "$URL/rest/v1/rpc/admin_set_sync_until" --data-binary @- >/dev/null
-echo "Sync is on until ${until%%T*}."
+  set_sync_until "$until"
+  echo "Sync is on until ${until%%T*}."
+fi
 
 cat <<EOF
 

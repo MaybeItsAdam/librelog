@@ -61,9 +61,11 @@ never set one, so in practice that's accounts given one by an admin (and
 email confirmation is on, so nobody can sign up someone else's address with
 a password of their own). `scripts/review-account.sh` makes the one for App Review
 (`appreview@maybeitssoftware.co.uk`, confirmed, sync on) and prints its
-password. Sign in to it once on any device to create its journal key, then put
-the email, password and recovery phrase in App Store Connect (App Review
-Information) and Play Console (App content → App access).
+password; `REVIEW_SYNC_YEARS=0 scripts/review-account.sh` makes a second one
+(`appreview-buy@maybeitssoftware.co.uk`, sync off) so reviewers can buy the
+subscription in the sandbox. Sign in to each once on any device to create its
+journal key, then put the email, password and recovery phrase in App Store
+Connect (App Review Information) and Play Console (App content → App access).
 
 ## Bringing in an Obsidian vault
 
@@ -90,8 +92,10 @@ on a day: [docs/locked-notes.md](docs/locked-notes.md).
 
 ## Not built yet
 
-Payments (Stripe, store subscriptions), branded sign-in emails (needs SMTP),
-and a signed Windows package for distribution (CI packages are test-signed).
+Branded sign-in emails (needs SMTP) and a signed Windows package for
+distribution (CI packages are test-signed). Sync payments (App Store, Google
+Play, and Stripe on the web for Windows) are built but need their store and
+Stripe accounts set up: [docs/billing.md](docs/billing.md).
 Sign in with Google is built on every platform but needs its Google Cloud
 clients and Supabase provider set up first: [docs/google-sign-in.md](docs/google-sign-in.md).
 

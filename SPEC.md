@@ -483,13 +483,15 @@ are **no direct insert/update policies** on `ops`, `snapshots` or
 
 | Function | Trigger | Does |
 |---|---|---|
-| `stripe-webhook` | Stripe events | sets `sync_until` (not built yet) |
+| `stripe-checkout` | Windows (signed in), to buy 1 or 3 years on the web | creates a one-off Stripe Checkout Session (Stripe Tax on) for the account, returns its URL |
+| `stripe-webhook` | Stripe events (`checkout.session.completed`, `…async_payment_succeeded`, `charge.refunded`, `charge.dispute.created`) | verifies the `Stripe-Signature`, adds the years after the later of now and `sync_until`, takes them back on a refund or dispute |
 | `appstore-notifications` | App Store Server Notifications v2 | verifies JWS, sets `sync_until` |
 | `play-rtdn` | Google Play real-time notifications (Pub/Sub push) | verifies via Play Developer API, sets `sync_until` |
 | `verify-purchase` | the apps, right after a purchase or restore | verifies the StoreKit 2 transaction or Play token, sets `sync_until` |
 
-All of them write through `record_purchase()`, which moves `sync_until`
-only forward except on a refund (docs/billing.md).
+All of them write through `record_purchase()` (Stripe through
+`record_stripe_purchase()`, which works out the expiry and calls it), which
+moves `sync_until` only forward except on a refund (docs/billing.md).
 
 **Housekeeping (`pg_cron`, daily):** compaction GC; delete expired
 `pairings`; delete data for accounts lapsed > 90 days.

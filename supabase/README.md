@@ -11,7 +11,8 @@ file is the contract the Rust core's sync client codes against.
 | --- | --- |
 | `migrations/20261003170000_sync_schema.sql` | Tables, RLS, every client function, the nightly `librelog.maintenance()` at 03:17 UTC, and the Realtime policy that lets a device receive on its own channel |
 | `migrations/20261022120000_billing.sql` | Store purchases, `record_purchase()` (service role only) and `sync_status()` |
-| `functions/` | The billing Edge Functions: `verify-purchase`, `appstore-notifications`, `play-rtdn` ([docs/billing.md](../docs/billing.md)); `deno task test` in there |
+| `migrations/20261022150000_stripe.sql` | Web purchases: `purchases.starts_at` and `record_stripe_purchase()` (service role only) |
+| `functions/` | The billing Edge Functions: `verify-purchase`, `appstore-notifications`, `play-rtdn`, `stripe-checkout`, `stripe-webhook` ([docs/billing.md](../docs/billing.md)); `deno task test` in there |
 | `templates/sign_in_code.html` | Sign-in code email, enabled once custom SMTP is set up |
 | `tests/` | `run.sh` tests the migrations on a throwaway local Postgres 17 |
 | `config.toml` | Pushed with `supabase config push`; changes here do nothing to the live project until then |
@@ -65,6 +66,15 @@ verify, 403 that the purchase was made for another account, 409 that it
 already pays for another account, 502 that the store couldn't be reached.
 On Play, acknowledge the purchase only after a 200, and only if
 `acknowledged` is false. docs/billing.md has the rest.
+
+## Buying on the web
+
+`POST https://wzkhuilypzapqkrjxeku.supabase.co/functions/v1/stripe-checkout`
+with the same headers and `{"years": 1}` or `{"years": 3}` answers
+`{url, id}`: open `url` (Stripe Checkout) in the browser. The payment reaches
+the account through `stripe-webhook`; read `sync_status` again afterwards.
+Only Windows does this: the App Store and Play rules keep it out of the
+phone apps.
 
 Plain `GET /rest/v1/accounts` and `/rest/v1/devices` (same `Accept-Profile:
 librelog` header) read the user's own rows for the settings screen.
