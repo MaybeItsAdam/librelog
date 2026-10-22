@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,7 +67,6 @@ import uniffi.librelog_core.TimelineCursor
 import uniffi.librelog_core.TimelineFilter
 
 private const val PAGE = 50u
-private val THUMB = 52.dp
 
 /**
  * Every entry, newest first, grouped by day, with today always on top
@@ -259,11 +257,9 @@ private fun LazyListScope.dayGroup(
         val index = stagger.take()
         item(key = e.id) {
             Reveal(index, stagger.active, rowMotion(m)) {
-                // The day's later rows keep the photo's indent, so the day reads as one block.
+                // The photo sits beside the day's first row only; later rows start at the margin.
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    preview?.let {
-                        if (i == 0) DayThumb(it, Modifier.padding(top = 12.dp)) else Spacer(Modifier.width(THUMB))
-                    }
+                    if (i == 0) preview?.let { DayThumb(it, Modifier.padding(top = 12.dp)) }
                     EntryRow(e, onClick = { openEntry(e.id) }, showDate = false)
                 }
                 Hairline()

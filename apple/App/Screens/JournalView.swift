@@ -161,17 +161,12 @@ struct JournalView: View {
     }
 
     /// An entry, with its day's preview photo on the left of the day's
-    /// first row; the day's later rows keep the same indent, so a day with
-    /// photos reads as one block.
+    /// first row. The day's later rows start at the margin, like any other.
     private func row(_ e: EntrySummary, first: Bool) -> some View {
         NavigationLink(value: Route.entry(e.id)) {
             HStack(alignment: .top, spacing: 12) {
-                if let photo = previews[e.date] {
-                    if first {
-                        DayThumb(photo: photo, side: Self.thumbSide).padding(.top, 12)
-                    } else {
-                        Color.clear.frame(width: Self.thumbSide, height: 1)
-                    }
+                if first, let photo = previews[e.date] {
+                    DayThumb(photo: photo, side: Self.thumbSide).padding(.top, 12)
                 }
                 EntryRow(entry: e, showDate: false)
             }

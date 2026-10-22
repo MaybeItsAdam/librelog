@@ -17,7 +17,7 @@ public sealed record JournalDay(string Name, string Date, bool IsToday = false)
 }
 
 /// An entry in the journal, with its day's preview photo when it's the
-/// day's first row (Thumb) and the gutter when the day has one at all.
+/// day's first row (Thumb), and the gutter on that row only.
 public sealed record JournalEntry(EntrySummary Entry, DayPhoto? Thumb, bool Gutter)
 {
     public double GutterWidth => Gutter ? DayThumb.Side : 0;
@@ -171,7 +171,8 @@ public sealed partial class JournalPage : Page
     private static JournalEntry Row(EntrySummary e, Dictionary<string, DayPhoto> thumbs, bool first)
     {
         var thumb = thumbs.GetValueOrDefault(e.Date);
-        return new JournalEntry(e, first ? thumb : null, thumb is not null);
+        var shown = first ? thumb : null;
+        return new JournalEntry(e, shown, shown is not null);
     }
 
     /// "Today" over SUNDAY 18 OCTOBER 2026; "Tuesday" over 14 OCTOBER 2026.
