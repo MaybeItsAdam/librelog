@@ -22,6 +22,8 @@ final class SyncEngine {
     private(set) var lastSynced: Date?
     private(set) var problem: SyncError?
     private(set) var pending: UInt32 = 0
+    /// The account's sync subscription, as the server last reported it.
+    private(set) var subscription = SubscriptionStatus()
     /// Set right after this device creates the key, so the recovery phrase
     /// can be shown before the user moves on. Shown again on the next
     /// activation if it was never dismissed (the app quit, say).
@@ -98,6 +100,7 @@ final class SyncEngine {
             phase = .on
             connectRealtime(userID: session.userID)
             await syncNow()
+            await refreshSubscription()
         } else {
             await adoptAccount()
         }
@@ -234,6 +237,7 @@ final class SyncEngine {
         email = nil
         problem = nil
         newRecoveryPhrase = nil
+        subscription = SubscriptionStatus()
     }
 
     /// The server ended the session (it was revoked, or the refresh token
@@ -356,12 +360,15 @@ final class SyncEngine {
     /// account it was signed in to before this device kept track of which,
     /// starts afresh under a new id.
     private func registerDevice(name: String) async throws -> [Registration] {
+        let reg: [Registration]
         do {
-            return try await client.rpc("register_device", ["p_device_id": deviceID, "p_name_enc": name])
+            reg = try await client.rpc("register_device", ["p_device_id": deviceID, "p_name_enc": name])
         } catch SyncError.deviceTaken {
             try forgetAccountState()
-            return try await client.rpc("register_device", ["p_device_id": deviceID, "p_name_enc": name])
+            reg = try await client.rpc("register_device", ["p_device_id": deviceID, "p_name_enc": name])
         }
+        if let row = reg.first { subscription.syncUntil = SubscriptionStatus.date(row.syncUntil) }
+        return reg
     }
 
     /// Restores the key from the 24 words. Throws if they're not this account's.
@@ -419,6 +426,39 @@ final class SyncEngine {
         phase = .on
         if let user = await client.session?.userID { connectRealtime(userID: user) }
         await syncNow()
+        await refreshSubscription()
+    }
+
+    // MARK: Subscription (docs/billing.md)
+
+    /// The signed-in account's id, which purchases carry so the stores'
+    /// notifications name it.
+    var userID: String? {
+        get async { await client.session?.userID.lowercased() }
+    }
+
+    /// Reads the account's paid-through date and subscription. Keeps the
+    /// last known status if the server can't be reached.
+    func refreshSubscription() async {
+        guard await client.session != nil else { return }
+        guard let rows: [StatusRow] = try? await client.rpc("sync_status", [:]), let row = rows.first else { return }
+        subscription = SubscriptionStatus(syncUntil: SubscriptionStatus.date(row.syncUntil), store: row.store,
+                                          state: row.status, autoRenew: row.autoRenew ?? false)
+    }
+
+    /// Hands a store purchase to the server to verify (`verify-purchase`),
+    /// and starts syncing as soon as it's paid for. Throws
+    /// `SyncError.server(4xx, …)` if the server won't accept it.
+    @discardableResult
+    func reportPurchase(_ body: [String: any Sendable]) async throws -> PurchaseReport {
+        let report: PurchaseReport = try await client.invoke("verify-purchase", body)
+        if let until = SubscriptionStatus.date(report.syncUntil) { subscription.syncUntil = until }
+        await refreshSubscription()
+        if subscription.isActive, problem == .notActive {
+            problem = nil
+            await syncNow()
+        }
+        return report
     }
 
     // MARK: The loop
@@ -504,6 +544,21 @@ private struct PulledRow: Decodable {
     let seq: Int64
     let deviceId: String
     let payload: String
+}
+
+private struct StatusRow: Decodable {
+    let syncUntil: String?
+    let store: String?
+    let status: String?
+    let autoRenew: Bool?
+}
+
+/// `verify-purchase`'s answer.
+struct PurchaseReport: Decodable, Sendable {
+    let syncUntil: String?
+    let status: String
+    let expiresAt: String?
+    let acknowledged: Bool
 }
 
 private struct SnapshotRow: Decodable {

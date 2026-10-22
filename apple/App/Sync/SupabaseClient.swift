@@ -241,29 +241,9 @@ actor SupabaseClient {
     private enum Unauthorised: Error { case token(String) }
 
     private func post(_ endpoint: URL, body: [String: any Sendable], auth: Bool) async throws -> Data {
-        var req = URLRequest(url: endpoint)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(key, forHTTPHeaderField: "apikey")
-        var token = ""
-        if auth {
-            token = try await accessToken()
-            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            req.setValue("librelog", forHTTPHeaderField: "Content-Profile")
-        }
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await http.data(for: req)
-        } catch let e as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost].contains(e.code) {
-            throw SyncError.offline
-        }
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let (status, data, token) = try await send(endpoint, body: body, auth: auth, profile: true)
         guard (200..<300).contains(status) else {
-            let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
-                .flatMap { $0["message"] as? String ?? $0["msg"] as? String ?? $0["error_description"] as? String }
-                ?? String(decoding: data, as: UTF8.self)
+            let message = Self.errorMessage(data)
             switch status {
             case 401 where auth: throw Unauthorised.token(token)
             case 400 where message.contains("device belongs to another account"): throw SyncError.deviceTaken
@@ -275,6 +255,53 @@ actor SupabaseClient {
             }
         }
         return data
+    }
+
+    /// The status, body and bearer token (empty without `auth`) of one POST.
+    private func send(_ endpoint: URL, body: [String: any Sendable], auth: Bool,
+                      profile: Bool) async throws -> (Int, Data, String) {
+        var req = URLRequest(url: endpoint)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(key, forHTTPHeaderField: "apikey")
+        var token = ""
+        if auth {
+            token = try await accessToken()
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            if profile { req.setValue("librelog", forHTTPHeaderField: "Content-Profile") }
+        }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await http.data(for: req)
+        } catch let e as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost].contains(e.code) {
+            throw SyncError.offline
+        }
+        return ((response as? HTTPURLResponse)?.statusCode ?? 0, data, token)
+    }
+
+    private static func errorMessage(_ data: Data) -> String {
+        (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+            .flatMap { $0["message"] as? String ?? $0["msg"] as? String ?? $0["error_description"] as? String ?? $0["error"] as? String }
+            ?? String(decoding: data, as: UTF8.self)
+    }
+
+    // MARK: Edge Functions
+
+    /// Calls the Edge Function `name` as the signed-in user. Unlike `rpc`,
+    /// error statuses keep their own meaning, so they come back as
+    /// `SyncError.server(status, message)`.
+    func invoke<T: Decodable>(_ name: String, _ body: [String: any Sendable], as: T.Type = T.self) async throws -> T {
+        let endpoint = url.appending(path: "functions/v1/\(name)")
+        var (status, data, token) = try await send(endpoint, body: body, auth: true, profile: false)
+        if status == 401 {
+            if session?.accessToken == token { _ = try await refresh() }
+            (status, data, _) = try await send(endpoint, body: body, auth: true, profile: false)
+            if status == 401 { throw SyncError.signedOut }
+        }
+        guard (200..<300).contains(status) else { throw SyncError.server(status, Self.errorMessage(data)) }
+        return try JSONDecoder.supabase.decode(T.self, from: data)
     }
 
     /// A session from a sign-in, replacing any other.

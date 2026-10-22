@@ -16,6 +16,7 @@ enum Backend {
 final class AppModel {
     let store: Store
     let sync: SyncEngine
+    let subscriptions: SyncSubscription
     let calendar = DeviceCalendar()
     /// Whether the device calendar can be read; asked on first use only.
     private(set) var calendarAccess: DeviceCalendar.Access
@@ -32,6 +33,7 @@ final class AppModel {
     init(store: Store) {
         self.store = store
         self.sync = SyncEngine(store: store)
+        self.subscriptions = SyncSubscription(sync: sync)
         self.calendarAccess = calendar.access
         // Read once before the first frame, so the theme doesn't flash.
         if let a = try? Appearance.load(from: store) { AppearanceModel.shared.apply(a) }

@@ -145,6 +145,8 @@ struct SyncSettingsView: View {
                 Text("Sync").microLabel()
             }
 
+            SubscriptionSection()
+
             Section {
                 NavigationLink("Add another device") { PairingApproveView() }
                 NavigationLink("Show recovery phrase") { RecoveryPhraseReveal() }
