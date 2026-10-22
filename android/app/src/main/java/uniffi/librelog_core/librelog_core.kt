@@ -731,9 +731,15 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_day_photos(
     ): Int
+    external fun uniffi_librelog_core_checksum_method_store_day_preview_choice(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_day_previews(
+    ): Int
     external fun uniffi_librelog_core_checksum_method_store_photos_awaiting_source_ref(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_remove_day_photo(
+    ): Int
+    external fun uniffi_librelog_core_checksum_method_store_set_day_preview(
     ): Int
     external fun uniffi_librelog_core_checksum_method_store_set_photo_caption(
     ): Int
@@ -921,9 +927,15 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_day_photos(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_day_preview_choice(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_librelog_core_fn_method_store_day_previews(`ptr`: Long,`journalId`: RustBuffer.ByValue,`dates`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_photos_awaiting_source_ref(`ptr`: Long,`assetPrefix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_librelog_core_fn_method_store_remove_day_photo(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_librelog_core_fn_method_store_set_day_preview(`ptr`: Long,`journalId`: RustBuffer.ByValue,`date`: RustBuffer.ByValue,`choice`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_librelog_core_fn_method_store_set_photo_caption(`ptr`: Long,`id`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1246,10 +1258,19 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_librelog_core_checksum_method_store_day_photos() and 0xFFFF) != 12701) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_librelog_core_checksum_method_store_day_preview_choice() and 0xFFFF) != 16294) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_day_previews() and 0xFFFF) != 55100) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_librelog_core_checksum_method_store_photos_awaiting_source_ref() and 0xFFFF) != 62904) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_remove_day_photo() and 0xFFFF) != 35833) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_librelog_core_checksum_method_store_set_day_preview() and 0xFFFF) != 11036) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_librelog_core_checksum_method_store_set_photo_caption() and 0xFFFF) != 33176) {
@@ -2314,6 +2335,19 @@ public interface StoreInterface {
     fun `dayPhotos`(`journalId`: kotlin.String?, `date`: kotlin.String): List<DayPhoto>
     
     /**
+     * What the user chose for a day, as stored. A chosen photo may since
+     * have been removed; [`Store::day_previews`] then falls back to the first.
+     */
+    fun `dayPreviewChoice`(`journalId`: kotlin.String?, `date`: kotlin.String): PreviewChoice
+    
+    /**
+     * The photo standing for each of `dates` in the journal list: the one
+     * chosen, else the day's first. Days with no photos, or set to no
+     * preview, are left out. One query for a whole page of the list.
+     */
+    fun `dayPreviews`(`journalId`: kotlin.String?, `dates`: List<kotlin.String>): List<DayPhoto>
+    
+    /**
      * Photos added here whose `source_ref` isn't known yet and whose local
      * asset id starts with `asset_prefix` ("apple:"), for the app to look up
      * when it comes to the front.
@@ -2325,6 +2359,12 @@ public interface StoreInterface {
      * the same photo is still kept on another day.
      */
     fun `removeDayPhoto`(`id`: kotlin.String)
+    
+    /**
+     * Chooses the photo that stands for a day in the journal list, or none.
+     * A chosen photo must be on that day.
+     */
+    fun `setDayPreview`(`journalId`: kotlin.String?, `date`: kotlin.String, `choice`: PreviewChoice)
     
     /**
      * The user's caption on a photo; empty clears it.
@@ -3032,6 +3072,47 @@ open class Store: Disposable, AutoCloseable, StoreInterface
 
     
     /**
+     * What the user chose for a day, as stored. A chosen photo may since
+     * have been removed; [`Store::day_previews`] then falls back to the first.
+     */
+    @Throws(CoreException::class)override fun `dayPreviewChoice`(`journalId`: kotlin.String?, `date`: kotlin.String): PreviewChoice {
+            return FfiConverterTypePreviewChoice.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_day_preview_choice(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The photo standing for each of `dates` in the journal list: the one
+     * chosen, else the day's first. Days with no photos, or set to no
+     * preview, are left out. One query for a whole page of the list.
+     */
+    @Throws(CoreException::class)override fun `dayPreviews`(`journalId`: kotlin.String?, `dates`: List<kotlin.String>): List<DayPhoto> {
+            return FfiConverterSequenceTypeDayPhoto.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_day_previews(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterSequenceString.lower(`dates`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Photos added here whose `source_ref` isn't known yet and whose local
      * asset id starts with `asset_prefix` ("apple:"), for the app to look up
      * when it comes to the front.
@@ -3063,6 +3144,26 @@ open class Store: Disposable, AutoCloseable, StoreInterface
         it,
         
         FfiConverterString.lower(`id`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Chooses the photo that stands for a day in the journal list, or none.
+     * A chosen photo must be on that day.
+     */
+    @Throws(CoreException::class)override fun `setDayPreview`(`journalId`: kotlin.String?, `date`: kotlin.String, `choice`: PreviewChoice)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_librelog_core_fn_method_store_set_day_preview(
+        it,
+        
+        FfiConverterOptionalString.lower(`journalId`),
+        FfiConverterString.lower(`date`),
+        FfiConverterTypePreviewChoice.lower(`choice`),_status)
 }
     }
     
@@ -6437,6 +6538,107 @@ public object FfiConverterTypeMarkKind : FfiConverterRustBuffer<MarkKind>{
             is MarkKind.EntryLink -> {
                 buf.putInt(8)
                 FfiConverterString.write(value.`entryId`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Which photo stands for a day in the journal list. The choice syncs; the
+ * photo's id is the same on every device (it names the row, not the file),
+ * so a device without the file still knows which one was chosen.
+ */
+sealed class PreviewChoice {
+    
+    /**
+     * The day's first photo, in the order they were taken.
+     */
+    object Default : PreviewChoice()
+    
+    
+    /**
+     * No photo, even though the day has some.
+     */
+    object NoPreview : PreviewChoice()
+    
+    
+    /**
+     * This photo while it's on the day; the first one once it's removed.
+     */
+    data class Photo(
+        val `id`: kotlin.String) : PreviewChoice()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePreviewChoice : FfiConverterRustBuffer<PreviewChoice>{
+    override fun read(buf: ByteBuffer): PreviewChoice {
+        return when(buf.getInt()) {
+            1 -> PreviewChoice.Default
+            2 -> PreviewChoice.NoPreview
+            3 -> PreviewChoice.Photo(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: PreviewChoice): ULong = when(value) {
+        is PreviewChoice.Default -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is PreviewChoice.NoPreview -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is PreviewChoice.Photo -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`id`)
+            )
+        }
+    }
+
+    override fun write(value: PreviewChoice, buf: ByteBuffer) {
+        when(value) {
+            is PreviewChoice.Default -> {
+                buf.putInt(1)
+                Unit
+            }
+            is PreviewChoice.NoPreview -> {
+                buf.putInt(2)
+                Unit
+            }
+            is PreviewChoice.Photo -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`id`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }

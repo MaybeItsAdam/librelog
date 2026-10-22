@@ -912,6 +912,19 @@ public protocol StoreProtocol: AnyObject, Sendable {
     func dayPhotos(journalId: String?, date: String) throws  -> [DayPhoto]
     
     /**
+     * What the user chose for a day, as stored. A chosen photo may since
+     * have been removed; [`Store::day_previews`] then falls back to the first.
+     */
+    func dayPreviewChoice(journalId: String?, date: String) throws  -> PreviewChoice
+    
+    /**
+     * The photo standing for each of `dates` in the journal list: the one
+     * chosen, else the day's first. Days with no photos, or set to no
+     * preview, are left out. One query for a whole page of the list.
+     */
+    func dayPreviews(journalId: String?, dates: [String]) throws  -> [DayPhoto]
+    
+    /**
      * Photos added here whose `source_ref` isn't known yet and whose local
      * asset id starts with `asset_prefix` ("apple:"), for the app to look up
      * when it comes to the front.
@@ -923,6 +936,12 @@ public protocol StoreProtocol: AnyObject, Sendable {
      * the same photo is still kept on another day.
      */
     func removeDayPhoto(id: String) throws 
+    
+    /**
+     * Chooses the photo that stands for a day in the journal list, or none.
+     * A chosen photo must be on that day.
+     */
+    func setDayPreview(journalId: String?, date: String, choice: PreviewChoice) throws 
     
     /**
      * The user's caption on a photo; empty clears it.
@@ -1496,6 +1515,37 @@ open func dayPhotos(journalId: String?, date: String)throws  -> [DayPhoto]  {
 }
     
     /**
+     * What the user chose for a day, as stored. A chosen photo may since
+     * have been removed; [`Store::day_previews`] then falls back to the first.
+     */
+open func dayPreviewChoice(journalId: String?, date: String)throws  -> PreviewChoice  {
+    return try  FfiConverterTypePreviewChoice_lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_day_preview_choice(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The photo standing for each of `dates` in the journal list: the one
+     * chosen, else the day's first. Days with no photos, or set to no
+     * preview, are left out. One query for a whole page of the list.
+     */
+open func dayPreviews(journalId: String?, dates: [String])throws  -> [DayPhoto]  {
+    return try  FfiConverterSequenceTypeDayPhoto.lift(try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_day_previews(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterSequenceString.lower(dates),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Photos added here whose `source_ref` isn't known yet and whose local
      * asset id starts with `asset_prefix` ("apple:"), for the app to look up
      * when it comes to the front.
@@ -1519,6 +1569,21 @@ open func removeDayPhoto(id: String)throws   {try rustCallWithError(FfiConverter
     uniffi_librelog_core_fn_method_store_remove_day_photo(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Chooses the photo that stands for a day in the journal list, or none.
+     * A chosen photo must be on that day.
+     */
+open func setDayPreview(journalId: String?, date: String, choice: PreviewChoice)throws   {try rustCallWithError(FfiConverterTypeCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_librelog_core_fn_method_store_set_day_preview(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(journalId),
+        FfiConverterString.lower(date),
+        FfiConverterTypePreviewChoice_lower(choice),uniffiCallStatus
     )
 }
 }
@@ -5213,6 +5278,96 @@ public func FfiConverterTypeMarkKind_lower(_ value: MarkKind) -> RustBuffer {
 }
 
 
+
+/**
+ * Which photo stands for a day in the journal list. The choice syncs; the
+ * photo's id is the same on every device (it names the row, not the file),
+ * so a device without the file still knows which one was chosen.
+ */
+
+public enum PreviewChoice: Equatable, Hashable {
+    
+    /**
+     * The day's first photo, in the order they were taken.
+     */
+    case `default`
+    /**
+     * No photo, even though the day has some.
+     */
+    case noPreview
+    /**
+     * This photo while it's on the day; the first one once it's removed.
+     */
+    case photo(id: String
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PreviewChoice: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePreviewChoice: FfiConverterRustBuffer {
+    typealias SwiftType = PreviewChoice
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PreviewChoice {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .`default`
+        
+        case 2: return .noPreview
+        
+        case 3: return .photo(id: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PreviewChoice, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .`default`:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .noPreview:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .photo(id):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(id, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePreviewChoice_lift(_ buf: RustBuffer) throws -> PreviewChoice {
+    return try FfiConverterTypePreviewChoice.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePreviewChoice_lower(_ value: PreviewChoice) -> RustBuffer {
+    return FfiConverterTypePreviewChoice.lower(value)
+}
+
+
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
@@ -5907,10 +6062,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_librelog_core_checksum_method_store_day_photos() != 12701) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_librelog_core_checksum_method_store_day_preview_choice() != 16294) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_day_previews() != 55100) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_librelog_core_checksum_method_store_photos_awaiting_source_ref() != 62904) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_remove_day_photo() != 35833) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_librelog_core_checksum_method_store_set_day_preview() != 11036) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_librelog_core_checksum_method_store_set_photo_caption() != 33176) {
