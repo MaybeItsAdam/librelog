@@ -322,9 +322,15 @@ private fun Status(app: AppModel) {
             }
         }
         if (sync.pending > 0u) Labeled("Waiting to upload") { Text(sync.pending.toString(), style = Typeface.mono(13), color = t.ink) }
-        sync.problem?.let { StatusBanner(it.message ?: "Problem", t.danger) }
+        sync.problem?.let {
+            val text = if (it == SyncError.NotActive) "Sync isn't active for this account. Subscribe below to switch it on; " +
+                "everything stays on this device meanwhile." else it.message ?: "Problem"
+            StatusBanner(text, t.danger)
+        }
         SecondaryButton("Sync now", { scope.launch { sync.syncNow() } })
     }
+
+    SubscriptionSection(app)
 
     Section("Devices") {
         SecondaryButton("Add another device", { adding = true })
@@ -487,7 +493,7 @@ internal fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Labeled(label: String, value: @Composable () -> Unit) {
+internal fun Labeled(label: String, value: @Composable () -> Unit) {
     val t = tokens
     Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = Typeface.small, color = t.muted, modifier = Modifier.weight(1f))
@@ -496,7 +502,7 @@ private fun Labeled(label: String, value: @Composable () -> Unit) {
 }
 
 @Composable
-private fun StatusTag(text: String, color: Color) {
+internal fun StatusTag(text: String, color: Color) {
     val shape = RoundedCornerShape(Radius.control)
     Text(
         text,

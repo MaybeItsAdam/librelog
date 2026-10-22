@@ -1,0 +1,66 @@
+{
+  "identifier" : "5C2A7E10",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_developerTeamID" : "6NQNU5YSC2",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_GB",
+    "_storefront" : "GBR",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21576100",
+      "localizations" : [
+        {
+          "description" : "",
+          "displayName" : "LibreLog Sync",
+          "locale" : "en_GB"
+        }
+      ],
+      "name" : "LibreLog Sync",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.19",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6753000001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "End-to-end encrypted sync across your devices for a year, at cost.",
+              "displayName" : "Sync, 1 year",
+              "locale" : "en_GB"
+            }
+          ],
+          "productID" : "uk.co.maybeitssoftware.librelog.sync.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Sync, 1 year",
+          "subscriptionGroupID" : "21576100",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

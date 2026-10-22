@@ -23,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uk.co.maybeitssoftware.librelog.billing.SyncSubscription
 import uk.co.maybeitssoftware.librelog.calendar.DeviceCalendar
 import uk.co.maybeitssoftware.librelog.lock.LockedNoteDraft
 import uk.co.maybeitssoftware.librelog.sync.KeystoreSecretStore
@@ -65,7 +66,14 @@ class LibrelogApplication : Application(), Configuration.Provider {
  * dispatcher via [run], so typing and scrolling never wait on SQLite.
  * Mirrors apple/App/AppModel.swift.
  */
-class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope, val calendar: DeviceCalendar) {
+class AppModel(
+    val store: Store,
+    val sync: SyncEngine,
+    val scope: CoroutineScope,
+    val calendar: DeviceCalendar,
+    /** Buying sync on Google Play (docs/billing.md). */
+    val billing: SyncSubscription,
+) {
     /** Bumped after any write or merged pull, so screens reload. */
     var revision by mutableIntStateOf(0)
         private set
@@ -190,7 +198,7 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
                     RealtimeChannel(Backend.URL, Backend.PUBLISHABLE_KEY, "user:$user", client, scope, onPing)
                 },
             )
-            val model = AppModel(store, sync, scope, DeviceCalendar(app))
+            val model = AppModel(store, sync, scope, DeviceCalendar(app), SyncSubscription(app, sync, scope))
             // Read before the first frame, so the chosen theme never flashes
             // in after the default one. Four indexed reads.
             runCatching { Appearance.from { store.setting(it) } }.onSuccess { model.appearance = it }

@@ -101,8 +101,17 @@ targets:
         "TEST_HOST[sdk=macosx*]": $(BUILT_PRODUCTS_DIR)/Librelog.app/Contents/MacOS/Librelog
         BUNDLE_LOADER: $(TEST_HOST)
 
+# Local StoreKit testing (docs/billing.md): Run uses this configuration
+# instead of the App Store, so the sync subscription can be bought, renewed
+# and refunded in Xcode without App Store Connect. Its transactions are signed
+# by Xcode, not Apple, so the sync server won't accept them.
+fileGroups:
+  - Librelog.storekit
+
 schemes:
   Librelog:
+    run:
+      storeKitConfiguration: Librelog.storekit
     build:
       targets:
         Librelog: all

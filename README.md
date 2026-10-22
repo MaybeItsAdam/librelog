@@ -44,8 +44,10 @@ supabase db push               # apply migrations to the linked project
 
 ## Sync access
 
-Until checkout exists, grant sync by hand in the Supabase SQL editor (the
-user must exist; sign in once first):
+Sync is a yearly subscription bought in the iPhone, Mac or Android app
+(Settings → Sync → Subscription); [docs/billing.md](docs/billing.md) has
+the store and server setup. It can also be granted by hand in the Supabase
+SQL editor (the user must exist; sign in once first):
 
 ```sql
 select librelog.admin_set_sync_until('someone@example.com', now() + interval '1 year');

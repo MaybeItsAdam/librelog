@@ -64,6 +64,7 @@ public sealed class SyncEngine(
     private uint pending;
     private string? newRecoveryPhrase;
     private string? codeSentTo;
+    private SubscriptionStatus? subscription;
 
     public SyncPhase Phase { get => phase; private set => Set(ref phase, value); }
     public string? Email { get => email; private set => Set(ref email, value); }
@@ -71,6 +72,10 @@ public sealed class SyncEngine(
     public DateTimeOffset? LastSynced { get => lastSynced; private set => Set(ref lastSynced, value); }
     public SyncException? Problem { get => problem; private set => Set(ref problem, value); }
     public uint Pending { get => pending; private set => Set(ref pending, value); }
+
+    /// The account's subscription, from the last <see cref="RefreshSubscription"/>.
+    /// Null until then, and after signing out.
+    public SubscriptionStatus? Subscription { get => subscription; private set => Set(ref subscription, value); }
 
     /// Where the last sign-in email went, while its code may still be typed.
     /// Null after a password sign-in, which sends no email.
@@ -262,6 +267,23 @@ public sealed class SyncEngine(
         Phase = SyncPhase.Off;
         Email = null;
         CodeSentTo = null;
+        Subscription = null;
+    }
+
+    /// Asks the server how long this account may sync and through which
+    /// store, for the Sync page. Best effort: offline or failing, the last
+    /// known status stays.
+    public async Task RefreshSubscription()
+    {
+        if (client.Session is null) return;
+        try
+        {
+            Subscription = SubscriptionStatus.Parse(await client.Rpc("sync_status", []));
+        }
+        catch (SyncException)
+        {
+            // A lost session is SyncNow's to deal with.
+        }
     }
 
     /// Deletes the account and everything synced to it, then forgets it

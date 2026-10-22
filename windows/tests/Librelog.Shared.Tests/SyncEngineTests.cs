@@ -138,6 +138,23 @@ public sealed class SyncEngineTests : IDisposable
         await a.SyncNow();
         Assert.Equal(SyncProblem.NotActive, a.Problem?.Problem);
         Assert.True(aStore.PendingCount() > 0);
+
+        await a.RefreshSubscription();
+        Assert.Null(a.Subscription?.SyncUntil);
+        Assert.True(a.Subscription!.Describe(DateTimeOffset.UtcNow).NeedsSubscription);
+    }
+
+    [Fact]
+    public async Task ThePaidThroughDateAndStoreComeFromSyncStatus()
+    {
+        var (a, _) = Device("u10", "laptop");
+        await a.Start();
+        await a.RefreshSubscription();
+        Assert.Equal(DateTimeOffset.Parse("2027-10-03T00:00:00Z"), a.Subscription?.SyncUntil);
+        Assert.Equal("play", a.Subscription?.Store);
+
+        await a.SignOut();
+        Assert.Null(a.Subscription);
     }
 
     [Fact]
@@ -370,6 +387,14 @@ internal sealed class FakeSupabase : HttpMessageHandler
                 {
                     ["last_seq"] = a.LastSeq, ["sync_until"] = active ? "2027-10-03T00:00:00Z" : null,
                     ["key_check"] = a.KeyCheck, ["quota_bytes"] = 524288000, ["bytes_used"] = 0,
+                }));
+            case "sync_status":
+                return Json(new JsonArray(new JsonObject
+                {
+                    ["sync_until"] = active ? "2027-10-03T00:00:00+00:00" : null,
+                    ["store"] = active ? "play" : null, ["product_id"] = active ? "sync_yearly" : null,
+                    ["status"] = active ? "active" : null, ["expires_at"] = active ? "2027-10-03T00:00:00+00:00" : null,
+                    ["auto_renew"] = active ? true : null,
                 }));
             case "set_key_check":
                 a.KeyCheck ??= args["p_key_check"]!.GetValue<string>();

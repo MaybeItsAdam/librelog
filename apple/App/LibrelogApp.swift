@@ -25,6 +25,7 @@ struct LibrelogApp: App {
             RootView()
                 .environment(app)
                 .task { await app.sync.start() }
+                .task { app.subscriptions.start() }
                 .task { await app.refreshCalendar() }
                 .task { await app.resolvePhotoSourceRefs() }
                 .onOpenURL { url in Task { await app.sync.handle(url: url) } }

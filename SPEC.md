@@ -483,9 +483,13 @@ are **no direct insert/update policies** on `ops`, `snapshots` or
 
 | Function | Trigger | Does |
 |---|---|---|
-| `stripe-webhook` | Stripe events | sets `sync_until` |
+| `stripe-webhook` | Stripe events | sets `sync_until` (not built yet) |
 | `appstore-notifications` | App Store Server Notifications v2 | verifies JWS, sets `sync_until` |
 | `play-rtdn` | Google Play real-time notifications (Pub/Sub push) | verifies via Play Developer API, sets `sync_until` |
+| `verify-purchase` | the apps, right after a purchase or restore | verifies the StoreKit 2 transaction or Play token, sets `sync_until` |
+
+All of them write through `record_purchase()`, which moves `sync_until`
+only forward except on a refund (docs/billing.md).
 
 **Housekeeping (`pg_cron`, daily):** compaction GC; delete expired
 `pairings`; delete data for accounts lapsed > 90 days.

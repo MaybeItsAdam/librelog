@@ -10,6 +10,8 @@ file is the contract the Rust core's sync client codes against.
 | Path | What |
 | --- | --- |
 | `migrations/20261003170000_sync_schema.sql` | Tables, RLS, every client function, the nightly `librelog.maintenance()` at 03:17 UTC, and the Realtime policy that lets a device receive on its own channel |
+| `migrations/20261022120000_billing.sql` | Store purchases, `record_purchase()` (service role only) and `sync_status()` |
+| `functions/` | The billing Edge Functions: `verify-purchase`, `appstore-notifications`, `play-rtdn` ([docs/billing.md](../docs/billing.md)); `deno task test` in there |
 | `templates/sign_in_code.html` | Sign-in code email, enabled once custom SMTP is set up |
 | `tests/` | `run.sh` tests the migrations on a throwaway local Postgres 17 |
 | `config.toml` | Pushed with `supabase config push`; changes here do nothing to the live project until then |
@@ -42,6 +44,27 @@ strings without line breaks.
 | `pairing_take` | `p_id` | payload, or `null` while waiting; deletes the pairing once taken |
 | `revoke_device` | `p_device_id` | — |
 | `delete_account` | — | — deletes the auth user and every row |
+| `sync_status` | — | `[{sync_until, store, product_id, status, expires_at, auto_renew}]` — the subscription that pays for sync, if any |
+
+Plain `GET /rest/v1/purchases` reads the user's own store purchases.
+
+## Reporting a purchase
+
+`POST https://wzkhuilypzapqkrjxeku.supabase.co/functions/v1/verify-purchase`
+with the same `apikey` and `Authorization` headers (no `Content-Profile`),
+right after a purchase, a restore, or on launch for one not yet confirmed:
+
+```json
+{"store": "app_store", "signed_transaction": "<StoreKit 2 jwsRepresentation>"}
+{"store": "play", "product_id": "sync_yearly", "purchase_token": "<token>"}
+```
+
+It answers `{sync_until, status, expires_at, acknowledged}`. Calling it again
+with the same purchase changes nothing. 400 means the store data didn't
+verify, 403 that the purchase was made for another account, 409 that it
+already pays for another account, 502 that the store couldn't be reached.
+On Play, acknowledge the purchase only after a 200, and only if
+`acknowledged` is false. docs/billing.md has the rest.
 
 Plain `GET /rest/v1/accounts` and `/rest/v1/devices` (same `Accept-Profile:
 librelog` header) read the user's own rows for the settings screen.
@@ -86,7 +109,7 @@ rejoin on `phx_close` or `phx_error`.
 
 ## Granting sync by hand
 
-Until checkout exists, in the SQL editor:
+Besides the store subscriptions (docs/billing.md), in the SQL editor:
 
 ```sql
 select librelog.admin_set_sync_until('you@example.com', now() + interval '1 year');

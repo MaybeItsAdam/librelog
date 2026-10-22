@@ -421,6 +421,19 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Billing (docs/billing.md). The store endpoints are called by Apple and by
+# Pub/Sub, which have no Supabase token: each checks its caller's signature
+# itself. verify-purchase checks the user's token itself too, so it works
+# with both the legacy JWT keys and the newer publishable/secret keys.
+[functions.appstore-notifications]
+verify_jwt = false
+
+[functions.play-rtdn]
+verify_jwt = false
+
+[functions.verify-purchase]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

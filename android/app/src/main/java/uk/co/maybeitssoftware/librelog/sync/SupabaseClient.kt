@@ -197,9 +197,19 @@ class SupabaseClient(
         return if (text.isBlank()) JsonPrimitive(null as String?) else json.parseToJsonElement(text)
     }
 
+    /**
+     * Calls the Edge Function [name] as the signed-in user (verify-purchase)
+     * and returns its JSON reply. Its errors keep their HTTP status in
+     * [SyncError.Server], since they mean something else than the database's.
+     */
+    suspend fun function(name: String, body: JsonObject): JsonElement {
+        val text = post("$baseUrl/functions/v1/$name", body, auth = true, rest = false)
+        return if (text.isBlank()) JsonPrimitive(null as String?) else json.parseToJsonElement(text)
+    }
+
     // MARK: Plumbing
 
-    private suspend fun post(url: String, body: JsonObject, auth: Boolean, retried: Boolean = false): String {
+    private suspend fun post(url: String, body: JsonObject, auth: Boolean, retried: Boolean = false, rest: Boolean = true): String {
         val bearer = if (auth) accessToken() else null
         val request = Request.Builder().url(url)
             .header("apikey", apiKey)
@@ -207,7 +217,7 @@ class SupabaseClient(
             .apply {
                 if (bearer != null) {
                     header("Authorization", "Bearer $bearer")
-                    header("Content-Profile", "librelog")
+                    if (rest) header("Content-Profile", "librelog")
                 }
             }
             .build()
@@ -224,18 +234,19 @@ class SupabaseClient(
         // out, since signing out forgets the journal key.
         if (status == 401 && bearer != null && !retried) {
             refreshAfterRejection(bearer)
-            return post(url, body, auth, retried = true)
+            return post(url, body, auth, retried = true, rest = rest)
         }
-        throw errorFor(status, text, auth)
+        throw errorFor(status, text, auth, rest)
     }
 
-    private fun errorFor(status: Int, text: String, auth: Boolean): SyncError {
+    private fun errorFor(status: Int, text: String, auth: Boolean, rest: Boolean = true): SyncError {
         val message = runCatching {
             val o = json.parseToJsonElement(text).jsonObject
-            (o["message"] ?: o["msg"] ?: o["error_description"])?.jsonPrimitive?.contentOrNull
+            (o["message"] ?: o["msg"] ?: o["error_description"] ?: o["error"])?.jsonPrimitive?.contentOrNull
         }.getOrNull() ?: text
         return when {
             status == 401 && auth -> SyncError.SignedOut
+            !rest -> SyncError.Server(status, message)
             status == 402 -> SyncError.NotActive
             status == 404 && message.contains("unknown device") -> SyncError.UnknownDevice
             status == 409 -> SyncError.BehindCompaction
