@@ -1,0 +1,5 @@
+LibreLog needs no account. Every feature except sync works straight away, offline: write an entry with the + button, add a photo to a day, and use Calendar and Search from the tab bar.
+
+Locked notes: in Settings, under Privacy, turn on Locked notes and choose any password of four or more characters. Each day then shows a "Locked note" tile.
+
+Sync (the yearly subscription): in Settings, under Sync across your devices, tap "Use a password instead" and sign in with the review account given in the sign-in fields. The account already has sync turned on, so nothing needs to be bought to test it; the subscription can still be bought in the sandbox from the Subscription section once signed in. As the account already holds a journal, the app then asks for it to be unlocked: choose "Use recovery phrase" and enter the 24-word phrase on the line below.

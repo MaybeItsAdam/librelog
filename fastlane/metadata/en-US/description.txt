@@ -1,0 +1,35 @@
+LibreLog is a private journal for writing a little about each day. Open it and start writing: there's no account to make, no sign-up screen and nothing to buy. Everything is kept on your device and works offline.
+
+WRITE
+• Rich text: headings, bold, italic, underline, highlight, bulleted and numbered lists, checklists and quotes, with Markdown shortcuts as you type.
+• As many entries on a day as you like, each with or without a time.
+• Missed a day? Write it up afterwards on its own date.
+• One entry can cover several days, for a trip or a festival.
+• Titles, star ratings, tags and favorites. Every change saves as you go, with version history for each entry.
+
+YOUR DAYS
+• The journal is one calm list, newest first, grouped by day.
+• Keep photos on a day. They stay on the device they were added on, and one of them stands for the day in the journal.
+• See the day's events from your calendar and keep the ones that mattered. Kept events follow the calendar if they move or are cancelled. You can add events of your own, too.
+• On This Day shows what you wrote on today's date in earlier years.
+
+LOCKED NOTES
+Any day can hold a locked note, sealed with a password of your choosing. It asks for the password every time it opens, and exports leave it out. There is no way round the password: forget it and the notes can't be recovered.
+
+FIND IT AGAIN
+• Search every entry as you type.
+• Narrow it down with tag:walk, rating:>=4, before: and after: dates, "exact phrases" and -words to leave out.
+• A month calendar marks the days you wrote, tinted by rating.
+
+BRING IT IN, TAKE IT OUT
+• Import from LibreLog backups, Day One, Daylio, Diarium and Markdown files, so notes kept as Markdown, such as an Obsidian vault, can come with you.
+• Export a backup of everything you've written at any time, or your journal as Markdown, a web page or plain text.
+
+MAKE IT YOURS
+Light and dark themes, seven accent colors, four typefaces including the Arvo slab serif, and a text size that works with Dynamic Type.
+
+OPTIONAL SYNC
+Sync between your iPhone, iPad, Mac and Android devices is the one paid part of LibreLog: a yearly subscription priced at what the service costs to run. It is end-to-end encrypted. Your journal is encrypted on your device before it is uploaded, so the server only ever holds ciphertext and nobody else, including us, can read it. Setting up sync gives you a 24-word recovery phrase; adding a device is a QR code scan away. Sync carries text, not photos; on Apple devices that share an iCloud Photos library, a day's photos still show everywhere.
+
+FREE AND OPEN
+LibreLog is free software under the GNU AGPL. Every app, the shared core and the sync backend are open source, and anyone can run their own sync server for free. There are no ads, no analytics and no tracking.

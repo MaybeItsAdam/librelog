@@ -1,0 +1,1 @@
+The first release of LibreLog: a private journal with rich text, photos on each day, locked notes, a calendar, search, import and export, and optional end-to-end encrypted sync.
