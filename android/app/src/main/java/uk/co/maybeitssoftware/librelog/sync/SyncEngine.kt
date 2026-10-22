@@ -21,6 +21,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import uk.co.maybeitssoftware.librelog.billing.SubscriptionInfo
+import uk.co.maybeitssoftware.librelog.billing.SyncStatusRow
+import uk.co.maybeitssoftware.librelog.billing.VerifyResult
+import uk.co.maybeitssoftware.librelog.billing.parseTime
 import uniffi.librelog_core.CoreException
 import uniffi.librelog_core.IncomingOps
 import uniffi.librelog_core.PairingSession
@@ -71,6 +75,16 @@ class SyncEngine(
      * phrase can be shown before the user moves on.
      */
     var newRecoveryPhrase by mutableStateOf<String?>(null)
+
+    /**
+     * The account's paid-through date and the subscription behind it, for
+     * Settings. Null until the server has been asked.
+     */
+    var subscription by mutableStateOf<SubscriptionInfo?>(null)
+        private set
+
+    /** The signed-in user's id: Play purchases carry it as the obfuscated account id. */
+    val userId: String? get() = client.session?.userId
 
     /** Called after a pull merged something, so screens reload. */
     var onChange: (() -> Unit)? = null
@@ -209,6 +223,7 @@ class SyncEngine(
         phase = Phase.Off
         email = null
         problem = null
+        subscription = null
     }
 
     /**
@@ -315,6 +330,42 @@ class SyncEngine(
             buildJsonObject { put("p_device_id", store.deviceId()); put("p_name_enc", nameEnc) },
         )
         return SupabaseClient.json.decodeFromJsonElement(ListSerializer(Registration.serializer()), result).firstOrNull()
+            ?.also { reg -> subscription = (subscription ?: SubscriptionInfo(null)).copy(syncUntil = parseTime(reg.syncUntil)) }
+    }
+
+    // MARK: Subscription
+
+    /**
+     * Asks the server what the account is paid up to and which subscription
+     * pays for it. Best effort: Settings keeps what it last knew if this fails.
+     */
+    suspend fun refreshSubscription() {
+        if (client.session == null) return
+        runCatching {
+            val rows = client.rpc("sync_status", buildJsonObject {})
+            SupabaseClient.json.decodeFromJsonElement(ListSerializer(SyncStatusRow.serializer()), rows).firstOrNull()
+        }.onSuccess { row -> subscription = row?.let(SubscriptionInfo::from) ?: SubscriptionInfo(null) }
+    }
+
+    /**
+     * Hands a store purchase to the server (the verify-purchase function),
+     * which checks it with the store and switches sync on. Idempotent, so a
+     * purchase can be sent again on every restore.
+     */
+    suspend fun verifyPurchase(store: String, productId: String, purchaseToken: String): VerifyResult {
+        val reply = client.function(
+            "verify-purchase",
+            buildJsonObject { put("store", store); put("product_id", productId); put("purchase_token", purchaseToken) },
+        )
+        val result = SupabaseClient.json.decodeFromJsonElement(VerifyResult.serializer(), reply)
+        val until = parseTime(result.syncUntil)
+        if (until != null && until > System.currentTimeMillis()) {
+            if (problem == SyncError.NotActive) problem = null
+            subscription = (subscription ?: SubscriptionInfo(null)).copy(syncUntil = until)
+        }
+        refreshSubscription()
+        if (phase == Phase.On) syncNow()
+        return result
     }
 
     // MARK: The loop

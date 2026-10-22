@@ -133,6 +133,7 @@ dependencies {
     implementation(libs.credentials.play.services)
     implementation(libs.googleid)
     implementation(libs.exifinterface)
+    implementation(libs.billing)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

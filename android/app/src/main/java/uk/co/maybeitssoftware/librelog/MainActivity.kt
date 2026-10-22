@@ -50,6 +50,9 @@ class MainActivity : ComponentActivity() {
         model.scope.launch {
             if (started) model.sync.syncNow() else model.sync.start()
             started = true
+            // Purchases that finished while the app was away (a pending
+            // payment clearing, say) go to the server and get acknowledged.
+            model.billing.checkOnLaunch()
         }
         model.scope.launch { model.refreshCalendar() }
     }
