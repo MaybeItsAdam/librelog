@@ -4,12 +4,15 @@ extension DayPhoto: Identifiable {}
 
 /// A day's photos, in the editor and under a day in Calendar
 /// (docs/photos.md). They belong to the day, beside its kept events, rather
-/// than to an entry.
+/// than to an entry. Each photo's menu also picks the day's preview in the
+/// journal list, or none (DayPreview).
 struct DayPhotosSection: View {
     @Environment(AppModel.self) private var app
     let date: String
 
     @State private var photos: [DayPhoto] = []
+    /// The photo standing for the day in the journal; nil for none.
+    @State private var previewID: String?
     @State private var choosing = false
     @State private var viewing: DayPhoto?
     @State private var captioning: DayPhoto?
@@ -81,7 +84,7 @@ struct DayPhotosSection: View {
     private func tile(_ photo: DayPhoto) -> some View {
         Button { viewing = photo } label: {
             VStack(alignment: .leading, spacing: 4) {
-                PhotoTile(photo: photo)
+                PhotoTile(photo: photo, isPreview: photos.count > 1 && photo.id == previewID)
                 if let c = photo.caption, !c.isEmpty {
                     Text(c)
                         .font(.system(size: 11))
@@ -98,6 +101,17 @@ struct DayPhotosSection: View {
             } label: {
                 Label(photo.caption?.isEmpty == false ? "Edit caption" : "Add caption", systemImage: "text.bubble")
             }
+            let preview = DayPreview.actions(for: photo.id, preview: previewID)
+            if preview.useAsPreview {
+                Button { setPreview(.photo(id: photo.id), shown: photo.id) } label: {
+                    Label("Use as preview", systemImage: "rectangle.stack")
+                }
+            }
+            if preview.noPreview {
+                Button { setPreview(.noPreview, shown: nil) } label: {
+                    Label("No preview", systemImage: "rectangle.slash")
+                }
+            }
             Button(role: .destructive) { remove(photo) } label: {
                 Label("Remove from this day", systemImage: "trash")
             }
@@ -112,6 +126,13 @@ struct DayPhotosSection: View {
         Task { await app.write { try $0.setPhotoCaption(id: id, caption: text.isEmpty ? nil : text) } }
     }
 
+    /// Picks the photo the journal shows for this day, for every device.
+    private func setPreview(_ choice: PreviewChoice, shown: String?) {
+        let day = date
+        previewID = shown
+        Task { await app.write { try $0.setDayPreview(journalId: nil, date: day, choice: choice) } }
+    }
+
     private func remove(_ photo: DayPhoto) {
         let id = photo.id
         withMotion(Motion.snappy, reduce: reduceMotion) { photos.removeAll { $0.id == id } }
@@ -121,7 +142,11 @@ struct DayPhotosSection: View {
     private func load() async {
         let day = date
         guard let list = try? await app.run({ try $0.dayPhotos(journalId: nil, date: day) }) else { return }
-        withMotion(Motion.snappy, reduce: reduceMotion) { photos = list }
+        let preview = await DayPreview.load(app, dates: [day])[day]?.id
+        withMotion(Motion.snappy, reduce: reduceMotion) {
+            photos = list
+            previewID = preview
+        }
     }
 }
 
@@ -129,6 +154,8 @@ struct DayPhotosSection: View {
 /// copy, or the blurred ThumbHash with a note that it lives elsewhere.
 struct PhotoTile: View {
     let photo: DayPhoto
+    /// Marked as the day's journal preview, when there's a choice to show.
+    var isPreview = false
     @State private var image: Image?
     @State private var elsewhere = false
 
@@ -145,24 +172,34 @@ struct PhotoTile: View {
                         .transition(.opacity)
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if isPreview {
+                    scrimLabel("Preview")
+                }
+            }
             .overlay(alignment: .bottomLeading) {
                 if elsewhere {
-                    // Text on a photo sits on a fixed scrim (house rule 5).
-                    Text("On another device")
-                        .font(.system(size: 10, weight: .bold))
-                        .textCase(.uppercase)
-                        .kerning(1.5)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: Radius.control))
-                        .padding(6)
+                    scrimLabel("On another device")
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: Radius.control))
             .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline))
             .task(id: photo.id + (photo.previewPath ?? "") + (photo.sourceRef ?? "")) { await load() }
+    }
+
+    /// A micro-label on a photo. Text on a photo sits on a fixed scrim
+    /// (house rule 5).
+    private func scrimLabel(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .bold))
+            .textCase(.uppercase)
+            .kerning(1.5)
+            .foregroundStyle(.white)
+            .lineLimit(2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: Radius.control))
+            .padding(6)
     }
 
     private func load() async {
