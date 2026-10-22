@@ -104,6 +104,7 @@ Licences from each artifact's published POM.
 | **Google code scanner** (`com.google.android.gms:play-services-code-scanner`), scans the pairing QR code | **Proprietary** — ML Kit Terms of Service |
 | **Google Play services** (`play-services-auth`, `play-services-basement`, … pulled in by the two above) | **Proprietary** — Android Software Development Kit License |
 | **Sign in with Google** (`com.google.android.libraries.identity.googleid:googleid`) | **Proprietary** — Android Software Development Kit License |
+| **Google Play Billing Library** (`com.android.billingclient:billing-ktx`), sells the sync subscription | **Proprietary** — Android Software Development Kit License |
 
 Test-only (not shipped): JUnit 4 (EPL-1.0), Robolectric (MIT), AndroidX
 Test (Apache-2.0), kotlinx-coroutines-test and OkHttp MockWebServer
@@ -128,22 +129,24 @@ Test-only (not shipped): xUnit (Apache-2.0), Microsoft.NET.Test.Sdk (MIT).
 
 ## Sync backend (`supabase/`)
 
-Only SQL migrations of our own, run on Supabase (Postgres — PostgreSQL
-Licence; Supabase's services — Apache-2.0; `pg_cron` — PostgreSQL Licence).
+SQL migrations and Deno Edge Functions of our own (no third-party modules),
+run on Supabase (Postgres — PostgreSQL Licence; Supabase's services —
+Apache-2.0; `pg_cron` — PostgreSQL Licence). The functions embed Apple's
+public root certificate (Apple Root CA - G3) to check App Store signatures.
 Nothing from those projects is copied into this repository.
 
 ## Proprietary components
 
-Four of the components above are not free software: Google's code scanner,
-Google Play services and the Sign in with Google library on Android, and the
-Windows App SDK on Windows. The AGPL forbids nobody from *running* LibreLog
+Five of the components above are not free software: Google's code scanner,
+Google Play services, the Sign in with Google library and the Play Billing
+Library on Android, and the Windows App SDK on Windows. The AGPL forbids nobody from *running* LibreLog
 with them, but it does matter for anyone who conveys a build:
 
 - **Windows App SDK.** Microsoft's UI runtime, shipped as a framework
   package that the OS installs and services, and the only way to build a
   WinUI 3 app. It is generally treated as part of the platform, in the way
   the GPL's "System Libraries" exception (AGPL-3.0 §1) intends.
-- **Google Play services, the code scanner and `googleid`.** These are
+- **Google Play services, the code scanner, `googleid` and Play Billing.** These are
   linked into the APK rather than provided by the operating system, so the
   System Libraries exception does not clearly cover them. The copyright
   holder can ship its own Play builds regardless (a licensor is not bound by
