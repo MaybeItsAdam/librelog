@@ -434,6 +434,14 @@ verify_jwt = false
 [functions.verify-purchase]
 verify_jwt = false
 
+# Checks the caller's session itself, as verify-purchase does.
+[functions.stripe-checkout]
+verify_jwt = false
+
+# Called by Stripe, with no Supabase token; checks the Stripe-Signature.
+[functions.stripe-webhook]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

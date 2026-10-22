@@ -1,5 +1,5 @@
-// The three billing endpoints, with their outside world passed in so the
-// tests can run them against fakes. Each function's index.ts wires up the
+// The billing endpoints, with their outside world passed in so the tests
+// can run them against fakes. Each function's index.ts wires up the
 // real one.
 
 import {
@@ -22,7 +22,23 @@ import {
   SUBSCRIPTION_NOTIFICATION,
   verifyPushToken,
 } from "./google.ts";
-import { errorResponse, HttpError, json, type RecordPurchase } from "./purchases.ts";
+import {
+  errorResponse,
+  HttpError,
+  json,
+  type RecordPurchase,
+  type RecordStripe,
+  type StripePurchase,
+} from "./purchases.ts";
+import {
+  checkoutParams,
+  type CheckoutPlans,
+  type CreateCheckoutSession,
+  PLAN_YEARS,
+  type PlanYears,
+  SignatureError,
+  verifyStripeSignature,
+} from "./stripe.ts";
 import { fromBase64 } from "./x509.ts";
 
 type Verify = <T>(jws: string) => Promise<T>;
@@ -241,6 +257,144 @@ export function verifyPurchase(deps: {
       throw new HttpError(400, "store must be app_store or play");
     } catch (e) {
       return errorResponse(e, "verify-purchase");
+    }
+  };
+}
+
+// Web checkout through Stripe ----------------------------------------------------------
+
+/** Starts a Checkout Session for the signed-in account and returns its URL
+ *  for the browser. */
+export function stripeCheckout(deps: {
+  user: (req: Request) => Promise<string>;
+  config: CheckoutPlans;
+  createSession: CreateCheckoutSession;
+}): Handler {
+  return async (req) => {
+    try {
+      if (req.method !== "POST") throw new HttpError(405, "POST only");
+      const user = await deps.user(req);
+      const body = await req.json().catch(() => ({}));
+      const years = body?.years;
+      if (!PLAN_YEARS.includes(years)) throw new HttpError(400, `years must be ${PLAN_YEARS.join(" or ")}`);
+      const session = await deps.createSession(checkoutParams(deps.config, user, years as PlanYears));
+      return json(200, { url: session.url, id: session.id });
+    } catch (e) {
+      return errorResponse(e, "stripe-checkout");
+    }
+  };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** An id field that Stripe sends as a string, or as the object when expanded. */
+function stripeId(value: unknown): string | undefined {
+  if (typeof value === "string" && value) return value;
+  if (value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string") {
+    return (value as { id: string }).id;
+  }
+}
+
+/** Stripe's webhook: a paid Checkout Session buys sync, a full refund or a
+ *  dispute takes it back. Each event once (by its id), each payment once. */
+export function stripeWebhook(deps: {
+  secret: string;
+  /** Whether this deployment runs on live keys; other-mode events are ignored. */
+  livemode: boolean;
+  record: RecordStripe;
+  now?: () => Date;
+}): Handler {
+  return async (req) => {
+    try {
+      if (req.method !== "POST") throw new HttpError(405, "POST only");
+      const payload = new Uint8Array(await req.arrayBuffer());
+      try {
+        await verifyStripeSignature(
+          req.headers.get("Stripe-Signature"),
+          payload,
+          deps.secret,
+          (deps.now?.() ?? new Date()).getTime(),
+        );
+      } catch (e) {
+        if (e instanceof SignatureError) throw new HttpError(400, `not verified: ${e.message}`);
+        throw e;
+      }
+      // deno-lint-ignore no-explicit-any
+      let event: Record<string, any>;
+      try {
+        event = JSON.parse(new TextDecoder().decode(payload));
+      } catch {
+        throw new HttpError(400, "unreadable event");
+      }
+      if (typeof event?.id !== "string" || typeof event.type !== "string") throw new HttpError(400, "not an event");
+      if (event.livemode !== deps.livemode) {
+        return json(200, { ignored: `${event.livemode ? "live" : "test"}-mode event` });
+      }
+
+      const object = event.data?.object ?? {};
+      const environment = deps.livemode ? "production" : "sandbox";
+      let purchase: StripePurchase;
+      switch (event.type) {
+        case "checkout.session.completed":
+        case "checkout.session.async_payment_succeeded": {
+          if (object.mode !== "payment") return json(200, { ignored: `mode ${object.mode}` });
+          // Bank debits and the like complete unpaid, then succeed later.
+          if (object.payment_status !== "paid" && object.payment_status !== "no_payment_required") {
+            return json(200, { ignored: `payment ${object.payment_status}` });
+          }
+          const user = object.client_reference_id ?? object.metadata?.user_id;
+          const years = Number(object.metadata?.years);
+          // Sessions not made by stripe-checkout (a payment link, say).
+          if (typeof user !== "string" || !UUID.test(user)) return json(200, { ignored: "no LibreLog account" });
+          if (!PLAN_YEARS.includes(years as PlanYears)) {
+            return json(200, { ignored: `years ${object.metadata?.years}` });
+          }
+          purchase = {
+            originalId: stripeId(object.payment_intent) ?? object.id,
+            userId: user.toLowerCase(),
+            productId: `sync_${years}y`,
+            environment,
+            years,
+            status: "active",
+          };
+          break;
+        }
+        case "charge.refunded": {
+          // A partial refund leaves the purchase standing.
+          if (object.refunded !== true) return json(200, { ignored: "partial refund" });
+          const id = stripeId(object.payment_intent);
+          if (!id) return json(200, { ignored: "no payment" });
+          purchase = { originalId: id, userId: null, productId: null, environment, years: null, status: "refunded" };
+          break;
+        }
+        case "charge.dispute.created": {
+          const id = stripeId(object.payment_intent);
+          if (!id) return json(200, { ignored: "no payment" });
+          purchase = { originalId: id, userId: null, productId: null, environment, years: null, status: "revoked" };
+          break;
+        }
+        default:
+          return json(200, { ignored: event.type });
+      }
+
+      try {
+        const syncUntil = await deps.record(purchase, {
+          event: event.type,
+          at: typeof event.created === "number" ? new Date(event.created * 1000) : (deps.now?.() ?? new Date()),
+          id: event.id,
+        });
+        return json(200, { ok: true, sync_until: syncUntil });
+      } catch (e) {
+        // An account deleted since, a payment that isn't ours: retrying
+        // won't change the answer, and Stripe retries anything but a 2xx.
+        if (e instanceof HttpError && (e.status === 404 || e.status === 409)) {
+          console.warn("stripe event not applied", event.type, event.id, e.message);
+          return json(200, { ignored: e.message });
+        }
+        throw e;
+      }
+    } catch (e) {
+      return errorResponse(e, "stripe-webhook");
     }
   };
 }
