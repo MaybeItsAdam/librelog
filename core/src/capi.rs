@@ -373,6 +373,19 @@ fn store_call(s: &Store, method: &str, a: Value) -> Outcome {
             let (id, caption) = args!(id: String, caption: Option<String>);
             ok(json!(s.set_photo_caption(id, caption)?))
         }
+        "set_day_preview" => {
+            // `choice` is {"kind": "default" | "no_preview"} or {"kind": "photo", "id": "…"}.
+            let (journal_id, date, choice) = args!(journal_id: Option<String>, date: String, choice: crate::PreviewChoice);
+            ok(json!(s.set_day_preview(journal_id, date, choice)?))
+        }
+        "day_preview_choice" => {
+            let (journal_id, date) = args!(journal_id: Option<String>, date: String);
+            ok(json!(s.day_preview_choice(journal_id, date)?))
+        }
+        "day_previews" => {
+            let (journal_id, dates) = args!(journal_id: Option<String>, dates: Vec<String>);
+            ok(json!(s.day_previews(journal_id, dates)?))
+        }
         "thumbhash_image" => {
             let thumbhash = args!(thumbhash: String);
             let img = crate::thumbhash_image(thumbhash)?;
@@ -559,6 +572,15 @@ mod tests {
         let thumb = added["ok"]["thumbhash"].as_str().unwrap();
         assert!(call(h, "thumbhash_image", json!({"thumbhash": thumb}))["ok"]["rgba"].is_string());
         assert_eq!(call(h, "day_photos", json!({"date": "2026-10-03"}))["ok"].as_array().unwrap().len(), 1);
+        let previews = json!({"dates": ["2026-10-03", "2026-10-02"]});
+        assert_eq!(call(h, "day_previews", previews.clone())["ok"][0]["id"], added["ok"]["id"]);
+        let none = json!({"date": "2026-10-03", "choice": {"kind": "no_preview"}});
+        assert!(call(h, "set_day_preview", none)["ok"].is_null());
+        assert_eq!(call(h, "day_preview_choice", json!({"date": "2026-10-03"}))["ok"]["kind"], "no_preview");
+        assert!(call(h, "day_previews", previews)["ok"].as_array().unwrap().is_empty());
+        let chosen = json!({"date": "2026-10-03", "choice": {"kind": "photo", "id": added["ok"]["id"]}});
+        call(h, "set_day_preview", chosen);
+        assert_eq!(call(h, "day_preview_choice", json!({"date": "2026-10-03"}))["ok"]["id"], added["ok"]["id"]);
 
         let blank = call(h, "create_entry", json!({"date": "2026-10-04"}))["ok"]["id"].clone();
         assert_eq!(call(h, "discard_if_empty", json!({"id": blank}))["ok"], true);

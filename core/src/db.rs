@@ -38,7 +38,7 @@ pub const SYNCED: &[(&str, &[&str])] = &[
         "templates",
         &["name", "journal_id", "body", "default_tags", "default_rating", "prompts", "schedule", "deleted_at"],
     ),
-    ("day_meta", &["journal_id", "date", "kept_items", "deleted_at"]),
+    ("day_meta", &["journal_id", "date", "kept_items", "preview_photo", "deleted_at"]),
     ("synced_settings", &["value", "deleted_at"]),
     ("locked_notes", &["journal_id", "date", "sealed", "deleted_at"]),
     (
@@ -346,6 +346,13 @@ const MIGRATIONS: &[&str] = &[
       deleted_at  text
     );
     create index locked_notes_day on locked_notes (journal_id, date) where deleted_at is null;
+    "#,
+    // 7: which photo stands for a day in the journal list (media.rs): none
+    // for the first, "none" for no photo, or a photo's id. Rows are keyed by
+    // name_id of "<journal_id>:<date>", so two devices converge on one.
+    r#"
+    alter table day_meta add column preview_photo text;
+    create index day_meta_day on day_meta (journal_id, date) where deleted_at is null;
     "#,
 ];
 
