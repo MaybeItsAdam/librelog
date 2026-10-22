@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests the sync migration on a throwaway local Postgres 17 (no Docker needed):
+# Tests the migrations on a throwaway local Postgres 17 (no Docker needed):
 #   supabase/tests/run.sh
 set -euo pipefail
 
@@ -23,4 +23,4 @@ psql=("$pgbin/psql" -h "$dir" -p "$port" -U postgres -d postgres -q -v ON_ERROR_
 for m in "$here"/../migrations/*.sql; do
   sed 's/^create extension if not exists pg_cron;/-- (pg_cron stubbed)/' "$m" | "${psql[@]}" -f -
 done
-"${psql[@]}" -f "$here/sync_test.sql"
+for t in "$here"/*_test.sql; do "${psql[@]}" -f "$t"; done
