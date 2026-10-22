@@ -96,6 +96,24 @@ pub struct ThumbImage {
     pub rgba: Vec<u8>,
 }
 
+/// Which photo stands for a day in the journal list. The choice syncs; the
+/// photo's id is the same on every device (it names the row, not the file),
+/// so a device without the file still knows which one was chosen.
+#[derive(Debug, Clone, PartialEq, uniffi::Enum, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PreviewChoice {
+    /// The day's first photo, in the order they were taken.
+    Default,
+    /// No photo, even though the day has some.
+    NoPreview,
+    /// This photo while it's on the day; the first one once it's removed.
+    Photo { id: String },
+}
+
+/// How `day_meta.preview_photo` spells "no photo". Photo ids are UUIDs, so
+/// it can't be mistaken for one.
+const NO_PREVIEW: &str = "none";
+
 /// Decodes a ThumbHash from [`DayPhoto::thumbhash`] into a small RGBA image
 /// (about 32 px on the long side) for the app to draw stretched and smooth.
 #[uniffi::export]
@@ -219,6 +237,106 @@ impl Store {
         self.lock().conn.execute("update attachments set local_asset = null where id = ?1", [&id])?;
         Ok(())
     }
+
+    /// Chooses the photo that stands for a day in the journal list, or none.
+    /// A chosen photo must be on that day.
+    pub fn set_day_preview(&self, journal_id: Option<String>, date: String, choice: PreviewChoice) -> Result<()> {
+        check_day(&date)?;
+        let journal = journal_id.unwrap_or_else(|| DEFAULT_JOURNAL.to_string());
+        let value = match choice {
+            PreviewChoice::Default => None,
+            PreviewChoice::NoPreview => Some(NO_PREVIEW.to_string()),
+            PreviewChoice::Photo { id } => {
+                let on_day = self.photo_row(&id)?.is_some_and(|p| p.journal_id == journal && p.date == date);
+                if !on_day {
+                    return Err(CoreError::NotFound(format!("photo {id} on {date}")));
+                }
+                Some(id)
+            }
+        };
+        // The day's own fields go with every write, so the row can always be
+        // created from whichever op another device sees first.
+        self.write(
+            "day_meta",
+            &day_meta_id(&journal, &date),
+            json!({ "journal_id": journal, "date": date, "preview_photo": value, "deleted_at": null }),
+        )
+    }
+
+    /// What the user chose for a day, as stored. A chosen photo may since
+    /// have been removed; [`Store::day_previews`] then falls back to the first.
+    pub fn day_preview_choice(&self, journal_id: Option<String>, date: String) -> Result<PreviewChoice> {
+        let journal = journal_id.unwrap_or_else(|| DEFAULT_JOURNAL.to_string());
+        let value: Option<String> = self
+            .lock()
+            .conn
+            .query_row(
+                "select preview_photo from day_meta where id = ?1 and deleted_at is null",
+                [day_meta_id(&journal, &date)],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(match value.as_deref() {
+            None => PreviewChoice::Default,
+            Some(NO_PREVIEW) => PreviewChoice::NoPreview,
+            Some(id) => PreviewChoice::Photo { id: id.to_string() },
+        })
+    }
+
+    /// The photo standing for each of `dates` in the journal list: the one
+    /// chosen, else the day's first. Days with no photos, or set to no
+    /// preview, are left out. One query for a whole page of the list.
+    pub fn day_previews(&self, journal_id: Option<String>, dates: Vec<String>) -> Result<Vec<DayPhoto>> {
+        if dates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let journal = journal_id.unwrap_or_else(|| DEFAULT_JOURNAL.to_string());
+        let dates = serde_json::to_string(&dates)?;
+        let (rows, choices) = {
+            let g = self.lock();
+            let mut stmt = g.conn.prepare_cached(&format!(
+                "select {COLS} from attachments
+                 where journal_id = ?1 and date in (select value from json_each(?2))
+                   and entry_id is null and kind = 'photo' and deleted_at is null
+                 order by date, coalesce(taken_at, created_at), created_at, id"
+            ))?;
+            let rows: Vec<Stored> = stmt.query_map(params![journal, dates], stored)?.collect::<std::result::Result<_, _>>()?;
+            let mut stmt = g.conn.prepare_cached(
+                "select date, preview_photo from day_meta
+                 where journal_id = ?1 and date in (select value from json_each(?2))
+                   and deleted_at is null and preview_photo is not null",
+            )?;
+            let choices: std::collections::HashMap<String, String> = stmt
+                .query_map(params![journal, dates], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<std::result::Result<_, _>>()?;
+            (rows, choices)
+        };
+
+        // Rows arrive grouped by day, each day's in photo order.
+        let mut days: Vec<(String, Vec<Stored>)> = Vec::new();
+        for r in rows {
+            match days.last_mut() {
+                Some((day, photos)) if *day == r.photo.date => photos.push(r),
+                _ => days.push((r.photo.date.clone(), vec![r])),
+            }
+        }
+        Ok(days
+            .into_iter()
+            .filter_map(|(day, mut photos)| {
+                let at = match choices.get(&day).map(String::as_str) {
+                    Some(NO_PREVIEW) => return None,
+                    Some(id) => photos.iter().position(|p| p.photo.id == id).unwrap_or(0),
+                    None => 0,
+                };
+                Some(self.day_photo(photos.swap_remove(at)))
+            })
+            .collect())
+    }
+}
+
+fn day_meta_id(journal: &str, date: &str) -> String {
+    name_id("day", &format!("{journal}:{date}"))
 }
 
 const COLS: &str =
@@ -449,6 +567,98 @@ mod tests {
         s.set_photo_source_ref(p.id.clone(), "icloud:XYZ".into()).unwrap();
         assert!(s.photos_awaiting_source_ref("apple:".into()).unwrap().is_empty());
         assert_eq!(s.day_photos(None, "2026-10-18".into()).unwrap()[0].source_ref.as_deref(), Some("icloud:XYZ"));
+    }
+
+    fn taken(dir: &Path, content: &[u8], at: &str) -> NewPhoto {
+        NewPhoto { taken_at: Some(at.into()), ..photo(dir, content) }
+    }
+
+    fn preview_ids(s: &Store, dates: &[&str]) -> Vec<(String, String)> {
+        let dates = dates.iter().map(|d| d.to_string()).collect();
+        s.day_previews(None, dates).unwrap().into_iter().map(|p| (p.date, p.id)).collect()
+    }
+
+    #[test]
+    fn a_day_is_previewed_by_its_first_photo_until_another_is_chosen() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = store(dir.path());
+        let day = "2026-10-18";
+        let late = s.add_day_photo(None, day.into(), taken(dir.path(), b"late", "2026-10-18T18:00:00+01:00")).unwrap();
+        let early = s.add_day_photo(None, day.into(), taken(dir.path(), b"early", "2026-10-18T08:00:00+01:00")).unwrap();
+        let other = s.add_day_photo(None, "2026-10-17".into(), photo(dir.path(), b"other")).unwrap();
+
+        // Default: the first taken. Days without photos are left out.
+        assert_eq!(s.day_preview_choice(None, day.into()).unwrap(), PreviewChoice::Default);
+        assert_eq!(
+            preview_ids(&s, &["2026-10-18", "2026-10-17", "2026-10-16"]),
+            vec![("2026-10-17".into(), other.id.clone()), (day.into(), early.id.clone())]
+        );
+
+        s.set_day_preview(None, day.into(), PreviewChoice::Photo { id: late.id.clone() }).unwrap();
+        assert_eq!(preview_ids(&s, &[day]), vec![(day.into(), late.id.clone())]);
+        assert_eq!(s.day_preview_choice(None, day.into()).unwrap(), PreviewChoice::Photo { id: late.id.clone() });
+
+        s.set_day_preview(None, day.into(), PreviewChoice::NoPreview).unwrap();
+        assert!(preview_ids(&s, &[day]).is_empty());
+        assert_eq!(preview_ids(&s, &["2026-10-17"]).len(), 1, "other days keep theirs");
+
+        s.set_day_preview(None, day.into(), PreviewChoice::Default).unwrap();
+        assert_eq!(preview_ids(&s, &[day]), vec![(day.into(), early.id)]);
+    }
+
+    #[test]
+    fn a_removed_choice_falls_back_to_the_first_photo() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = store(dir.path());
+        let day = "2026-10-18";
+        let a = s.add_day_photo(None, day.into(), taken(dir.path(), b"a", "2026-10-18T08:00:00+01:00")).unwrap();
+        let b = s.add_day_photo(None, day.into(), taken(dir.path(), b"b", "2026-10-18T09:00:00+01:00")).unwrap();
+        s.set_day_preview(None, day.into(), PreviewChoice::Photo { id: b.id.clone() }).unwrap();
+        s.remove_day_photo(b.id).unwrap();
+        assert_eq!(preview_ids(&s, &[day]), vec![(day.into(), a.id)]);
+    }
+
+    #[test]
+    fn only_a_photo_on_that_day_can_be_chosen() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = store(dir.path());
+        let p = s.add_day_photo(None, "2026-10-17".into(), photo(dir.path(), b"x")).unwrap();
+        let wrong_day = s.set_day_preview(None, "2026-10-18".into(), PreviewChoice::Photo { id: p.id });
+        assert!(matches!(wrong_day, Err(CoreError::NotFound(_))));
+        let unknown = s.set_day_preview(None, "2026-10-18".into(), PreviewChoice::Photo { id: "nope".into() });
+        assert!(matches!(unknown, Err(CoreError::NotFound(_))));
+        assert!(matches!(s.set_day_preview(None, "18/10".into(), PreviewChoice::NoPreview), Err(CoreError::Invalid(_))));
+    }
+
+    #[test]
+    fn the_preview_choice_syncs_including_none() {
+        let (da, db) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        let (a, b) = (store(da.path()), store(db.path()));
+        let key = a.generate_journal_key().unwrap();
+        a.set_journal_key(key.clone()).unwrap();
+        b.set_journal_key(key).unwrap();
+        let day = "2026-10-18";
+        let mut seq = 0;
+        let mut send = |from: &Store, to: &Store| {
+            let batch = from.outgoing_batch(100).unwrap().unwrap();
+            seq += 1;
+            to.apply_incoming(vec![IncomingOps { seq, device_id: from.device_id(), payload: batch.payload }]).unwrap();
+            from.push_succeeded(batch.batch_id).unwrap();
+        };
+
+        a.add_day_photo(None, day.into(), taken(da.path(), b"one", "2026-10-18T08:00:00+01:00")).unwrap();
+        let two = a.add_day_photo(None, day.into(), taken(da.path(), b"two", "2026-10-18T09:00:00+01:00")).unwrap();
+        a.set_day_preview(None, day.into(), PreviewChoice::Photo { id: two.id.clone() }).unwrap();
+        send(&a, &b);
+        let seen = b.day_previews(None, vec![day.into()]).unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].id, two.id, "the same photo, though b has no file for it");
+        assert!(seen[0].preview_path.is_none() && seen[0].thumbhash.is_some());
+
+        b.set_day_preview(None, day.into(), PreviewChoice::NoPreview).unwrap();
+        send(&b, &a);
+        assert!(a.day_previews(None, vec![day.into()]).unwrap().is_empty());
+        assert_eq!(a.day_preview_choice(None, day.into()).unwrap(), PreviewChoice::NoPreview);
     }
 
     #[test]

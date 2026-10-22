@@ -20,5 +20,10 @@ public static class EntryMeta
         return string.Join(" · ", parts).ToUpper(culture);
     }
 
+    /// The time a new entry on `day` starts with: now for today. A missed
+    /// day written up later has none, since the moment has gone.
+    public static string? DefaultTime(string day, string today, DateTime now) =>
+        day == today ? now.ToString("HH:mm", CultureInfo.InvariantCulture) : null;
+
     private static DateOnly Day(string ymd) => DateOnly.ParseExact(ymd, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 }

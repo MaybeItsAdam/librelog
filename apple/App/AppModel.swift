@@ -160,9 +160,15 @@ final class AppModel {
         }
     }
 
+    /// A new entry on `date`, or the selected day when nil, at the day's
+    /// default time (`Day.defaultTime`).
     func newEntry(on date: String? = nil) async -> String? {
         let day = date ?? selectedDate
-        let time = day == Day.today ? Day.nowTime : nil
+        return await newEntry(on: day, at: Day.defaultTime(for: day))
+    }
+
+    /// A new entry on `day` at `time`, or with no time of day when nil.
+    func newEntry(on day: String, at time: String?) async -> String? {
         do {
             let entry = try await run { try $0.createEntry(journalId: nil, date: day, time: time) }
             changed()
@@ -192,6 +198,12 @@ enum Day {
     static var nowTime: String {
         let c = Calendar.current.dateComponents([.hour, .minute], from: Date())
         return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+    }
+
+    /// The time a new entry on `day` starts with: now for today. A missed
+    /// day written up later has none, since the moment has gone.
+    static func defaultTime(for day: String, today: String = Day.today) -> String? {
+        day == today ? nowTime : nil
     }
 
     static func string(_ date: Date) -> String {

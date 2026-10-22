@@ -12,7 +12,8 @@
         <pages:JournalTemplateSelector x:Key="JournalTemplates">
             <pages:JournalTemplateSelector.DayTemplate>
                 <!-- The day's name large, the full date beneath; today's
-                     heading also carries New entry. -->
+                     heading also carries New entry, and New entry for
+                     another day (a missed one, say). -->
                 <DataTemplate x:DataType="pages:JournalDay">
                     <Grid Margin="0,28,0,6" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
@@ -23,21 +24,58 @@
                             <TextBlock Text="{x:Bind Name}" Style="{StaticResource DayTitleText}" />
                             <TextBlock Text="{x:Bind Date}" Style="{StaticResource MicroLabel}" />
                         </StackPanel>
-                        <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Click="OnNew" VerticalAlignment="Center"
-                                ToolTipService.ToolTip="New entry (Ctrl+N)" Visibility="{x:Bind NewVisibility}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE710;" FontSize="12" />
-                                <TextBlock Text="New entry" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                                    Visibility="{x:Bind NewVisibility}">
+                            <Button Style="{StaticResource QuietButton}" Click="OnNewForDay"
+                                    ToolTipService.ToolTip="New entry for another day" AutomationProperties.Name="New entry for another day">
+                                <FontIcon Glyph="&#xE787;" FontSize="14" />
+                            </Button>
+                            <Button Style="{StaticResource PrimaryButton}" Click="OnNew" ToolTipService.ToolTip="New entry (Ctrl+N)">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                    <TextBlock Text="New entry" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </DataTemplate>
             </pages:JournalTemplateSelector.DayTemplate>
+            <!-- A day with photos shows the one standing for it on the left
+                 of its first entry (docs/photos.md); its other entries keep
+                 the gutter, so the column lines up. -->
             <pages:JournalTemplateSelector.EntryTemplate>
-                <DataTemplate x:DataType="core:EntrySummary">
-                    <pages:EntryRow Entry="{x:Bind}" ShowDate="False" />
+                <DataTemplate x:DataType="pages:JournalEntry">
+                    <Grid ColumnSpacing="{x:Bind GutterSpacing}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="{x:Bind GutterWidth}">
+                            <pages:DayThumb Photo="{x:Bind Thumb}" Margin="0,12,0,0" />
+                        </Border>
+                        <pages:EntryRow Grid.Column="1" Entry="{x:Bind Entry}" ShowDate="False" />
+                    </Grid>
                 </DataTemplate>
             </pages:JournalTemplateSelector.EntryTemplate>
+            <!-- Today's rule, with its add-photo icon set into the line: the
+                 photo goes on today, the day it sits under. -->
+            <pages:JournalTemplateSelector.RuleTemplate>
+                <DataTemplate x:DataType="pages:JournalRule">
+                    <Grid Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Height="1" Background="{ThemeResource HairlineBrush}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Style="{StaticResource QuietButton}" Click="OnAddPhoto" Padding="8,6" MinWidth="44" MinHeight="36"
+                                ToolTipService.ToolTip="Add photo to today" AutomationProperties.Name="Add photo to today">
+                            <FontIcon Glyph="&#xE91B;" FontSize="14" />
+                        </Button>
+                        <Border Grid.Column="2" Height="1" Background="{ThemeResource HairlineBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </pages:JournalTemplateSelector.RuleTemplate>
             <pages:JournalTemplateSelector.ActionTemplate>
                 <DataTemplate x:DataType="pages:JournalAction">
                     <Grid Padding="0,12" ColumnSpacing="10" BorderBrush="{ThemeResource HairlineBrush}" BorderThickness="0,0,0,1">

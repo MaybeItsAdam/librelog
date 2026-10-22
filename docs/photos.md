@@ -5,8 +5,9 @@ events, rather than inside an entry (SPEC.md §11, "Photos of the day").
 
 ## Choosing a photo
 
-Tap **Add photo** on a day. The chooser shows only photos **taken that day**,
-read from the device's own library. A **Choose another photo** button opens
+Tap **Add photo** on a day, or, for today, the photo icon set into the rule
+under today's heading in the journal. The chooser shows only photos **taken
+that day**, read from the device's own library. A **Choose another photo** button opens
 the system picker, which can choose any photo, for days with no library
 photos or a photo from elsewhere. On phones, **Take photo** opens the camera.
 
@@ -53,6 +54,24 @@ ones that now resolve with `set_photo_source_ref`.
 **Google Photos** can't do the same thing. Since March 2025, its API only reads
 media the app itself uploaded, and Android's MediaStore ids are per device.
 Android and Windows show the blurred tile.
+
+## The day's preview
+
+In the journal, a day with photos shows one of them, small, on the left of
+its first entry. It's the first photo taken that day unless the user picks
+another: a photo's menu (hold it, or right-click) offers **Use as preview**,
+and **No preview** for a day that shouldn't show one.
+
+The choice is `day_meta.preview_photo`, written by `Store::set_day_preview`
+and synced like any other field: none for the first photo, `"none"` for no
+preview, or the photo's id. A photo's id names its synced row
+(`journal:date:content hash`), so it is the same on every device whether or
+not that device has the file; a device without it shows the ThumbHash. If
+the chosen photo is removed, the day falls back to its first.
+`Store::day_previews` resolves a page of days in one query.
+
+Thumbnails are decoded from the 1024 px preview at thumbnail size and kept
+in memory only, never written to disk.
 
 ## Not done yet
 

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -18,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -25,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -34,12 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uk.co.maybeitssoftware.librelog.AppModel
 import uk.co.maybeitssoftware.librelog.Day
 import uk.co.maybeitssoftware.librelog.photos.DayPhotosSection
+import uk.co.maybeitssoftware.librelog.photos.DayPreview
+import uk.co.maybeitssoftware.librelog.photos.DayThumb
 import uk.co.maybeitssoftware.librelog.lock.LockedNoteSection
 import uk.co.maybeitssoftware.librelog.ui.EntryRow
 import uk.co.maybeitssoftware.librelog.ui.Hairline
@@ -54,16 +62,20 @@ import uk.co.maybeitssoftware.librelog.ui.motion
 import uk.co.maybeitssoftware.librelog.ui.pressable
 import uk.co.maybeitssoftware.librelog.ui.rowMotion
 import uk.co.maybeitssoftware.librelog.ui.tokens
+import uniffi.librelog_core.DayPhoto
 import uniffi.librelog_core.EntrySummary
 import uniffi.librelog_core.TimelineCursor
 import uniffi.librelog_core.TimelineFilter
 
 private const val PAGE = 50u
+private val THUMB = 52.dp
 
 /**
  * Every entry, newest first, grouped by day, with today always on top
- * (SPEC.md §6.1, §6.4) and its photos under its entries. On This Day has
- * its own button in the bottom bar.
+ * (SPEC.md §6.1, §6.4) and its photos under its entries. A day with photos
+ * shows its preview on the left of its first row (DayPreview). Holding the
+ * new-entry button writes up another day. On This Day has its own button in
+ * the bottom bar.
  */
 @Composable
 fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
@@ -74,6 +86,9 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
     var entries by remember { mutableStateOf<List<EntrySummary>>(emptyList()) }
     var done by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
+    var previews by remember { mutableStateOf<Map<String, DayPhoto>>(emptyMap()) }
+    var addPhotoRequests by remember { mutableIntStateOf(0) }
+    var choosingDay by rememberSaveable { mutableStateOf(false) }
     val list = rememberLazyListState()
     val today = Day.today
     val filter = TimelineFilter(null, emptyList(), null, false)
@@ -83,6 +98,7 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
 
     LaunchedEffect(app.revision, today) {
         val first = page(null)
+        previews = DayPreview.load(app, first.map { it.date } + today)
         entries = first
         done = first.size < PAGE.toInt()
     }
@@ -94,6 +110,7 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
         loading = true
         val last = entries.last()
         val more = page(TimelineCursor(last.date, last.time, last.id))
+        previews = previews + DayPreview.load(app, more.map { it.date })
         entries = entries + more
         done = more.size < PAGE.toInt()
         loading = false
@@ -110,8 +127,8 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
         }
     }
 
-    fun newEntry() = scope.launch {
-        app.newEntry(today)?.let {
+    fun newEntry(date: String = today, time: String? = Day.defaultTime(date)) = scope.launch {
+        app.newEntry(date, time)?.let {
             Haptics.confirm(haptics)
             openEntry(it)
         }
@@ -138,15 +155,19 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
                 }
             }
 
-            dayGroup(today, days[today].orEmpty(), openEntry, m, stagger, onNewEntry = { newEntry() }, titled = false)
+            dayGroup(
+                today, days[today].orEmpty(), previews[today], openEntry, m, stagger,
+                onNewEntry = { newEntry() }, onAddPhoto = { addPhotoRequests++ }, titled = false,
+            )
+            // Adding is the icon in today's rule, so no worded button here.
             item(key = "photos$today") {
-                DayPhotosSection(app, today, rowMotion(m).padding(top = 4.dp))
+                DayPhotosSection(app, today, rowMotion(m).padding(top = 4.dp), showAdd = false, addRequests = addPhotoRequests)
             }
             item(key = "locked$today") {
                 LockedNoteSection(app, today, rowMotion(m))
             }
 
-            otherDays.forEach { date -> dayGroup(date, days.getValue(date), openEntry, m, stagger) }
+            otherDays.forEach { date -> dayGroup(date, days.getValue(date), previews[date], openEntry, m, stagger) }
 
             if (entries.isEmpty() && done) {
                 item(key = "empty") {
@@ -160,19 +181,33 @@ fun JournalScreen(app: AppModel, openEntry: (String) -> Unit) {
             }
         }
 
-        NewEntryButton({ newEntry() }, Modifier.align(Alignment.BottomEnd))
+        NewEntryButton({ newEntry() }, Modifier.align(Alignment.BottomEnd), onLongClick = { choosingDay = true })
+    }
+
+    if (choosingDay) {
+        NewEntrySheet(today, onDismiss = { choosingDay = false }) { date, time ->
+            choosingDay = false
+            newEntry(date, time)
+        }
     }
 }
 
-/** A sticky day header and that day's entries; today gets a quiet "New entry" row when empty. */
+/**
+ * A sticky day header and that day's entries, the first beside the day's
+ * [preview] photo. Today gets a quiet "New entry" row when empty, and
+ * [onAddPhoto] as an unworded icon set into its rule: between today's
+ * heading and its entries, it can only mean today.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.dayGroup(
     date: String,
     entries: List<EntrySummary>,
+    preview: DayPhoto?,
     openEntry: (String) -> Unit,
     m: Motion,
     stagger: Stagger,
     onNewEntry: (() -> Unit)? = null,
+    onAddPhoto: (() -> Unit)? = null,
     titled: Boolean = true,
 ) {
     val headerIndex = stagger.take()
@@ -181,7 +216,23 @@ private fun LazyListScope.dayGroup(
         val t = tokens
         Reveal(headerIndex, stagger.active, Modifier.fillMaxWidth().background(t.paper).padding(top = if (titled) 20.dp else 12.dp)) {
             if (titled) MicroLabel(Day.title(date), Modifier.padding(bottom = 6.dp))
-            Hairline()
+            if (onAddPhoto != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Hairline(Modifier.width(12.dp))
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .pressable(onClick = onAddPhoto)
+                            .semantics { contentDescription = "Add photo to today" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.AddPhotoAlternate, null, Modifier.size(20.dp), tint = t.muted)
+                    }
+                    Hairline(Modifier.weight(1f))
+                }
+            } else {
+                Hairline()
+            }
         }
     }
     if (entries.isEmpty() && onNewEntry != null) {
@@ -189,25 +240,32 @@ private fun LazyListScope.dayGroup(
         item(key = "new$date") {
             val t = tokens
             Reveal(index, stagger.active, rowMotion(m)) {
-                Text(
-                    "New entry",
-                    style = Typeface.small,
-                    color = t.muted,
-                    modifier = Modifier
+                Row(
+                    Modifier
                         .fillMaxWidth()
                         .heightIn(min = 44.dp)
-                        .pressable(onClick = onNewEntry)
-                        .padding(vertical = 13.dp),
-                )
+                        .pressable(onClick = onNewEntry),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    preview?.let { DayThumb(it, Modifier.padding(vertical = 8.dp)) }
+                    Text("New entry", style = Typeface.small, color = t.muted, modifier = Modifier.padding(vertical = 13.dp))
+                }
                 Hairline()
             }
         }
     }
-    entries.forEach { e ->
+    entries.forEachIndexed { i, e ->
         val index = stagger.take()
         item(key = e.id) {
             Reveal(index, stagger.active, rowMotion(m)) {
-                EntryRow(e, onClick = { openEntry(e.id) }, showDate = false)
+                // The day's later rows keep the photo's indent, so the day reads as one block.
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    preview?.let {
+                        if (i == 0) DayThumb(it, Modifier.padding(top = 12.dp)) else Spacer(Modifier.width(THUMB))
+                    }
+                    EntryRow(e, onClick = { openEntry(e.id) }, showDate = false)
+                }
                 Hairline()
             }
         }

@@ -133,6 +133,33 @@ public sealed class PhotoTests : IDisposable
     }
 
     [Fact]
+    public void ADayIsPreviewedByItsFirstPhotoUnlessAnotherOrNoneIsChosen()
+    {
+        var early = store.AddDayPhoto("2026-10-03", Photo("early", [1], "2026-10-03T08:00:00+01:00"));
+        var late = store.AddDayPhoto("2026-10-03", Photo("late", [2], "2026-10-03T18:00:00+01:00"));
+        Assert.Equal("default", store.DayPreviewChoice("2026-10-03").Kind);
+        Assert.Equal(early.Id, Assert.Single(store.DayPreviews(["2026-10-03", "2026-10-02"])).Id);
+
+        store.SetDayPreview("2026-10-03", PreviewChoice.Photo(late.Id));
+        Assert.Equal(late.Id, store.DayPreviewChoice("2026-10-03").Id);
+        Assert.Equal(late.Id, Assert.Single(store.DayPreviews(["2026-10-03"])).Id);
+
+        store.SetDayPreview("2026-10-03", PreviewChoice.None);
+        Assert.Equal("no_preview", store.DayPreviewChoice("2026-10-03").Kind);
+        Assert.Empty(store.DayPreviews(["2026-10-03"]));
+
+        Assert.Throws<CoreException>(() => store.SetDayPreview("2026-10-04", PreviewChoice.Photo(late.Id)));
+    }
+
+    [Fact]
+    public void PreviewMenuOffersWhatIsntAlreadyChosen()
+    {
+        Assert.Equal((false, true), PhotoDay.PreviewActions("a", "a"));
+        Assert.Equal((true, true), PhotoDay.PreviewActions("b", "a"));
+        Assert.Equal((true, false), PhotoDay.PreviewActions("a", null));
+    }
+
+    [Fact]
     public void FitsWithinASquare()
     {
         Assert.Equal((1024u, 768u), PhotoDay.Fit(4000, 3000, 1024));

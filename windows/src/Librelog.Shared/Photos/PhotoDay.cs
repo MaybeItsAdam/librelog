@@ -88,6 +88,12 @@ public static class PhotoDay
         return ((uint)Math.Clamp(Math.Round(width * scale), 1, max), (uint)Math.Clamp(Math.Round(height * scale), 1, max));
     }
 
+    /// What a photo's menu offers for the day's preview in the journal:
+    /// "Use as preview" unless it already is, and "No preview" while the
+    /// day shows one. `previewId` is the photo shown now, or null for none.
+    public static (bool UseAsPreview, bool NoPreview) PreviewActions(string photoId, string? previewId) =>
+        (previewId != photoId, previewId != null);
+
     private static string Ymd(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 }
 

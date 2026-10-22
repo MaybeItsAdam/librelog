@@ -158,11 +158,10 @@ class AppModel(val store: Store, val sync: SyncEngine, val scope: CoroutineScope
         }
     }
 
-    suspend fun newEntry(date: String = Day.today): String? {
-        val day = date
-        val time = if (day == Day.today) Day.nowTime else null
+    /** A new entry on [date] at [time]: by default now for today, and none for a missed day. */
+    suspend fun newEntry(date: String = Day.today, time: String? = Day.defaultTime(date)): String? {
         return try {
-            val entry = run { it.createEntry(null, day, time) }
+            val entry = run { it.createEntry(null, date, time) }
             changed()
             sync.schedulePush()
             entry.id
@@ -217,6 +216,12 @@ object Day {
      * default locale's (Persian, Arabic…) are refused by the core.
      */
     val nowTime: String get() = LocalTime.now().let { "%02d:%02d".format(Locale.ROOT, it.hour, it.minute) }
+
+    /**
+     * The time a new entry on [day] starts with: now for today. A missed day
+     * written up later has none, since the moment has gone.
+     */
+    fun defaultTime(day: String, from: String = today): String? = if (day == from) nowTime else null
 
     fun date(s: String): LocalDate? = runCatching { LocalDate.parse(s, iso) }.getOrNull()
 

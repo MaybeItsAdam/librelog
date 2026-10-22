@@ -1106,6 +1106,37 @@ mod tests {
     }
 
     #[test]
+    fn untimed_and_back_dated_entries() {
+        let s = store();
+        write_entry(&s, "2026-10-02", "09:00", "morning");
+        // Written later for a day that was missed, with no time of day.
+        let missed = s.create_entry(None, "2026-10-02".into(), None).unwrap();
+        s.save_body(missed.id.clone(), para("the whole day")).unwrap();
+        write_entry(&s, "2026-10-03", "07:00", "next");
+        assert_eq!(s.entry(missed.id.clone()).unwrap().time, None);
+
+        // Untimed sorts as the empty time: first in a day, last in the newest-first list.
+        let day: Vec<String> = s.day("2026-10-02".into(), None).unwrap().into_iter().map(|e| e.excerpt).collect();
+        assert_eq!(day, ["the whole day", "morning"]);
+        let all: Vec<String> =
+            s.timeline(TimelineFilter::default(), None, 10).unwrap().into_iter().map(|e| e.excerpt).collect();
+        assert_eq!(all, ["next", "morning", "the whole day"]);
+
+        // Paging carries an untimed row's cursor through.
+        let page1 = s.timeline(TimelineFilter::default(), None, 3).unwrap();
+        let last = page1.last().unwrap();
+        assert_eq!(last.time, None);
+        let cursor = TimelineCursor { date: last.date.clone(), time: last.time.clone(), id: last.id.clone() };
+        assert!(s.timeline(TimelineFilter::default(), Some(cursor), 10).unwrap().is_empty());
+
+        // An entry's time can be cleared, and it can move to an earlier day.
+        let timed = write_entry(&s, "2026-10-03", "12:00", "moved");
+        s.set_date_time(timed.clone(), "2026-09-20".into(), None).unwrap();
+        let e = s.entry(timed).unwrap();
+        assert_eq!((e.date.as_str(), e.time), ("2026-09-20", None));
+    }
+
+    #[test]
     fn settings_round_trip_and_reset() {
         let s = store();
         assert_eq!(s.setting("appearance.theme".into()).unwrap(), None);

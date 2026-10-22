@@ -250,6 +250,7 @@ fun CalendarScreen(app: AppModel, openEntry: (String) -> Unit) {
             }
         },
         Modifier.align(Alignment.BottomEnd),
+        label = if (selected == Day.today) "New entry" else "New entry on ${Day.title(selected)}",
     )
     }
 

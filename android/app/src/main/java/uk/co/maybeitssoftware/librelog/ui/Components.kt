@@ -4,7 +4,13 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -284,18 +290,42 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
     }
 }
 
-/** The one primary action: a square-cornered azure "New entry" button, no shadow. */
+/**
+ * The one primary action: a square-cornered azure "New entry" button, no
+ * shadow. Held, it offers [onLongClick]: a new entry on another day.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NewEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun NewEntryButton(onClick: () -> Unit, modifier: Modifier = Modifier, label: String = "New entry", onLongClick: (() -> Unit)? = null) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) Motion.PRESSED_PRIMARY else 1f, motion.press(), label = "press")
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier
             .padding(20.dp)
             .size(56.dp)
-            .pressable(pressedScale = Motion.PRESSED_PRIMARY, onClick = onClick)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .combinedClickable(
+                interactionSource = source,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick,
+                onLongClickLabel = onLongClick?.let { "New entry on another day" },
+                onLongClick = onLongClick?.let {
+                    {
+                        Haptics.tick(haptics)
+                        it()
+                    }
+                },
+            )
             .background(tokens.primary, RoundedCornerShape(Radius.card)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Filled.Add, "New entry", Modifier.size(26.dp), tint = tokens.onPrimary)
+        Icon(Icons.Filled.Add, label, Modifier.size(26.dp), tint = tokens.onPrimary)
     }
 }
 

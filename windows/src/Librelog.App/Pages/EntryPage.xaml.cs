@@ -52,6 +52,8 @@ public sealed partial class EntryPage : Page
         ShowJournals(en.JournalId);
         DatePicker.Date = Format.Date(en.Date).ToDateTime(TimeOnly.MinValue);
         TimePicker.SelectedTime = en.Time is { } t ? TimeOnly.ParseExact(t, "HH:mm", CultureInfo.InvariantCulture).ToTimeSpan() : null;
+        TimedBox.IsChecked = en.Time is not null;
+        TimePicker.Visibility = Format.Shown(en.Time is not null);
         ShowSpan(en.Date, en.EndDate);
         TitleBox.Text = en.Title ?? "";
         TitleBox.FontFamily = AppearanceService.TitleFont;
@@ -222,6 +224,15 @@ public sealed partial class EntryPage : Page
 
     private void OnDateChanged(CalendarDatePicker sender, CalendarDatePickerDateChangedEventArgs args) => SaveDateTime();
     private void OnTimeChanged(TimePicker sender, TimePickerSelectedValueChangedEventArgs args) => SaveDateTime();
+
+    /// Gives the entry a time (now) or takes it away.
+    private void OnTimed(object sender, RoutedEventArgs e)
+    {
+        var timed = TimedBox.IsChecked == true;
+        TimePicker.Visibility = Format.Shown(timed);
+        // Setting the picker saves through OnTimeChanged.
+        TimePicker.SelectedTime = timed ? new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0) : null;
+    }
 
     private void SaveDateTime()
     {

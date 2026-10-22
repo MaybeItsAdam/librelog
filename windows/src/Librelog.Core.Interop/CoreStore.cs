@@ -87,6 +87,16 @@ public sealed class CoreStore : IDisposable
     public void RemoveDayPhoto(string id) => Call("remove_day_photo", ("id", id));
     /// Empty or null clears it.
     public void SetPhotoCaption(string id, string? caption) => Call("set_photo_caption", ("id", id), ("caption", caption));
+    /// Chooses the photo that stands for a day in the journal, or none.
+    public void SetDayPreview(string date, PreviewChoice choice, string? journalId = null) =>
+        Call("set_day_preview", ("journal_id", journalId), ("date", date), ("choice", Native.Node(choice, CoreJson.Default.PreviewChoice)));
+    public PreviewChoice DayPreviewChoice(string date, string? journalId = null) =>
+        Get("day_preview_choice", CoreJson.Default.PreviewChoice, ("journal_id", journalId), ("date", date))!;
+    /// The photo standing for each of `dates` that has one: the chosen one,
+    /// else the day's first. One call for a page of the journal.
+    public List<DayPhoto> DayPreviews(IEnumerable<string> dates, string? journalId = null) =>
+        Get("day_previews", CoreJson.Default.ListDayPhoto,
+            ("journal_id", journalId), ("dates", new JsonArray(dates.Distinct().Select(d => (JsonNode?)d).ToArray())))!;
     public ThumbImage ThumbhashImage(string thumbhash) =>
         Get("thumbhash_image", CoreJson.Default.ThumbImage, ("thumbhash", thumbhash))!;
 

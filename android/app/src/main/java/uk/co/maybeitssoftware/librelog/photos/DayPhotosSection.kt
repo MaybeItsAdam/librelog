@@ -94,6 +94,7 @@ import uk.co.maybeitssoftware.librelog.ui.motion
 import uk.co.maybeitssoftware.librelog.ui.pressable
 import uk.co.maybeitssoftware.librelog.ui.tokens
 import uniffi.librelog_core.DayPhoto
+import uniffi.librelog_core.PreviewChoice
 
 /** Photos sit three to a row on a phone. */
 private const val COLUMNS = 3
@@ -113,15 +114,29 @@ private data class Chosen(val uri: Uri, val takenHint: Long?, val fromLibrary: B
  * A day's photos, in the editor and under a day in Calendar and Journal
  * (docs/photos.md). Each tile is this device's preview, or the blurred
  * ThumbHash when the photo was added on another device. Tap to view, hold
- * for caption and remove. Mirrors calendar/DayCalendarSection.kt.
+ * for caption, remove and the day's journal preview (DayPreview). Mirrors
+ * calendar/DayCalendarSection.kt.
+ *
+ * In the journal, today's add button lives in the rule under its heading
+ * instead: [showAdd] hides the worded one here, and each bump of
+ * [addRequests] opens the chooser.
  */
 @Composable
-fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier) {
+fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier, showAdd: Boolean = true, addRequests: Int = 0) {
     val t = tokens
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     var photos by remember(date) { mutableStateOf<List<DayPhoto>>(emptyList()) }
+    // The photo standing for the day in the journal; null for none.
+    var previewId by remember(date) { mutableStateOf<String?>(null) }
     var choosing by remember { mutableStateOf(false) }
+    var seenRequests by remember { mutableIntStateOf(addRequests) }
+    LaunchedEffect(addRequests) {
+        if (addRequests != seenRequests) {
+            seenRequests = addRequests
+            choosing = true
+        }
+    }
     var viewing by remember { mutableStateOf<DayPhoto?>(null) }
     // Saved by id, so the caption sheet stays open through rotation.
     var captioningId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -132,6 +147,13 @@ fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier)
 
     LaunchedEffect(date, app.revision) {
         photos = runCatching { app.run { it.dayPhotos(null, date) } }.getOrNull() ?: return@LaunchedEffect
+        previewId = DayPreview.load(app, listOf(date))[date]?.id
+    }
+
+    fun setPreview(choice: PreviewChoice, shown: String?) {
+        Haptics.confirm(haptics)
+        previewId = shown
+        app.scope.launch { app.write { it.setDayPreview(null, date, choice) } }
     }
 
     fun add(chosen: List<Chosen>, cleanup: () -> Unit = {}) {
@@ -188,6 +210,10 @@ fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier)
                     PhotoTile(
                         photo,
                         Modifier.weight(1f),
+                        isPreview = photos.size > 1 && photo.id == previewId,
+                        preview = DayPreview.actions(photo.id, previewId),
+                        onUseAsPreview = { setPreview(PreviewChoice.Photo(photo.id), photo.id) },
+                        onNoPreview = { setPreview(PreviewChoice.NoPreview, null) },
                         onOpen = { viewing = photo },
                         onCaption = { captioningId = photo.id },
                         onRemove = {
@@ -200,15 +226,17 @@ fun DayPhotosSection(app: AppModel, date: String, modifier: Modifier = Modifier)
                 repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .pressable { choosing = true },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.AddPhotoAlternate, null, Modifier.size(16.dp), tint = t.muted)
-            Text("Add photo", style = Typeface.small, color = t.muted, modifier = Modifier.padding(start = 8.dp))
+        if (showAdd) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .pressable { choosing = true },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.AddPhotoAlternate, null, Modifier.size(16.dp), tint = t.muted)
+                Text("Add photo", style = Typeface.small, color = t.muted, modifier = Modifier.padding(start = 8.dp))
+            }
         }
     }
 
@@ -261,7 +289,17 @@ private fun rememberTile(photo: DayPhoto, px: Int) = rememberPicture(photo.previ
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoTile(photo: DayPhoto, modifier: Modifier, onOpen: () -> Unit, onCaption: () -> Unit, onRemove: () -> Unit) {
+private fun PhotoTile(
+    photo: DayPhoto,
+    modifier: Modifier,
+    isPreview: Boolean,
+    preview: DayPreview.Actions,
+    onUseAsPreview: () -> Unit,
+    onNoPreview: () -> Unit,
+    onOpen: () -> Unit,
+    onCaption: () -> Unit,
+    onRemove: () -> Unit,
+) {
     val t = tokens
     val haptics = LocalHapticFeedback.current
     var menuOpen by remember { mutableStateOf(false) }
@@ -284,13 +322,18 @@ private fun PhotoTile(photo: DayPhoto, modifier: Modifier, onOpen: () -> Unit, o
                         Haptics.tick(haptics)
                         menuOpen = true
                     },
-                    onLongClickLabel = "Caption or remove",
+                    onLongClickLabel = "Caption, preview or remove",
                 )
                 .semantics { contentDescription = photo.caption ?: "Photo" },
         ) {
             // Fades in once decoded, over the well colour.
             picture?.let {
                 Image(it, null, Modifier.fillMaxSize().graphicsLayer { this.alpha = shown }, contentScale = ContentScale.Crop, filterQuality = FilterQuality.High)
+            }
+            if (isPreview) {
+                Box(Modifier.align(Alignment.TopStart).padding(6.dp).background(Scrim, RoundedCornerShape(Radius.control)).padding(horizontal = 6.dp, vertical = 4.dp)) {
+                    MicroLabel("Preview", color = OnScrim)
+                }
             }
             if (elsewhere) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Scrim).padding(horizontal = 6.dp, vertical = 4.dp)) {
@@ -314,6 +357,24 @@ private fun PhotoTile(photo: DayPhoto, modifier: Modifier, onOpen: () -> Unit, o
                         onCaption()
                     },
                 )
+                if (preview.useAsPreview) {
+                    DropdownMenuItem(
+                        text = { Text("Use as preview") },
+                        onClick = {
+                            menuOpen = false
+                            onUseAsPreview()
+                        },
+                    )
+                }
+                if (preview.noPreview) {
+                    DropdownMenuItem(
+                        text = { Text("No preview") },
+                        onClick = {
+                            menuOpen = false
+                            onNoPreview()
+                        },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Remove from this day", color = t.danger) },
                     onClick = {

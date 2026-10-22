@@ -33,6 +33,7 @@ namespace Librelog.Core;
 [JsonSerializable(typeof(DayPhoto))]
 [JsonSerializable(typeof(List<DayPhoto>))]
 [JsonSerializable(typeof(ThumbImage))]
+[JsonSerializable(typeof(PreviewChoice))]
 [JsonSerializable(typeof(KeptEvent))]
 [JsonSerializable(typeof(List<KeptEvent>))]
 [JsonSerializable(typeof(OwnEvent))]
