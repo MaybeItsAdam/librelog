@@ -132,4 +132,12 @@ public sealed class DayExtrasTests : IDisposable
         Assert.Equal("MON 13 OCT 2025 · 08:00", EntryMeta.Line("2025-10-13", "08:00", "2025-10-13", today, En));
         Assert.Equal("WED 14 OCT · WORK", EntryMeta.Line("2026-10-14", "", null, today, En, "Work"));
     }
+
+    [Fact]
+    public void TodayStartsNowAndAMissedDayHasNoTime()
+    {
+        var now = new DateTime(2026, 10, 22, 9, 5, 0);
+        Assert.Equal("09:05", EntryMeta.DefaultTime("2026-10-22", "2026-10-22", now));
+        Assert.Null(EntryMeta.DefaultTime("2026-10-03", "2026-10-22", now));
+    }
 }

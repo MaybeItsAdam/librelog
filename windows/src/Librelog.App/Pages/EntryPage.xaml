@@ -102,6 +102,9 @@
                                         <TextBlock Text="DAY AND TIME" Style="{StaticResource MicroLabel}" />
                                         <CalendarDatePicker x:Name="DatePicker" DateChanged="OnDateChanged" CornerRadius="6"
                                                             HorizontalAlignment="Stretch" />
+                                        <!-- Off for an entry about the day as a whole, or a
+                                             missed day written up later. -->
+                                        <CheckBox x:Name="TimedBox" Content="Time" Click="OnTimed" MinWidth="0" />
                                         <TimePicker x:Name="TimePicker" SelectedTimeChanged="OnTimeChanged" CornerRadius="6"
                                                     MinuteIncrement="1" HorizontalAlignment="Stretch" />
                                     </StackPanel>

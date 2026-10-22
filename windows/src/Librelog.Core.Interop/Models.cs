@@ -156,6 +156,16 @@ public sealed record DayPhoto(
     string? Caption, string? Thumbhash, string? PreviewPath, string? OriginalPath, string? SourceRef,
     bool FromThisDevice);
 
+/// Which photo stands for a day in the journal list (docs/photos.md): Kind
+/// is "default" (the day's first photo), "no_preview", or "photo" with Id.
+/// The id names the synced row, so it's the same on every device.
+public sealed record PreviewChoice(string Kind, string? Id = null)
+{
+    public static PreviewChoice First => new("default");
+    public static PreviewChoice None => new("no_preview");
+    public static PreviewChoice Photo(string id) => new("photo", id);
+}
+
 /// A decoded ThumbHash: a small straight-RGBA image to draw stretched.
 public sealed record ThumbImage(uint Width, uint Height, byte[] Rgba);
 

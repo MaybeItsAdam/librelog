@@ -16,14 +16,19 @@ namespace Librelog.App.Pages;
 /// The photos kept on a day (docs/photos.md), with Add photo. Shown under
 /// the editor and under the calendar's selected day. Tiles show this
 /// device's preview, or the ThumbHash blurred and labelled "On another
-/// device" when the photo was added elsewhere.
+/// device" when the photo was added elsewhere. A photo's menu also picks
+/// the day's preview in the journal, or none.
 public sealed partial class DayPhotosView : UserControl
 {
     private const string GlyphAdd = "";
 
     private readonly VariableSizedWrapGrid tiles;
     private readonly TextBlock statusText;
+    private readonly Grid header;
+    private readonly Button addButton;
     private string? date;
+    private string? previewId;  // the photo standing for the day in the journal; null for none
+    private bool showAdd = true;
     private int generation;
 
     public DayPhotosView()
@@ -34,8 +39,9 @@ public sealed partial class DayPhotosView : UserControl
         addContent.Children.Add(new TextBlock { Text = "Add photo" });
         var add = new Button { Style = Res<Style>("QuietButton"), Content = addContent, HorizontalAlignment = HorizontalAlignment.Right };
         ToolTipService.SetToolTip(add, "Add photos taken this day");
-        add.Click += OnAdd;
-        var header = new Grid();
+        add.Click += (_, _) => _ = Add();
+        addButton = add;
+        header = new Grid();
         header.Children.Add(label);
         header.Children.Add(add);
 
@@ -66,6 +72,20 @@ public sealed partial class DayPhotosView : UserControl
         }
     }
 
+    /// False in the journal, where today's add button is an icon in the
+    /// rule under its heading (JournalPage); the section then shows only
+    /// once there are photos.
+    public bool ShowAdd
+    {
+        get => showAdd;
+        set
+        {
+            showAdd = value;
+            addButton.Visibility = Format.Shown(value);
+            header.Visibility = Format.Shown(value || tiles.Children.Count > 0);
+        }
+    }
+
     private static T Res<T>(string key) => (T)Application.Current.Resources[key];
 
     private void Reload() => _ = Load();
@@ -78,10 +98,12 @@ public sealed partial class DayPhotosView : UserControl
             tiles.Children.Clear();
             return;
         }
-        var photos = await AppServices.Run(s => s.DayPhotos(day));
+        var (photos, preview) = await AppServices.Run(s => (s.DayPhotos(day), s.DayPreviews([day]).FirstOrDefault()?.Id));
         if (mine != generation) return;
+        previewId = preview;
         tiles.Children.Clear();
-        foreach (var photo in photos) tiles.Children.Add(Tile(photo));
+        foreach (var photo in photos) tiles.Children.Add(Tile(photo, photos.Count > 1 && photo.Id == preview));
+        header.Visibility = Format.Shown(showAdd || photos.Count > 0);
     }
 
     private void ShowStatus(string text)
@@ -92,7 +114,7 @@ public sealed partial class DayPhotosView : UserControl
 
     // --- Tiles --------------------------------------------------------------------
 
-    private Button Tile(DayPhoto photo)
+    private Button Tile(DayPhoto photo, bool isPreview)
     {
         var image = new Image { Stretch = Stretch.UniformToFill };
         var face = new Grid();
@@ -110,6 +132,19 @@ public sealed partial class DayPhotosView : UserControl
             };
             face.Children.Add(scrim);
         }
+        if (isPreview)
+        {
+            face.Children.Add(new Border
+            {
+                Background = Res<Brush>("ScrimBrush"),
+                VerticalAlignment = VerticalAlignment.Top,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                CornerRadius = new CornerRadius(6),
+                Margin = new Thickness(6),
+                Padding = new Thickness(6, 4, 6, 4),
+                Child = new TextBlock { Text = "PREVIEW", Style = Res<Style>("ScrimLabel") },
+            });
+        }
         _ = Fill(image, photo, decodeWidth: 224);
 
         var tile = new Button { Style = Res<Style>("PhotoTileButton"), Content = face, Tag = photo };
@@ -123,15 +158,44 @@ public sealed partial class DayPhotosView : UserControl
         var remove = new MenuFlyoutItem { Text = "Remove from this day", Foreground = Res<Brush>("RaspberryBrush") };
         remove.Click += (_, _) => _ = Remove(photo);
         menu.Items.Add(captionItem);
+        // The day's preview in the journal, for every device.
+        var (usable, removable) = PhotoDay.PreviewActions(photo.Id, previewId);
+        if (usable)
+        {
+            var use = new MenuFlyoutItem { Text = "Use as preview" };
+            use.Click += (_, _) => _ = SetPreview(PreviewChoice.Photo(photo.Id));
+            menu.Items.Add(use);
+        }
+        if (removable)
+        {
+            var none = new MenuFlyoutItem { Text = "No preview" };
+            none.Click += (_, _) => _ = SetPreview(PreviewChoice.None);
+            menu.Items.Add(none);
+        }
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(remove);
         tile.ContextFlyout = menu;
         return tile;
     }
 
+    private async Task SetPreview(PreviewChoice choice)
+    {
+        if (date is not { } day) return;
+        await AppServices.Write(s => s.SetDayPreview(day, choice));
+        Reload();
+    }
+
     /// The best picture this device has: the preview (or, for the viewer, the
     /// original), else the ThumbHash scaled up.
     private static async Task Fill(Image image, DayPhoto photo, int decodeWidth, bool original = false)
+    {
+        if (await Picture(photo, decodeWidth, original) is { } picture) image.Source = picture;
+    }
+
+    /// The picture behind Fill, decoded at `decodeWidth`; null when nothing
+    /// can be read, which leaves the plain tile. The journal's day
+    /// thumbnails (DayThumb) use it too.
+    internal static async Task<ImageSource?> Picture(DayPhoto photo, int decodeWidth, bool original = false)
     {
         var path = original && photo.OriginalPath is { } o && File.Exists(o) ? o
             : photo.PreviewPath is { } p && File.Exists(p) ? p
@@ -144,9 +208,9 @@ public sealed partial class DayPhotosView : UserControl
                 using var stream = await file.OpenReadAsync();
                 var bitmap = new BitmapImage { DecodePixelWidth = decodeWidth };
                 await bitmap.SetSourceAsync(stream);
-                image.Source = bitmap;
+                return bitmap;
             }
-            else if (photo.Thumbhash is { } hash)
+            if (photo.Thumbhash is { } hash)
             {
                 var thumb = await AppServices.Run(s => s.ThumbhashImage(hash));
                 var bitmap = new WriteableBitmap((int)thumb.Width, (int)thumb.Height);
@@ -156,13 +220,14 @@ public sealed partial class DayPhotosView : UserControl
                     pixels.Write(bgra, 0, bgra.Length);
                 }
                 bitmap.Invalidate();
-                image.Source = bitmap;
+                return bitmap;
             }
         }
         catch (Exception ex) when (ex is CoreException or IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
         {
             // A file that can't be read leaves the plain tile.
         }
+        return null;
     }
 
     // --- Viewer, caption, remove ------------------------------------------------------
@@ -227,7 +292,9 @@ public sealed partial class DayPhotosView : UserControl
 
     // --- Adding -------------------------------------------------------------------
 
-    private async void OnAdd(object sender, RoutedEventArgs e)
+    /// Chooses photos for the day and adds them: the section's own button,
+    /// or today's icon in the journal.
+    public async Task Add()
     {
         if (date is not { } day) return;
         var files = await Choose(Format.Date(day));
