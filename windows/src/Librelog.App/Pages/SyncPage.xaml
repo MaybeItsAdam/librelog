@@ -106,13 +106,23 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Sync is bought in the phone, tablet or Mac app; this only shows it. -->
+                <!-- Sync bought anywhere shows here; on Windows it's bought on the
+                     web through Stripe Checkout (docs/billing.md). -->
                 <Border Style="{StaticResource Card}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="SUBSCRIPTION" Style="{StaticResource MicroLabel}" />
                         <TextBlock x:Name="SubscriptionText" Style="{StaticResource HeadlineText}" />
-                        <TextBlock x:Name="SubscriptionDetail" Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" />
-                        <TextBlock x:Name="SubscribeHintText" Style="{StaticResource BodyText}" />
+                        <TextBlock x:Name="SubscriptionDetail" Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="SubscribeHintText" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+                        <StackPanel x:Name="WebPlansPanel" Spacing="10">
+                            <TextBlock Text="SUBSCRIBE ON THE WEB" Style="{StaticResource MicroLabel}" Margin="0,8,0,0" />
+                            <TextBlock x:Name="WebPlansText" Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="BuyThreeYearsButton" Style="{StaticResource PrimaryButton}" Content="3 years · €3" Click="OnBuyThreeYears" />
+                                <Button x:Name="BuyOneYearButton" Style="{StaticResource PlainButton}" Content="1 year · €1" Click="OnBuyOneYear" />
+                            </StackPanel>
+                            <TextBlock x:Name="CheckoutText" Style="{StaticResource BodyText}" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

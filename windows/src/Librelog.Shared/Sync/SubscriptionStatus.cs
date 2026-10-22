@@ -7,11 +7,11 @@ namespace Librelog.Sync;
 /// (supabase/migrations/20261022120000_billing.sql), and the words the Sync
 /// page shows for it.
 ///
-/// Windows can't take payment yet: sync is bought in the iPhone, iPad, Mac or
-/// Android app (App Store / Google Play) and then works here on the same
-/// account. Future work (SPEC.md §15.5): the Microsoft Store lets non-game
-/// apps use their own payments with no commission, so a Stripe web checkout
-/// (and the `stripe-webhook` Edge Function) can be offered here directly.
+/// Windows sells sync on the web: the Microsoft Store lets non-game apps take
+/// their own payments with no commission (SPEC.md §15.5), so the Sync page
+/// opens a Stripe Checkout page (`stripe-checkout`) for one payment of 1 or 3
+/// years, and `stripe-webhook` records it. Sync bought in the iPhone, iPad,
+/// Mac or Android app works here too, on the same account.
 public sealed record SubscriptionStatus(
     DateTimeOffset? SyncUntil,
     string? Store,
@@ -23,7 +23,12 @@ public sealed record SubscriptionStatus(
     public static readonly TimeSpan PullGrace = TimeSpan.FromDays(30);
 
     public const string SubscribeHint =
-        "Sync is a yearly subscription. Subscribe from LibreLog on your iPhone, iPad, Mac or Android phone with the same account, then sync here.";
+        "Sync is paid for by the year. Buy it on the web below, or subscribe from LibreLog on your iPhone, iPad, Mac or Android phone with the same account.";
+
+    /// The web plans, as priced in Stripe (docs/billing.md). Keep in step
+    /// with the Prices there.
+    public const string WebPlans =
+        "€1 for a year or €3 for three years, VAT included, paid once by card on the web. It doesn't renew; time you buy is added after any you already have.";
 
     /// The first row of `sync_status`, or an empty status if there is none.
     public static SubscriptionStatus Parse(JsonNode? node)
@@ -52,6 +57,11 @@ public sealed record SubscriptionStatus(
 
     public bool IsActive(DateTimeOffset now) => SyncUntil is { } until && until > now;
 
+    /// Whether to offer the web plans: always, except to an active store
+    /// subscription that renews by itself, which more time would only overlap.
+    public bool OffersWebPlans(DateTimeOffset now) =>
+        !(IsActive(now) && AutoRenew && Store is "app_store" or "play");
+
     /// What the Sync page says: a headline ("Active until 3 Oct 2027"), a
     /// line about where it was bought and whether it renews, and whether to
     /// show <see cref="SubscribeHint"/>.
@@ -76,10 +86,13 @@ public sealed record SubscriptionStatus(
         {
             "app_store" => "Subscribed through the App Store",
             "play" => "Subscribed through Google Play",
-            "stripe" => "Subscribed on the web",
+            "stripe" => "Paid for on the web",
             _ => null,
         };
         if (where is null) return ($"Active until {Day(until)}", "", false);
+
+        if (Store == "stripe" && Status == "active")
+            return ($"Active until {Day(until)}", "Paid for on the web. Doesn't renew: buy more time whenever you like.", false);
 
         var renewal = Status switch
         {

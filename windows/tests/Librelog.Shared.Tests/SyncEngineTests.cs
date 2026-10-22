@@ -251,6 +251,16 @@ public sealed class SyncEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task WebCheckoutOpensTheSessionMadeForThisAccount()
+    {
+        var (a, _) = Device("u1", "laptop");
+        await a.Start();
+        Assert.Equal(new Uri("https://checkout.stripe.com/c/pay/cs_u1_3"), await a.StartWebCheckout(3));
+        var e = await Assert.ThrowsAsync<SyncException>(() => a.StartWebCheckout(2));
+        Assert.Equal("years must be 1 or 3", e.Message);
+    }
+
+    [Fact]
     public async Task SigningOutEndsOnlyThisDevicesSession()
     {
         var (a, _) = Device("u1", "laptop");
@@ -366,6 +376,13 @@ internal sealed class FakeSupabase : HttpMessageHandler
         {
             LogoutQuery = request.RequestUri.Query;
             return Reply(HttpStatusCode.NoContent, "");
+        }
+        if (path == "/functions/v1/stripe-checkout")
+        {
+            var who = SupabaseClient.JwtClaims(request.Headers.Authorization!.Parameter!)["sub"];
+            var years = JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!["years"]!.GetValue<int>();
+            if (years is not (1 or 3)) return Reply(HttpStatusCode.BadRequest, """{"error":"years must be 1 or 3"}""");
+            return Json(new JsonObject { ["url"] = $"https://checkout.stripe.com/c/pay/cs_{who}_{years}", ["id"] = $"cs_{who}_{years}" });
         }
         if (!path.StartsWith("/rest/v1/rpc/", StringComparison.Ordinal)) return Reply(HttpStatusCode.NotFound, "{}");
         Assert.Equal("librelog", request.Headers.GetValues("Content-Profile").Single());

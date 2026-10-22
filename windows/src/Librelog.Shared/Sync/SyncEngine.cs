@@ -286,6 +286,20 @@ public sealed class SyncEngine(
         }
     }
 
+    /// Starts a web purchase of `years` of sync (1 or 3) for this account
+    /// through Stripe Checkout (the `stripe-checkout` Edge Function) and
+    /// returns the page to open in the browser. The `stripe-webhook`
+    /// function records the payment; <see cref="RefreshSubscription"/> then
+    /// shows it.
+    public async Task<Uri> StartWebCheckout(int years)
+    {
+        var node = await client.Function("stripe-checkout", new JsonObject { ["years"] = years });
+        var url = node?["url"]?.GetValue<string>();
+        if (url is null || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            throw new SyncException(SyncProblem.Server, "the checkout page didn't come back", 502);
+        return uri;
+    }
+
     /// Deletes the account and everything synced to it, then forgets it
     /// here. The journal on this device is untouched, and is queued to upload
     /// in full if the user signs in to a new account later.

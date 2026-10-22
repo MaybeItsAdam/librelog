@@ -211,6 +211,14 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
         return body.Length == 0 ? null : JsonNode.Parse(body);
     }
 
+    /// Calls the Edge Function `name` as the signed-in user and returns its
+    /// JSON answer.
+    public async Task<JsonNode?> Function(string name, JsonObject body, CancellationToken ct = default)
+    {
+        var text = await Post($"functions/v1/{name}", body, auth: true, ct);
+        return text.Length == 0 ? null : JsonNode.Parse(text);
+    }
+
     // --- Plumbing ---------------------------------------------------------------
 
     private async Task<string> Post(string path, JsonObject body, bool auth, CancellationToken ct, bool retried = false)
@@ -273,8 +281,9 @@ public sealed class SupabaseClient(HttpClient http, ISecrets secrets, Uri? url =
         try
         {
             if (JsonNode.Parse(body) is JsonObject o)
-                foreach (var k in new[] { "message", "msg", "error_description" })
-                    if (o[k]?.GetValue<string>() is { } m) return m;
+                // PostgREST, Auth, then the Edge Functions' {"error": "…"}.
+                foreach (var k in new[] { "message", "msg", "error_description", "error" })
+                    if (o[k] is JsonValue v && v.TryGetValue<string>(out var m)) return m;
         }
         catch (JsonException)
         {

@@ -49,6 +49,26 @@ public sealed class SubscriptionStatusTests
     }
 
     [Fact]
+    public void AWebPurchaseSaysItDoesntRenew()
+    {
+        Assert.Equal(("Active until 3 Oct 2029", "Paid for on the web. Doesn't renew: buy more time whenever you like.", false),
+            Shown("""[{"sync_until":"2029-10-03T00:00:00Z","store":"stripe","status":"active","auto_renew":false}]"""));
+        Assert.Equal(("Active until 3 Oct 2027", "Paid for on the web. Won't renew.", false),
+            Shown("""[{"sync_until":"2027-10-03T00:00:00Z","store":"stripe","status":"refunded","auto_renew":false}]"""));
+    }
+
+    [Fact]
+    public void WebPlansAreOfferedUnlessAStoreSubscriptionRenews()
+    {
+        Assert.True(Row("[]").OffersWebPlans(Now));
+        Assert.True(Row("""[{"sync_until":"2029-10-03T00:00:00Z","store":"stripe","status":"active","auto_renew":false}]""").OffersWebPlans(Now));
+        Assert.True(Row("""[{"sync_until":"2027-10-03T00:00:00Z","store":"play","status":"active","auto_renew":false}]""").OffersWebPlans(Now));
+        Assert.True(Row("""[{"sync_until":"2026-01-01T00:00:00Z","store":"app_store","status":"expired","auto_renew":true}]""").OffersWebPlans(Now));
+        Assert.False(Row("""[{"sync_until":"2027-10-03T00:00:00Z","store":"app_store","status":"active","auto_renew":true}]""").OffersWebPlans(Now));
+        Assert.False(Row("""[{"sync_until":"2027-10-03T00:00:00Z","store":"play","status":"grace","auto_renew":true}]""").OffersWebPlans(Now));
+    }
+
+    [Fact]
     public void AHandGrantShowsOnlyTheDate()
     {
         Assert.Equal(("Active until 1 Jan 2036", "", false),

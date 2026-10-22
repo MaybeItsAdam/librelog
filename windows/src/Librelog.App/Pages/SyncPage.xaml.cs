@@ -24,6 +24,10 @@ public sealed partial class SyncPage : Page
     private string? localProblem;
     private SyncPhase? shownPhase;
 
+    /// A web checkout was opened in the browser: the status is checked again
+    /// each time the window comes back to the front, until the payment shows.
+    private bool awaitingCheckout;
+
     public SyncPage()
     {
         InitializeComponent();
@@ -32,6 +36,7 @@ public sealed partial class SyncPage : Page
         Unloaded += (_, _) =>
         {
             Sync.PropertyChanged -= OnSyncChanged;
+            StopWatchingCheckout();
             pairing?.Cancel();
         };
     }
@@ -74,8 +79,9 @@ public sealed partial class SyncPage : Page
         StatusText.Text = Sync.IsSyncing ? "Syncing…"
             : Sync.LastSynced is { } at ? $"Last synced {at:t} · {Sync.Pending} waiting to upload"
             : "Not synced yet";
-        // Sync is bought on the phone, tablet or Mac (docs/billing.md); here it's
-        // only shown, along with where to subscribe when it isn't active.
+        // Sync is bought here on the web, or in the phone, tablet or Mac app
+        // (docs/billing.md). The web plans stay on offer to add time, except
+        // over a store subscription that renews by itself.
         var notActive = Sync.Problem?.Problem == SyncProblem.NotActive;
         var (headline, detail, needsSubscription) = Sync.Subscription?.Describe(DateTimeOffset.Now)
             ?? (notActive ? ("Not active", "", true) : ("—", "", false));
@@ -84,6 +90,9 @@ public sealed partial class SyncPage : Page
         SubscriptionDetail.Visibility = Format.Shown(detail.Length > 0);
         SubscribeHintText.Text = SubscriptionStatus.SubscribeHint;
         SubscribeHintText.Visibility = Format.Shown(needsSubscription || notActive);
+        WebPlansText.Text = SubscriptionStatus.WebPlans;
+        WebPlansPanel.Visibility = Format.Shown(Sync.Subscription?.OffersWebPlans(DateTimeOffset.Now) ?? true);
+        CheckoutText.Visibility = Format.Shown(CheckoutText.Text.Length > 0);
 
         var problem = localProblem ?? Sync.Problem?.Describe();
         ProblemText.Text = problem ?? "";
@@ -244,6 +253,60 @@ public sealed partial class SyncPage : Page
         await Sync.SyncNow();
         await Sync.RefreshSubscription();
     });
+
+    // --- Buying sync on the web -----------------------------------------------------
+
+    private async void OnBuyOneYear(object sender, RoutedEventArgs e) => await BuyOnWeb(1, sender);
+
+    private async void OnBuyThreeYears(object sender, RoutedEventArgs e) => await BuyOnWeb(3, sender);
+
+    /// Stripe Checkout in the default browser, made for this account by the
+    /// `stripe-checkout` Edge Function. The payment reaches the account
+    /// through `stripe-webhook`, not through this app, so the status is
+    /// simply asked for again when the window comes back to the front.
+    private async Task BuyOnWeb(int years, object button) => await Try(async () =>
+    {
+        var url = await Sync.StartWebCheckout(years);
+        if (!await global::Windows.System.Launcher.LaunchUriAsync(url))
+            throw new InvalidOperationException("Couldn't open the browser.");
+        CheckoutText.Text = "Finish paying in your browser. This page updates when you come back to it.";
+        WatchForCheckout();
+    }, busy: button);
+
+    private void WatchForCheckout()
+    {
+        if (awaitingCheckout) return;
+        awaitingCheckout = true;
+        Shell.Window.Activated += OnWindowActivated;
+    }
+
+    private void StopWatchingCheckout()
+    {
+        if (!awaitingCheckout) return;
+        awaitingCheckout = false;
+        Shell.Window.Activated -= OnWindowActivated;
+    }
+
+    private async void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        var before = Sync.Subscription?.SyncUntil;
+        // Stripe's webhook can land a few seconds after the browser's thank-you
+        // page, so ask again once more shortly after.
+        foreach (var wait in new[] { TimeSpan.Zero, TimeSpan.FromSeconds(5) })
+        {
+            await Task.Delay(wait);
+            if (!awaitingCheckout) return;
+            await Sync.RefreshSubscription();
+            if (Sync.Subscription?.SyncUntil != before)
+            {
+                StopWatchingCheckout();
+                CheckoutText.Text = "Thank you. Your payment has come through.";
+                break;
+            }
+        }
+        Update();
+    }
 
     // --- Helpers ------------------------------------------------------------------
 
