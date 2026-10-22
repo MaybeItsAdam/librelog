@@ -20,7 +20,15 @@ protocol EditorHost: AnyObject {
 /// what's on screen is always exactly what `blocks()` will save.
 @MainActor
 final class EditorController {
-    weak var host: EditorHost?
+    weak var host: EditorHost? {
+        didSet { if host != nil, let blocks = pending { pending = nil; load(blocks) } }
+    }
+    /// Blocks handed to `load` before the text view attached.
+    private var pending: [Block]?
+    /// The last body loaded or read from the text view.
+    private var known: [Block] = []
+    /// Called after `load` fills the text view, so the placeholder can hide.
+    var onLoad: (() -> Void)?
     /// Called after every edit; the screen debounces the save.
     var onChange: (() -> Void)?
     /// Called when the caret moves, so the toolbar can reflect the paragraph.
@@ -29,15 +37,20 @@ final class EditorController {
     private var applyingEdit = false
 
     func load(_ blocks: [Block]) {
-        guard let host else { return }
+        known = blocks
+        guard let host else { pending = blocks; return }
         host.storage.setAttributedString(BlockText.attributed(blocks))
         host.selection = NSRange(location: host.storage.length, length: 0)
         syncTypingAttributes()
+        onLoad?()
     }
 
+    /// The body as edited. Once the text view has gone (the screen closing
+    /// saves after it's torn down), the last body it held, never an empty one.
     func blocks() -> [Block] {
-        guard let host else { return [] }
-        return BlockText.blocks(host.storage)
+        guard let host else { return known }
+        known = BlockText.blocks(host.storage)
+        return known
     }
 
     // MARK: Text view callbacks

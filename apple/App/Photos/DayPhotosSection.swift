@@ -68,12 +68,16 @@ struct DayPhotosSection: View {
 
     private var addTile: some View {
         Button { choosing = true } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color.muted)
-                .frame(maxWidth: .infinity)
+            // A square like the photo tiles; the bare symbol would size the
+            // tile to its own height and leave a thin bar.
+            Color.raised
                 .aspectRatio(1, contentMode: .fit)
-                .background(Color.raised, in: RoundedRectangle(cornerRadius: Radius.control))
+                .overlay {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.muted)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Radius.control))
                 .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline))
                 .contentShape(Rectangle())
         }

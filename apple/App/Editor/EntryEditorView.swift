@@ -485,6 +485,8 @@ struct EntryEditorView: View {
     /// ever written in it, so a stray "New entry" leaves nothing behind.
     private func close() {
         saveTask?.cancel()
+        // Read the text now, while the text view is still there to read.
+        _ = controller.blocks()
         let id = entryID
         let deleting = confirmDelete
         Task {

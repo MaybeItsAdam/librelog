@@ -51,6 +51,16 @@ private struct PlatformTextView: UIViewRepresentable {
         tv.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         tv.delegate = context.coordinator
         tv.linkTextAttributes = [:] // links are styled by BlockText
+        // Loading can happen inside a view update (when the text view
+        // attaches), where SwiftUI drops state changes, so hide the
+        // placeholder on the next turn.
+        controller.onLoad = { [weak tv, coordinator = context.coordinator] in
+            DispatchQueue.main.async {
+                guard let tv else { return }
+                coordinator.updateEmpty(tv)
+                tv.invalidateIntrinsicContentSize()
+            }
+        }
         controller.host = tv
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:)))
         tap.delegate = context.coordinator
@@ -194,6 +204,9 @@ private struct PlatformTextView: NSViewRepresentable {
         tv.delegate = context.coordinator
         tv.linkTextAttributes = [:]
         scroll.documentView = tv
+        controller.onLoad = { [weak tv, coordinator = context.coordinator] in
+            DispatchQueue.main.async { if let tv { coordinator.updateEmpty(tv) } }
+        }
         controller.host = tv
         context.coordinator.updateEmpty(tv)
         return scroll
