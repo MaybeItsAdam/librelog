@@ -30,7 +30,7 @@ struct SubscriptionSection: View {
                 }
                 .disabled(subs.product == nil || subs.busy)
             }
-            if status.store == "app_store" || (status.store == nil && status.isActive) {
+            if status.store == "app_store" {
                 Button("Manage subscription") { manage() }
             } else if let name = status.storeName {
                 Text("Bought through \(name). Manage it there.")
