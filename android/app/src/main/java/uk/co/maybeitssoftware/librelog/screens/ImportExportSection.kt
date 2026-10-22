@@ -117,7 +117,7 @@ fun ImportExportSection(app: AppModel) {
     Section("Import & export") {
         ActionRow("Export…", "Save a copy of your journal") { choosingFormat = true }
         Hairline()
-        ActionRow("Import…", "Day One, Daylio, Diarium, Markdown, or a Librelog backup") {
+        ActionRow("Import…", "Day One, Daylio, Diarium, Markdown, or a LibreLog backup") {
             pickFile.launch(arrayOf("*/*"))
         }
         AnimatedVisibility(busy, enter = fadeIn(m.standard()) + expandVertically(m.glide()), exit = fadeOut(m.quick()) + shrinkVertically(m.glide())) {
@@ -146,7 +146,7 @@ fun ImportExportSection(app: AppModel) {
                         val result = runCatching {
                             withContext(Dispatchers.IO) {
                                 val dir = File(context.cacheDir, "export").apply { mkdirs() }
-                                val file = File(dir, "Librelog ${Day.today}.${exportExtension(choice.format)}")
+                                val file = File(dir, "LibreLog ${Day.today}.${exportExtension(choice.format)}")
                                 val summary = app.store.export(choice.format, file.path, null)
                                 PendingExport(file, summary.entries.toInt())
                             }
@@ -239,7 +239,7 @@ private fun MessageBanner(msg: Message) {
 }
 
 private enum class ExportChoice(val format: ExportFormat, val title: String, val detail: String) {
-    Backup(ExportFormat.JSON, "Complete backup (JSON)", "Everything, to restore into Librelog"),
+    Backup(ExportFormat.JSON, "Complete backup (JSON)", "Everything, to restore into LibreLog"),
     Markdown(ExportFormat.MARKDOWN, "Markdown files (.zip)", "One file per entry; opens in Obsidian and most editors"),
     Html(ExportFormat.HTML, "Web page (.html)", "One page to read or print in a browser"),
     Text(ExportFormat.TEXT, "Plain text (.txt)", "Just the words"),
@@ -264,7 +264,7 @@ private fun ActionRow(title: String, detail: String, onClick: () -> Unit) {
 }
 
 private fun sourceName(s: ImportSource) = when (s) {
-    ImportSource.LIBRELOG -> "Librelog"
+    ImportSource.LIBRELOG -> "LibreLog"
     ImportSource.DAY_ONE -> "Day One"
     ImportSource.DAYLIO -> "Daylio"
     ImportSource.MARKDOWN -> "Markdown"

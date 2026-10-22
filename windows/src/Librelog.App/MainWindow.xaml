@@ -2,7 +2,7 @@
     x:Class="Librelog.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Librelog">
+    Title="LibreLog">
 
     <!-- The root takes the theme from Settings → Appearance. -->
     <Grid x:Name="Root" Background="{ThemeResource PaperBrush}">

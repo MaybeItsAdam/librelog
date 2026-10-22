@@ -418,7 +418,7 @@ private fun PairingApproveSheet(app: AppModel, onDismiss: () -> Unit) {
                         code = raw
                         approve(raw)
                     } else {
-                        state = "That isn't a Librelog pairing code."
+                        state = "That isn't a LibreLog pairing code."
                     }
                 }
                 .addOnFailureListener { state = it.message }

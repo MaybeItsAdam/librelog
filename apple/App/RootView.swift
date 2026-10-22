@@ -75,7 +75,7 @@ struct RootView: View {
                     Label(t.title, systemImage: t.symbol).tag(t)
                 }
             }
-            .navigationTitle("Librelog")
+            .navigationTitle("LibreLog")
             .navigationSplitViewColumnWidth(min: 180, ideal: 210)
         } detail: {
             TabStack(tab: tab, path: $paths[tab])

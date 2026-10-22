@@ -8,7 +8,7 @@
   <Identity Name="uk.co.maybeitssoftware.librelog" Publisher="CN=Librelog Dev" Version="0.1.0.0" />
 
   <Properties>
-    <DisplayName>Librelog</DisplayName>
+    <DisplayName>LibreLog</DisplayName>
     <PublisherDisplayName>MaybeItsSoftware</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -24,7 +24,7 @@
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="Librelog"
+        DisplayName="LibreLog"
         Description="A private journal"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -36,7 +36,7 @@
         <!-- librelog://auth#access_token=… from the sign-in email. -->
         <uap:Extension Category="windows.protocol">
           <uap:Protocol Name="librelog">
-            <uap:DisplayName>Librelog sign-in</uap:DisplayName>
+            <uap:DisplayName>LibreLog sign-in</uap:DisplayName>
           </uap:Protocol>
         </uap:Extension>
       </Extensions>

@@ -38,7 +38,7 @@ struct TransferSection: View {
         } header: {
             Text("Import & export").microLabel()
         } footer: {
-            Text("Exports include every entry's text, tags and ratings. Imports read Librelog backups, Day One, Daylio, Diarium backups and Markdown; photos aren't imported.")
+            Text("Exports include every entry's text, tags and ratings. Imports read LibreLog backups, Day One, Daylio, Diarium backups and Markdown; photos aren't imported.")
                 .font(.system(size: 12))
                 .foregroundStyle(Color.muted)
         }
@@ -110,7 +110,7 @@ struct TransferSection: View {
         defer { busy = false }
         let format = choice.format
         let ext = exportExtension(format: format)
-        let name = "Librelog \(Day.today)"
+        let name = "LibreLog \(Day.today)"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).\(ext)")
         do {
             let summary = try await app.run { try $0.export(format: format, path: url.path, journalId: nil) }
@@ -297,7 +297,7 @@ private struct ImportPreviewSheet: View {
 
     private var sourceName: String {
         switch p.source {
-        case .librelog: "Librelog backup"
+        case .librelog: "LibreLog backup"
         case .dayOne: "Day One"
         case .daylio: "Daylio"
         case .markdown: "Markdown"
