@@ -61,6 +61,9 @@ platform :android do
     upload_to_play_store(
       **play_key,
       metadata_path: "#{ROOT}/fastlane/metadata/android",
+      # supply attaches the listing to a release; production has none yet,
+      # so it goes with the latest internal one.
+      track: "internal",
       skip_upload_apk: true, skip_upload_aab: true, skip_upload_changelogs: true,
     )
   end
