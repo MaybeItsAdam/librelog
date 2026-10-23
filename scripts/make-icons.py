@@ -11,7 +11,8 @@ rsvg-convert (Homebrew: `brew install librsvg`):
 Writes:
   design/icon/librelog-icon.svg            the full-bleed source, 1024
   design/icon/play-store-512.png           Play Console's hi-res icon
-  apple/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+  apple/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png   iOS
+  apple/App/Assets.xcassets/AppIcon.appiconset/mac-*.png        macOS
   android/app/src/main/res/drawable/ic_launcher_foreground.xml
   android/app/src/main/res/drawable/ic_launcher_monochrome.xml
   windows/src/Librelog.App/Assets/*.png    tiles, store logo, splash
@@ -54,6 +55,32 @@ def svg(width, height, scale, background=PAPER):
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">\n'
         f"{bg}<g transform=\"translate({tx:.3f} {ty:.3f}) scale({scale:.5f})\">\n{mark()}</g>\n</svg>\n"
     )
+
+
+# The Mac draws no mask of its own, so its icon carries its own shape: the
+# rounded square of Apple's icon grid, 824 in the 1024 canvas with a 100
+# margin, and a hairline in place of the shadow the house style leaves out.
+MAC_BODY, MAC_MARGIN, MAC_RADIUS = 824, 100, 185
+MAC_HAIRLINE = "#d8d5dd"
+
+
+def mac_svg():
+    """The leaf on the Mac's rounded paper square, transparent around it."""
+    leaf = BOX[3] - BOX[1]
+    scale = MAC_BODY * 0.66 / leaf
+    cx, cy = (BOX[0] + BOX[2]) / 2, (BOX[1] + BOX[3]) / 2
+    tx, ty = 512 - cx * scale, 512 - cy * scale
+    m, b, r = MAC_MARGIN, MAC_BODY, MAC_RADIUS
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">\n'
+        f'<rect x="{m + 2}" y="{m + 2}" width="{b - 4}" height="{b - 4}" rx="{r}" fill="{PAPER}" '
+        f'stroke="{MAC_HAIRLINE}" stroke-width="4"/>\n'
+        f'<g transform="translate({tx:.3f} {ty:.3f}) scale({scale:.5f})">\n{mark()}</g>\n</svg>\n'
+    )
+
+
+# Every size the Mac asks an app icon for, in points, at 1x and 2x.
+MAC_SIZES = [16, 32, 128, 256, 512]
 
 
 def render(source, path, width, height):
@@ -107,7 +134,21 @@ def main():
     with open(f"{ROOT}/design/icon/librelog-icon.svg", "w") as f:
         f.write(full)
     render(full, f"{ROOT}/design/icon/play-store-512.png", 512, 512)
-    render(full, f"{ROOT}/apple/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png", 1024, 1024)
+    icons = f"{ROOT}/apple/App/Assets.xcassets/AppIcon.appiconset"
+    render(full, f"{icons}/icon-1024.png", 1024, 1024)
+    mac = mac_svg()
+    with open(f"{ROOT}/design/icon/librelog-icon-mac.svg", "w") as f:
+        f.write(mac)
+    images = [{"filename": "icon-1024.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"}]
+    for points in MAC_SIZES:
+        for scale in (1, 2):
+            name = f"mac-{points}@{scale}x.png"
+            render(mac, f"{icons}/{name}", points * scale, points * scale)
+            images.append({"filename": name, "idiom": "mac", "scale": f"{scale}x", "size": f"{points}x{points}"})
+    import json
+    with open(f"{icons}/Contents.json", "w") as f:
+        json.dump({"images": images, "info": {"author": "xcode", "version": 1}}, f, indent=2)
+        f.write("\n")
 
     res = f"{ROOT}/android/app/src/main/res/drawable"
     with open(f"{res}/ic_launcher_foreground.xml", "w") as f:
